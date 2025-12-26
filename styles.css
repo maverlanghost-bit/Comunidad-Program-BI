@@ -1,0 +1,143 @@
+/* =========================================
+   1. Variables y Reset Global
+   ========================================= */
+:root {
+    /* Dimensiones */
+    --sidebar-collapsed: 72px;  
+    --sidebar-expanded: 280px;  
+    
+    /* Paleta de Colores (Sistema PBI) */
+    --pbi-white: #FFFFFF;
+    --pbi-bg: #FAFAFA;
+    --pbi-border: #E5E7EB;
+    --pbi-text-main: #09090b;
+    
+    /* Animaciones */
+    --transition-speed: 0.3s;
+}
+
+/* FIX: Altura 100% para layout tipo App (No Web Tradicional) */
+html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* CRÍTICO: El scroll lo manejan los contenedores internos */
+    background-color: var(--pbi-bg);
+    color: var(--pbi-text-main);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* =========================================
+   2. SIDEBAR AVANZADO
+   ========================================= */
+#sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--sidebar-collapsed);
+    background-color: var(--pbi-white);
+    border-right: 1px solid var(--pbi-border);
+    z-index: 50; 
+    transition: width var(--transition-speed) cubic-bezier(0.2, 0, 0, 1), box-shadow 0.3s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Estados del Sidebar */
+#sidebar:hover,
+#sidebar.is-pinned {
+    width: var(--sidebar-expanded);
+    box-shadow: 10px 0 40px rgba(0,0,0,0.05);
+}
+
+#sidebar.is-pinned {
+    box-shadow: none;
+}
+
+/* Textos con Fade */
+.sidebar-text {
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+    margin-left: 12px;
+    white-space: nowrap;
+}
+
+#sidebar:hover .sidebar-text,
+#sidebar.is-pinned .sidebar-text {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+    transition-delay: 0.1s;
+}
+
+/* =========================================
+   3. LAYOUT PRINCIPAL
+   ========================================= */
+/* El margin-left empuja el contenido. El contenido SIEMPRE ocupa el 100% de altura */
+main {
+    height: 100%;
+    margin-left: var(--sidebar-collapsed);
+    width: calc(100% - var(--sidebar-collapsed));
+    transition: margin-left var(--transition-speed) ease;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+body.sidebar-is-pinned main {
+    margin-left: var(--sidebar-expanded);
+    width: calc(100% - var(--sidebar-expanded));
+}
+
+/* =========================================
+   4. ACORDEÓN / SUBMENÚ
+   ========================================= */
+.submenu-container {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-out, opacity 0.3s ease;
+    background-color: #FAFAFA;
+    display: block; 
+}
+
+.submenu-container.open {
+    max-height: 500px;
+    opacity: 1;
+}
+
+/* =========================================
+   5. UTILIDADES UI
+   ========================================= */
+
+/* Scrollbar Sutil (Estilo Mac/Moderno) */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
+
+/* Ocultar scrollbar pero permitir scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Animaciones de Entrada */
+.animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+.animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.2, 0, 0, 1) forwards; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* Skeleton Loading Mejorado */
+.skeleton {
+    background: #F3F4F6;
+    background-image: linear-gradient(to right, #F3F4F6 0%, #E5E7EB 20%, #F3F4F6 40%, #F3F4F6 100%);
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite linear forwards;
+}
+@keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
