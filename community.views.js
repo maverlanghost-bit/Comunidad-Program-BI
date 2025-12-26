@@ -1,10 +1,9 @@
 /**
- * community.views.js (V12.0 - Ultimate Nav Stability)
+ * community.views.js (V13.0 - ID Injection Fix)
  * Controlador de Comunidad: Feed, LMS, Chat Inmersivo y Eventos.
- * * CAMBIOS V12.0:
- * - FIX DEFINITIVO HEADER: Desacople de la carga de datos y el renderizado del header.
- * - ACTUALIZACIÓN GARANTIZADA: El header se actualiza SIEMPRE al cambiar de pestaña.
- * - PROTECCIÓN DE DATOS: Recuperación inteligente de datos si la caché falla.
+ * * CAMBIOS V13.0:
+ * - FIX URL UNDEFINED: Se inyecta manualmente el ID al recuperar de caché
+ * para evitar enlaces rotos en la navegación (#community/undefined/...).
  */
 
 // 1. Cargar API de YouTube (Singleton)
@@ -23,11 +22,13 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
     if (!user) return; 
 
     // 1. GESTIÓN DE ESTADO Y DATOS (CRÍTICO)
-    // Intentamos recuperar de caché primero
-    let community = App.state.cache.communities[communityId] || null;
+    // FIX: Recuperación robusta de caché.
+    // El objeto en caché no suele tener el ID dentro, así que lo inyectamos.
+    let cachedData = App.state.cache.communities[communityId];
+    let community = cachedData ? { id: communityId, ...cachedData } : null;
     
-    // Si no hay datos en caché, los pedimos AHORA MISMO.
-    // Esto asegura que 'community' exista antes de intentar actualizar el Header.
+    // Si no hay datos en caché, los pedimos AHORA MISMO a la API.
+    // La API ya se encarga de devolver el objeto con el ID inyectado.
     if (!community) {
         try {
             community = await App.api.getCommunityById(communityId);
@@ -42,7 +43,6 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
 
     // 3. RENDERIZADO ESTRUCTURAL (Solo si es necesario)
     // Si cambiamos de comunidad o es la primera carga, pintamos el esqueleto completo.
-    // Si solo cambiamos de tab (isSameCommunity), SALTAMOS esto para evitar el "Flash Blanco".
     if (!isSameCommunity) {
         const sidebarHTML = App.sidebar ? App.sidebar.render(`#community/${communityId}`) : '';
         const isPinned = localStorage.getItem('sidebar_pinned') === 'true';
@@ -89,9 +89,8 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
     }
 
     // 4. ACTUALIZACIÓN DINÁMICA (Se ejecuta SIEMPRE)
-    // Aquí es donde corregimos la barra superior y cambiamos el contenido sin recargar todo.
     
-    // A. Actualizar Header (FIX: Se ejecuta siempre que tengamos datos)
+    // A. Actualizar Header (FIX: Se ejecuta siempre que tengamos datos y con el ID correcto)
     const headerContainer = document.getElementById('community-header-container');
     if (headerContainer && community) {
         // Esto cambia la clase "active" (negrita/fondo) en la pestaña correspondiente
@@ -149,6 +148,9 @@ function _renderHeader(community, isAdmin, activeTab) {
     const name = community.name || 'Sin Nombre';
     const members = community.membersCount || 0;
 
+    // Aseguramos que community.id existe para los enlaces
+    const cid = community.id;
+
     return `
     <header class="w-full">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0 px-6 py-3">
@@ -167,10 +169,10 @@ function _renderHeader(community, isAdmin, activeTab) {
                 </div>
                 <div class="h-8 w-px bg-gray-200 hidden md:block mx-2"></div>
                 <nav class="flex items-center gap-1">
-                    ${_renderTabLink(community.id, 'inicio', 'Inicio', activeTab, 'fa-home')}
-                    ${_renderTabLink(community.id, 'clases', 'Clases', activeTab, 'fa-graduation-cap')}
-                    ${_renderTabLink(community.id, 'live', 'Live', activeTab, 'fa-video', true)}
-                    ${_renderTabLink(community.id, 'comunidad', 'Chat', activeTab, 'fa-comments')}
+                    ${_renderTabLink(cid, 'inicio', 'Inicio', activeTab, 'fa-home')}
+                    ${_renderTabLink(cid, 'clases', 'Clases', activeTab, 'fa-graduation-cap')}
+                    ${_renderTabLink(cid, 'live', 'Live', activeTab, 'fa-video', true)}
+                    ${_renderTabLink(cid, 'comunidad', 'Chat', activeTab, 'fa-comments')}
                 </nav>
             </div>
         </div>
@@ -194,7 +196,7 @@ function _renderTabLink(cid, tabKey, label, currentTab, icon, isLive = false) {
 }
 
 // ==========================================
-// 2. LOGICA DE CONTENIDO (TABS) - ROBUSTA
+// 2. LOGICA DE CONTENIDO (TABS)
 // ==========================================
 
 async function _loadTabContent(tab, community, user, extraId) {
