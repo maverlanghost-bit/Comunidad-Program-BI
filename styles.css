@@ -1,0 +1,282 @@
+/* =========================================
+   1. VARIABLES & SISTEMA DE DISEÑO (AZUL CORPORATIVO)
+   ========================================= */
+:root {
+    /* Dimensiones */
+    --sidebar-collapsed: 72px;
+    --sidebar-expanded: 260px;
+    --header-height: 72px;
+
+    /* Paleta de Colores: "Corporate Blue" (#1890ff) */
+    --bg-app: #F0F2F5;         /* Gris muy suave, profesional */
+    --bg-surface: #FFFFFF;     /* Blanco puro */
+    
+    --text-primary: #1F1F1F;   /* Negro suave */
+    --text-secondary: #595959; /* Gris medio */
+    --text-tertiary: #8C8C8C;  /* Gris claro */
+
+    --border-light: #F0F0F0;   
+    --border-subtle: #D9D9D9;  
+
+    /* IDENTIDAD DE MARCA: #1890ff */
+    --accent-primary: #1890ff; 
+    --accent-hover: #40a9ff;   /* Hover más claro */
+    --accent-dark: #096dd9;    /* Active más oscuro */
+    --accent-glow: rgba(24, 144, 255, 0.25); 
+
+    /* Estados Semánticos */
+    --success: #52c41a;
+    --warning: #faad14;
+    --error: #f5222d;
+
+    /* Sombras Elevadas */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+    --shadow-glow: 0 0 20px var(--accent-glow);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+    /* Animaciones */
+    --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+/* =========================================
+   2. RESET & BASE
+   ========================================= */
+html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* App-like feel */
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.02em;
+}
+
+/* =========================================
+   3. SIDEBAR (LOGO DINÁMICO & COMPORTAMIENTO)
+   ========================================= */
+#sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--sidebar-collapsed);
+    background: rgba(255, 255, 255, 0.98); 
+    border-right: 1px solid var(--border-light);
+    z-index: 50;
+    transition: width 0.3s var(--ease-out-quart), box-shadow 0.3s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#sidebar:hover,
+#sidebar.is-pinned {
+    width: var(--sidebar-expanded);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.04);
+}
+
+/* Control de Logo (Oculto/Visible según estado) */
+.logo-collapsed {
+    opacity: 1;
+    transition: opacity 0.2s ease;
+    display: block;
+    max-width: 40px;
+    height: auto;
+}
+.logo-expanded {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    display: none; /* Oculto por defecto */
+    max-height: 32px;
+    width: auto;
+}
+
+#sidebar:hover .logo-collapsed, 
+#sidebar.is-pinned .logo-collapsed {
+    opacity: 0;
+    display: none;
+}
+
+#sidebar:hover .logo-expanded, 
+#sidebar.is-pinned .logo-expanded {
+    opacity: 1;
+    display: block;
+}
+
+/* Textos del Sidebar */
+.sidebar-text {
+    opacity: 0;
+    transform: translateX(-5px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+#sidebar:hover .sidebar-text,
+#sidebar.is-pinned .sidebar-text {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+    transition-delay: 0.05s;
+}
+
+/* Scrollbar interno del sidebar */
+#sidebar nav {
+    scrollbar-width: none; /* Firefox */
+}
+#sidebar nav::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+/* =========================================
+   4. LAYOUT PRINCIPAL
+   ========================================= */
+main {
+    height: 100%;
+    margin-left: var(--sidebar-collapsed);
+    width: calc(100% - var(--sidebar-collapsed));
+    transition: margin-left 0.3s var(--ease-out-quart), width 0.3s var(--ease-out-quart);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+body.sidebar-is-pinned main {
+    margin-left: var(--sidebar-expanded);
+    width: calc(100% - var(--sidebar-expanded));
+}
+
+/* =========================================
+   5. LMS VIDEO PLAYER FIX (CRÍTICO)
+   ========================================= */
+/* Asegura que el contenedor del video mantenga el ratio 16:9 y esté por encima de fondos */
+.aspect-video-fix {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
+    z-index: 10;
+}
+
+.aspect-video-fix iframe,
+.aspect-video-fix object,
+.aspect-video-fix embed {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* =========================================
+   6. LANDING PAGE & TRIAL STYLES
+   ========================================= */
+
+/* Hero Section de la Landing */
+.landing-hero-bg {
+    background-color: #0f172a; /* Slate 900 base */
+    background-image: 
+        radial-gradient(at 0% 0%, rgba(24, 144, 255, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Card de Beneficios en Landing */
+.landing-feature-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+.landing-feature-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* Badge de "Solo 10 días" */
+.trial-badge {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: #000;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    box-shadow: 0 4px 15px rgba(255, 165, 0, 0.4);
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+    0% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 165, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0); }
+}
+
+/* =========================================
+   7. UTILIDADES UI (BENTO, SCROLL, ETC.)
+   ========================================= */
+
+/* Bento Card Refinado */
+.bento-card {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    border-radius: 16px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s var(--ease-out-quart);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.bento-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card);
+    border-color: var(--accent-primary);
+}
+
+/* Widget "Smart Continue" */
+.smart-continue-card {
+    background: linear-gradient(to right, #ffffff, #f8faff);
+    border-left: 4px solid var(--accent-primary);
+}
+
+/* Scrollbars Personalizados */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #d9d9d9; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #bfbfbf; }
+
+/* Animaciones de Entrada */
+.animate-enter { animation: enterUp 0.5s var(--ease-out-quart) forwards; }
+@keyframes enterUp {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.animate-slide-up { animation: slideUp 0.3s var(--ease-out-quart) forwards; }
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}

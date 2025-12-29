@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ProgramBI | Plataforma Educativa</title>
+    
+    <!-- Fuentes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        heading: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: { 500: '#1890ff', 600: '#096dd9' }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out',
+                        'slide-up': 'slideUp 0.4s ease-out',
+                        'scale-in': 'scaleIn 0.2s ease-out'
+                    },
+                    keyframes: {
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideUp: { '0%': { transform: 'translateY(10px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+                        scaleIn: { '0%': { transform: 'scale(0.95)', opacity: '0' }, '100%': { transform: 'scale(1)', opacity: '1' } }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Estilos -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- 🛡️ MANEJO DE ERRORES GLOBAL -->
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            console.error("Global Error:", msg, error);
+            const loader = document.getElementById('initial-loader');
+            if(loader) {
+                setTimeout(() => {
+                    if(document.getElementById('initial-loader')) {
+                        loader.innerHTML = `
+                            <div class="text-center p-6 text-red-500 bg-white rounded-xl shadow-xl max-w-sm mx-4">
+                                <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                                <p class="font-bold text-lg mb-2">Error de Inicialización</p>
+                                <p class="text-xs font-mono bg-red-50 p-3 rounded border border-red-100 mb-4 text-left overflow-auto max-h-32">${msg}</p>
+                                <button onclick="location.reload()" class="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors w-full">Reintentar</button>
+                            </div>`;
+                    }
+                }, 1000);
+            }
+            return false;
+        };
+    </script>
+</head>
+<body class="bg-[#F0F2F5] text-slate-900 antialiased overflow-hidden selection:bg-[#1890ff] selection:text-white">
+
+    <!-- ROOT APP CONTAINER -->
+    <div id="app" class="h-full w-full relative z-0">
+        <!-- Loader Inicial -->
+        <div class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center transition-opacity duration-500" id="initial-loader">
+            <div class="w-16 h-16 border-4 border-slate-100 border-t-[#1890ff] rounded-full animate-spin mb-4"></div>
+            <p class="text-slate-400 text-sm font-bold animate-pulse tracking-wide">Conectando a ProgramBI...</p>
+        </div>
+    </div>
+
+    <!-- Modales Globales -->
+    <div id="modal-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] hidden opacity-0 transition-opacity duration-300"></div>
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
+    <!-- FIREBASE SDK & APP BOOTSTRAP -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs, getDoc, addDoc, updateDoc, setDoc, doc, query, where, orderBy, limit, arrayUnion, serverTimestamp, runTransaction, increment, arrayRemove, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        async function bootstrap() {
+            try {
+                // 1. Configuración de Firebase (DATOS REALES DEL USUARIO)
+                const firebaseConfig = {
+                    apiKey: "AIzaSyDTBdv1jZ-yo3-Kwq7aKZQSx3kiClhuP8Q",
+                    authDomain: "comunidad-649d2.firebaseapp.com",
+                    projectId: "comunidad-649d2",
+                    storageBucket: "comunidad-649d2.firebasestorage.app",
+                    messagingSenderId: "1069690355912",
+                    appId: "1:1069690355912:web:51dd90089623fbd8e465fd"
+                };
+
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getFirestore(app);
+
+                // 2. Exponer API Globalmente
+                window.F = {
+                    auth, db,
+                    signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile,
+                    signInWithCustomToken, signInAnonymously,
+                    collection, getDocs, getDoc, addDoc, updateDoc, setDoc, doc, query, where, orderBy, limit, 
+                    arrayUnion, serverTimestamp, runTransaction, increment, arrayRemove, deleteDoc, onSnapshot,
+                    initialized: true
+                };
+
+                console.log("✅ Firebase Inicializado con éxito");
+
+                // 3. Cargar Scripts de la App Dinámicamente (Orden Garantizado)
+                const scripts = [
+                    'mockData.js',
+                    'core.js',
+                    'components.sidebar.js',
+                    'auth.views.js',
+                    'dashboard.views.js',
+                    'community.lms.js',
+                    'community.views.js',
+                    'admin.views.js'
+                ];
+
+                for (const src of scripts) {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = src;
+                        script.onload = resolve;
+                        script.onerror = () => reject(new Error(`Error cargando ${src}`));
+                        document.body.appendChild(script);
+                    });
+                }
+
+                console.log("✅ Scripts de App Cargados");
+
+                // 4. Autenticación Silenciosa (Si existe token inicial)
+                // Nota: Ya no forzamos login anónimo por defecto para permitir Auth real
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } 
+
+                // 5. ARRANQUE MANUAL
+                if (window.App && window.App.handleRoute) {
+                    console.log("🚀 Ejecutando arranque manual de App...");
+                    window.App.handleRoute();
+                } else {
+                    console.warn("⚠️ App.handleRoute no encontrado tras carga.");
+                }
+
+                // 6. Quitar Loader (Final)
+                setTimeout(() => {
+                    const loader = document.getElementById('initial-loader');
+                    if(loader) {
+                        loader.style.opacity = '0';
+                        setTimeout(() => loader.remove(), 500);
+                    }
+                }, 800);
+
+            } catch (error) {
+                console.error("Critical Bootstrap Error:", error);
+                const loader = document.getElementById('initial-loader');
+                if(loader) loader.innerHTML = `<div class="p-4 text-red-500 bg-white rounded shadow text-center"><strong>Error crítico de conexión:</strong><br>${error.message}<br><small>Verifica tu conexión a internet.</small></div>`;
+            }
+        }
+
+        // Fusible de Seguridad (8s)
+        setTimeout(() => {
+            const loader = document.getElementById('initial-loader');
+            if (loader && document.body.contains(loader)) {
+                console.warn("Bootstrap timeout - Forzando UI");
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 500);
+            }
+        }, 8000);
+
+        bootstrap();
+    </script>
+
+</body>
+</html>
