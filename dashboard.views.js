@@ -1,701 +1,579 @@
 /**
- * dashboard.views.js (V10.4 - FINAL FIXES)
- * Dashboard Global: Feed, Eventos y Recomendaciones.
- * * CORRECCIONES V10.4:
- * - Widget "Comunidad Sugerida" implementado y funcional.
- * - Fix Z-Index: Modales ahora aparecen correctamente sobre la interfaz.
- * - Fix Feed: Lógica de carga de posts robustecida para evitar el estado "Cargando" eterno.
+ * dashboard.views.js (V37.0 - CLEANUP)
+ * Motor del Panel de Usuario.
+ * * CAMBIOS V37.0:
+ * - REFACTOR: Eliminados Tabs "Mi Feed" / "Explorar". El dashboard es SOLO Feed.
+ * - NAV: Botones de "Explorar" redirigen a #discovery.
+ * - UX: Header simplificado.
  */
 
 window.App = window.App || {};
 window.App.dashboard = window.App.dashboard || {};
 
-// ==========================================
-// 1. RENDERIZADOR PRINCIPAL (LAYOUT)
-// ==========================================
-window.App.renderDashboard = async (forceTab = null) => {
+// ============================================================================
+// 1. RENDERIZADOR PRINCIPAL (FRAMEWORK)
+// ============================================================================
+
+window.App.renderDashboard = async () => {
     const user = App.state.currentUser;
-    if (!user) return; 
-
-    // 1. Configuración Inicial
-    const hasCommunities = user.joinedCommunities && user.joinedCommunities.length > 0;
-    const activeTab = forceTab || (hasCommunities ? 'feed' : 'explore');
-
-    // 2. Render Sidebar
-    const sidebarHTML = App.sidebar && App.sidebar.render ? App.sidebar.render('#home') : '';
-    const isPinned = localStorage.getItem('sidebar_pinned') === 'true';
-    if (isPinned) document.body.classList.add('sidebar-is-pinned');
-
-    // 3. Estructura Principal
-    const html = `
-        <div class="h-screen w-full bg-[#F0F2F5] overflow-hidden flex font-sans">
-            ${sidebarHTML}
-
-            <main class="flex-1 flex flex-col relative transition-all duration-300 min-w-0">
-                
-                <!-- HEADER FLOTANTE -->
-                <header class="h-[80px] px-8 flex items-center justify-between shrink-0 z-30 sticky top-0 bg-white/90 backdrop-blur-xl border-b border-slate-200/60 transition-all">
-                    
-                    <!-- IZQUIERDA: SALUDO + NAVEGACIÓN (TABS) -->
-                    <div class="flex items-center gap-8 animate-enter">
-                        <div>
-                            <h1 class="text-xl font-heading font-bold text-slate-900 tracking-tight">
-                                ${activeTab === 'feed' ? `Hola, ${user.name.split(' ')[0]} 👋` : 'Explorar Catálogo'}
-                            </h1>
-                            <p class="text-xs text-slate-500 font-medium mt-0.5 tracking-wide">
-                                ${activeTab === 'feed' ? 'Tu centro de aprendizaje y comunidad.' : 'Descubre nuevas rutas de conocimiento.'}
-                            </p>
-                        </div>
-
-                        <!-- Selector de Vistas (Tabs) - A LA IZQUIERDA -->
-                        <div class="hidden md:flex bg-slate-100/80 p-1 rounded-xl items-center shadow-inner relative">
-                            <button onclick="App.renderDashboard('explore')" 
-                                class="px-5 py-2 rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-2 relative z-10 ${activeTab === 'explore' ? 'bg-white text-[#1890ff] shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}">
-                                <i class="fas fa-compass"></i> Explorar
-                            </button>
-                            <button onclick="App.renderDashboard('feed')" 
-                                class="px-5 py-2 rounded-lg text-xs font-bold transition-all duration-300 flex items-center gap-2 relative z-10 ${activeTab === 'feed' ? 'bg-white text-[#1890ff] shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}">
-                                <i class="fas fa-stream"></i> Tu Feed
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- DERECHA: ACCIONES -->
-                    <div class="flex items-center gap-5">
-                        
-                        <!-- Botón Admin / Post Global -->
-                        <button onclick="App.dashboard.openPostModal()" class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center hover:bg-[#1890ff] transition-colors shadow-lg hover:shadow-blue-500/30 active:scale-95" title="Crear Publicación">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                        
-                        <!-- Perfil Mini -->
-                        <button onclick="App.dashboard.openProfileModal()" class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#1890ff] transition-all">
-                            <img src="${user.avatar}" class="w-full h-full object-cover">
-                        </button>
-                    </div>
-                </header>
-
-                <!-- CONTENIDO SCROLLABLE -->
-                <div class="flex-1 overflow-y-auto custom-scrollbar p-8 w-full" id="dashboard-content">
-                    ${App.ui.skeleton('card')}
-                </div>
-            </main>
-        </div>
-
-        <!-- MODALES GLOBALES (Z-INDEX 200 CORREGIDO) -->
-        ${_renderPostModal()}
-        ${_renderProfileModal(user)}
-        ${_renderEditPostModal()} 
-    `;
-
-    await App.render(html);
-    if (App.sidebar && App.sidebar.loadData) App.sidebar.loadData(user);
     
-    // 4. Carga de Pestañas
-    if (activeTab === 'explore') {
-        await App.dashboard.loadExploreTab(user);
-    } else {
-        await App.dashboard.loadFeedTab(user);
+    // 1. Guardia de Seguridad
+    if (!user) { 
+        window.location.hash = '#discovery'; 
+        return; 
     }
+
+    // 2. Precarga de Datos (Comunidades)
+    if (user.joinedCommunities && user.joinedCommunities.length > 0) {
+        try {
+            const missingIds = user.joinedCommunities.filter(cid => !App.state.cache.communities[cid]);
+            if (missingIds.length > 0) {
+                await Promise.all(missingIds.map(cid => App.api.getCommunityById(cid)));
+            }
+        } catch (e) {
+            console.warn("Precarga parcial fallida:", e);
+        }
+    }
+
+    // 3. Cálculo de Progreso (Widget Derecho)
+    const progressData = _calculateUserProgress(user);
+
+    // 4. Sidebar Global (Izquierdo) - Activo: 'feed'
+    const sidebarHTML = App.sidebar && App.sidebar.render ? App.sidebar.render('feed') : '';
+
+    // 5. Renderizado del Marco
+    await App.render(`
+        ${sidebarHTML}
+        
+        <main class="app-layout min-h-screen bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300 pb-20 md:pb-0 flex flex-col relative">
+            
+            <!-- HEADER FLOTANTE (Simplificado) -->
+            <header class="h-[80px] px-6 md:px-10 flex items-center justify-between shrink-0 z-30 sticky top-0 bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-xl border-b border-gray-200 dark:border-slate-800 transition-colors">
+                
+                <!-- IZQUIERDA: TÍTULO -->
+                <div class="flex items-center gap-6 animate-enter min-w-0">
+                    <div>
+                        <h1 class="text-xl font-heading font-bold text-slate-900 dark:text-white tracking-tight truncate hidden md:block">
+                            Hola, ${user.name.split(' ')[0]} 👋
+                        </h1>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium md:hidden">Tu Actividad</p>
+                    </div>
+                </div>
+
+                <!-- DERECHA: BÚSQUEDA GLOBAL + ACCIONES RÁPIDAS -->
+                <div class="flex items-center gap-4 flex-1 justify-end pl-4">
+                    
+                    <!-- Buscador -->
+                    <div class="relative z-50 w-full max-w-[320px] hidden md:block group">
+                        <input type="text" placeholder="Buscar en comunidades..." 
+                               class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-10 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#1890ff] transition-all"
+                               oninput="App.search.handleInput(event)">
+                        <i class="fas fa-search absolute left-3.5 top-3 text-slate-400 group-focus-within:text-[#1890ff] transition-colors"></i>
+                        
+                        <!-- Resultados de Búsqueda -->
+                        <div id="global-search-results" class="hidden absolute top-full right-0 w-full mt-2 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 overflow-hidden z-[100] max-h-[500px] overflow-y-auto custom-scrollbar animate-slide-up"></div>
+                    </div>
+
+                    <div class="h-8 w-px bg-gray-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
+
+                    <!-- Botón Crear Post -->
+                    <button onclick="App.dashboard.openPostModal()" class="w-10 h-10 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center hover:bg-[#1890ff] dark:hover:bg-[#1890ff] dark:hover:text-white transition-colors shadow-lg hover:shadow-blue-500/30 active:scale-95 flex-shrink-0" title="Crear Publicación">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    
+                    <!-- Avatar Perfil (Trigger Modal) -->
+                    <button onclick="App.dashboard.openProfileModal()" class="w-10 h-10 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden border border-gray-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1890ff] transition-all relative group flex-shrink-0">
+                        <img src="${user.avatar}" class="w-full h-full object-cover">
+                    </button>
+                </div>
+            </header>
+
+            <!-- CONTENIDO PRINCIPAL SCROLLABLE -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 w-full relative z-0" id="dashboard-scroller">
+                <!-- Contenedor Max-Width 1600px -->
+                <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    
+                    <!-- COLUMNA PRINCIPAL (FEED) -->
+                    <div class="lg:col-span-8 xl:col-span-9 space-y-8 min-w-0" id="dashboard-content">
+                        <!-- AQUÍ SE INYECTA EL FEED -->
+                    </div>
+
+                    <!-- COLUMNA DERECHA (WIDGETS) -->
+                    <div class="hidden lg:block lg:col-span-4 xl:col-span-3 space-y-6 sticky top-6">
+                        ${_renderRightSidebar(user, progressData)}
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modales Globales -->
+        ${_renderProfileModal(user)}
+        ${_renderPostModal()}
+    `);
+
+    // 6. Cargar Contenido del Feed
+    _loadDashboardContent(user);
 };
 
-// ==========================================
-// 2. CONTROLADORES DE PESTAÑAS (LOGIC)
-// ==========================================
-Object.assign(App.dashboard, {
+// ============================================================================
+// 2. LÓGICA DE CARGA DE CONTENIDO (SOLO FEED)
+// ============================================================================
 
-    // --- TAB: EXPLORAR ---
-    loadExploreTab: async (user) => {
-        try {
-            const container = document.getElementById('dashboard-content');
-            if(!container) return;
+async function _loadDashboardContent(user) {
+    const container = document.getElementById('dashboard-content');
+    if (!container) return;
 
-            const allCommunities = await App.api.getCommunities();
-            
-            container.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-enter pb-20">
-                    ${allCommunities.map(c => _renderExploreCard(c, user)).join('')}
-                </div>
-            `;
-        } catch (e) {
-            console.error("Explore Error:", e);
-            App.ui.toast("Error cargando comunidades", "error");
-        }
-    },
-
-    // --- TAB: FEED (Live Events + Smart Continue + Suggestions) ---
-    loadFeedTab: async (user) => {
-        try {
-            const container = document.getElementById('dashboard-content');
-            if(!container) return;
-
-            const allCommunities = await App.api.getCommunities();
-            const joinedIds = user.joinedCommunities || [];
-            
-            // Filtro: Solo comunidades unidas (o todas si es admin)
-            const myCommunities = user.role === 'admin' 
-                ? allCommunities 
-                : allCommunities.filter(c => joinedIds.includes(c.id));
-
-            // 1. Encontrar eventos Live (Global)
-            const liveCandidates = user.role === 'admin' ? allCommunities : myCommunities;
-            let featuredLive = null;
-            const now = new Date();
-            const upcomingLives = [];
-
-            liveCandidates.forEach(c => {
-                if (c.nextLiveSession && c.nextLiveSession.date) {
-                    const liveDate = new Date(c.nextLiveSession.date);
-                    const diff = liveDate - now;
-                    // Si es futuro o pasó hace menos de 2 horas
-                    if (diff > -7200000) { 
-                        upcomingLives.push({
-                            communityId: c.id,
-                            communityName: c.name,
-                            ...c.nextLiveSession,
-                            isLiveNow: diff <= 0
-                        });
-                    }
-                }
-            });
-
-            upcomingLives.sort((a, b) => {
-                if (a.isLiveNow && !b.isLiveNow) return -1;
-                if (!a.isLiveNow && b.isLiveNow) return 1;
-                return new Date(a.date) - new Date(b.date);
-            });
-
-            if (upcomingLives.length > 0) featuredLive = upcomingLives[0];
-
-            // 2. Encontrar Comunidad Sugerida (Flag isSuggested)
-            // Priorizamos las marcadas como sugeridas que el usuario NO ha unido
-            const suggestedComm = allCommunities.find(c => c.isSuggested === true && !joinedIds.includes(c.id));
-
-            // Si no tiene comunidades y no hay lives, mostrar Empty State
-            if (myCommunities.length === 0 && user.role !== 'admin' && !featuredLive) {
-                container.innerHTML = _renderEmptyState();
-                return;
-            }
-
-            // 3. Calcular Smart Continue Global
-            const smartNext = _calculateGlobalSmartContinue(user, myCommunities);
-
-            // 4. Renderizar Layout Bento
-            container.innerHTML = `
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-enter pb-24 max-w-7xl mx-auto">
-                    
-                    <!-- COLUMNA PRINCIPAL (8/12) -->
-                    <div class="lg:col-span-8 space-y-8">
-                        
-                        <!-- WIDGET LIVE GLOBAL -->
-                        ${featuredLive ? _renderGlobalLiveBanner(featuredLive) : ''}
-
-                        <!-- WIDGET SMART CONTINUE -->
-                        <section>
-                            ${_renderSmartContinueWidget(smartNext)}
-                        </section>
-
-                        <!-- FEED STREAM -->
-                        <section>
-                            <div class="flex items-center justify-between mb-4 px-1">
-                                <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                    <i class="fas fa-rss text-[#1890ff]"></i> Actividad Reciente
-                                </h2>
-                            </div>
-                            <div id="feed-list" class="space-y-6">
-                                ${App.ui.skeleton('card')}
-                            </div>
-                        </section>
-                    </div>
-
-                    <!-- COLUMNA LATERAL (4/12) -->
-                    <div class="lg:col-span-4 space-y-6 sticky top-6">
-                        
-                        <!-- Widget: Comunidad Sugerida (NUEVO) -->
-                        ${suggestedComm ? _renderSuggestedCommunityWidget(suggestedComm) : ''}
-
-                        <!-- Widget: Próximos Lives -->
-                        <div class="bento-card p-6 bg-white border border-slate-200">
-                            <h3 class="font-heading font-bold text-slate-900 text-sm mb-4 flex items-center gap-2">
-                                <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span></span>
-                                Agenda en Vivo
-                            </h3>
-                            <div id="lives-widget-list" class="space-y-3">
-                                ${upcomingLives.length > 0 
-                                    ? upcomingLives.slice(0, 3).map(l => _renderSmallLiveItem(l)).join('') 
-                                    : '<p class="text-xs text-slate-400 italic text-center py-2">Sin eventos próximos.</p>'
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // 5. Cargar Datos Asíncronos (Posts)
-            _loadPostsForFeed(myCommunities, user);
-
-        } catch (e) {
-            console.error("Feed Error:", e);
-        }
-    }
-});
-
-// ==========================================
-// 3. LÓGICA DE NEGOCIO
-// ==========================================
-
-function _calculateGlobalSmartContinue(user, communities) {
-    const joinedIds = user.joinedCommunities || [];
-    const completedIds = user.completedModules || [];
-
-    for (const community of communities) {
-        if (!community.courses) continue;
-        const access = App.api.checkAccess(user, community.id);
-        if (!access.allowed) continue;
-
-        for (const course of community.courses) {
-            const classes = course.classes || [];
-            if (classes.length === 0) continue;
-            const firstPendingClass = classes.find(c => !completedIds.includes(`${community.id}_${c.id}`));
-
-            if (firstPendingClass) {
-                const idx = classes.indexOf(firstPendingClass);
-                const progress = Math.round((idx / classes.length) * 100);
-                
-                return {
-                    type: 'continue',
-                    communityId: community.id,
-                    communityName: community.name,
-                    courseId: course.id,
-                    courseTitle: course.title,
-                    classTitle: firstPendingClass.title,
-                    classIndex: idx + 1,
-                    totalClasses: classes.length,
-                    image: course.image || community.image,
-                    progress: progress
-                };
-            }
-        }
-    }
-    if (joinedIds.length > 0) return { type: 'all_done' };
-    return { type: 'new_user' };
-}
-
-// ==========================================
-// 4. ACCIONES SOCIALES (MODALES FIX)
-// ==========================================
-Object.assign(App.dashboard, {
-
-    openPostModal: () => {
-        // Uso de _toggleModal con lógica de espera
-        _toggleModal('post', true);
-        const select = document.getElementById('post-community-select');
-        if (select) {
-            App.api.getCommunities().then(all => {
-                const user = App.state.currentUser;
-                let valid = user.role === 'admin' ? all : all.filter(c => (user.joinedCommunities||[]).includes(c.id));
-                select.innerHTML = '<option value="" disabled selected>Selecciona una comunidad...</option>' + 
-                    valid.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-            });
-        }
-    },
-    closePostModal: () => _toggleModal('post', false),
-
-    submitPost: async () => {
-        const btn = document.getElementById('btn-submit-post');
-        const title = document.getElementById('post-title').value;
-        const content = document.getElementById('post-content').value;
-        const communityId = document.getElementById('post-community-select').value;
-        const fileInput = document.getElementById('post-file-input');
-        const urlInput = document.getElementById('post-image-url');
-
-        if(!communityId || !content) return App.ui.toast("El contenido es obligatorio", "error");
-        
-        btn.disabled = true; btn.innerHTML = "Publicando...";
-
-        try {
-            let img = null;
-            if (fileInput.files[0]) {
-                img = await App.api.fileToBase64(fileInput.files[0]);
-            } else if (urlInput.value) {
-                img = urlInput.value;
-            }
-
-            await App.api.createPost({
-                communityId, title, content, image: img, isOfficial: false,
-                authorId: App.state.currentUser.uid,
-                author: { name: App.state.currentUser.name, avatar: App.state.currentUser.avatar }
-            });
-            
-            App.ui.toast("Publicado con éxito", "success");
-            App.dashboard.closePostModal();
-            document.getElementById('post-title').value = '';
-            document.getElementById('post-content').value = '';
-            
-            App.renderDashboard('feed'); 
-        } catch(e) { 
-            console.error(e);
-            App.ui.toast("Error al publicar", "error"); 
-        } finally { 
-            btn.disabled = false; btn.innerHTML = "Publicar"; 
-        }
-    },
-
-    previewFile: async (inputId, imgId, areaId, placeholderId) => {
-        const fileInput = document.getElementById(inputId);
-        if(!fileInput || !fileInput.files[0]) return;
-        try {
-            const b64 = await App.api.fileToBase64(fileInput.files[0]);
-            if(document.getElementById(imgId)) document.getElementById(imgId).src = b64;
-            if(areaId) document.getElementById(areaId).classList.remove('hidden');
-            if(placeholderId) document.getElementById(placeholderId).classList.add('hidden');
-        } catch(e) { console.error(e); }
-    },
+    const joined = user.joinedCommunities || [];
     
-    previewUrl: (url, imgId, areaId, placeholderId) => {
-        if(url && areaId) {
-            const img = document.getElementById(imgId);
-            if(img) img.src = url;
-            document.getElementById(areaId).classList.remove('hidden');
-            if(placeholderId) document.getElementById(placeholderId).classList.add('hidden');
-        }
-    },
-
-    handleLike: async (postId) => { 
-        await App.api.toggleLike(postId); 
-        App.renderDashboard('feed'); 
-    },
-
-    toggleComments: (id) => {
-        const el = document.getElementById(`dash-comments-${id}`);
-        if(el) el.classList.toggle('hidden');
-    },
-
-    submitComment: async (e, postId) => {
-        e.preventDefault();
-        const input = e.target.comment;
-        const text = input.value.trim();
-        if(!text) return;
-        App.ui.toast("Comentario enviado (Simulado)", "success");
-        input.value = '';
-    },
-
-    openProfileModal: () => _toggleModal('profile', true),
-    closeProfileModal: () => _toggleModal('profile', false),
-    saveProfile: async () => {
-        const name = document.getElementById('profile-name').value;
-        if(!name) return;
-        try {
-            await App.api.updateProfile(App.state.currentUser.uid, { name });
-            App.ui.toast("Perfil actualizado", "success");
-            App.dashboard.closeProfileModal();
-            App.renderDashboard();
-        } catch(e) { App.ui.toast("Error", "error"); }
-    },
-
-    openEditModal: (id, content) => {
-        _toggleModal('dash-edit', true);
-        document.getElementById('dash-edit-post-id').value = id;
-        document.getElementById('dash-edit-content').value = decodeURIComponent(content);
-    },
-    closeEditModal: () => _toggleModal('dash-edit', false),
-    saveEditPost: async () => {
-        const id = document.getElementById('dash-edit-post-id').value;
-        const content = document.getElementById('dash-edit-content').value;
-        try {
-            await App.api.updatePost(id, { content });
-            App.ui.toast("Post actualizado", "success");
-            App.dashboard.closeEditModal();
-            App.renderDashboard('feed');
-        } catch(e) { App.ui.toast("Error", "error"); }
+    // Estado Vacío (Sin comunidades)
+    if (joined.length === 0) {
+        container.innerHTML = _renderEmptyState();
+        return;
     }
-});
 
-// ==========================================
-// 5. COMPONENTES VISUALES
-// ==========================================
-
-function _renderGlobalLiveBanner(live) {
-    const isLive = live.isLiveNow;
-    const badge = isLive 
-        ? `<span class="bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-bold animate-pulse shadow-lg shadow-red-500/40">🔴 EN VIVO AHORA</span>`
-        : `<span class="bg-black text-white px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide"><i class="far fa-calendar-alt mr-1"></i> Próximo Live</span>`;
-    
-    const timeText = isLive 
-        ? '¡La sesión ha comenzado! Únete ahora.' 
-        : `Comienza: ${App.ui.formatDate(live.date)}`;
-
-    return `
-    <div class="relative w-full rounded-2xl overflow-hidden shadow-xl group cursor-pointer" onclick="window.location.hash='#community/${live.communityId}/live'">
-        <!-- Background -->
-        <div class="absolute inset-0 bg-slate-900">
-            ${live.imageUrl ? `<img src="${live.imageUrl}" class="w-full h-full object-cover opacity-60 group-hover:opacity-50 transition-opacity">` : ''}
-            <div class="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent"></div>
-        </div>
-        
-        <!-- Content -->
-        <div class="relative p-8 md:p-10 flex flex-col justify-center h-full min-h-[240px]">
-            <div class="flex items-center gap-3 mb-4">
-                ${badge}
-                <span class="text-white/80 text-xs font-bold uppercase tracking-wider bg-white/10 px-2 py-1 rounded backdrop-blur-md border border-white/10">${live.communityName}</span>
+    // Renderizar Skeleton mientras carga
+    container.innerHTML = `
+        <div class="space-y-6">
+            <!-- Caja Crear Post (Visual) -->
+            <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-4 cursor-pointer hover:border-gray-300 dark:hover:border-slate-600 transition-colors group" onclick="App.dashboard.openPostModal()">
+                <img src="${user.avatar}" class="w-11 h-11 rounded-full bg-gray-100 dark:bg-slate-800 object-cover">
+                <div class="flex-1 bg-gray-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 text-slate-400 dark:text-slate-500 text-sm font-medium group-hover:bg-gray-100 dark:group-hover:bg-slate-800 transition-colors">
+                    Comparte tu progreso, dudas o ideas...
+                </div>
+                <button class="w-11 h-11 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center shadow-md hover:scale-105 transition-transform"><i class="fas fa-plus"></i></button>
             </div>
             
-            <h2 class="text-3xl md:text-4xl font-heading font-extrabold text-white mb-2 max-w-2xl leading-tight">${live.title}</h2>
-            <p class="text-slate-300 text-sm md:text-base font-medium mb-6 flex items-center gap-2">
-                <i class="far fa-clock"></i> ${timeText}
-            </p>
+            <!-- Lista de Posts -->
+            <div id="feed-list" class="space-y-6">
+                ${[1, 2].map(() => App.ui.skeleton('card')).join('')}
+            </div>
+        </div>`;
+
+    // Carga Real de Posts (Algoritmo de Agregación)
+    try {
+        let allPosts = [];
+        
+        for (const cid of joined) {
+            const posts = await App.api.getPosts(cid, 'all');
+            const commName = App.state.cache.communities[cid]?.name || 'Comunidad';
+            const commIcon = App.state.cache.communities[cid]?.icon || 'fa-users';
             
-            <div>
-                <button class="bg-[#1890ff] text-white px-8 py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-blue-600 transition-all flex items-center gap-2 transform active:scale-95">
-                    ${isLive ? '<i class="fas fa-play"></i> Entrar a la Sala' : '<i class="fas fa-bell"></i> Ver Detalles'}
+            if (Array.isArray(posts)) {
+                const enriched = posts.slice(0, 5).map(p => ({
+                    ...p, 
+                    communityId: cid, 
+                    communityName: commName,
+                    communityIcon: commIcon
+                }));
+                allPosts = allPosts.concat(enriched);
+            }
+        }
+        
+        // Ordenar por fecha descendente
+        allPosts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
+        const list = document.getElementById('feed-list');
+        if (list) {
+            list.innerHTML = allPosts.length > 0 
+                ? allPosts.map(p => _renderFeedCard(p, user)).join('') 
+                : `<div class="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-gray-200 dark:border-slate-800 animate-fade-in">
+                     <div class="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-[#1890ff] rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"><i class="fas fa-wind"></i></div>
+                     <h3 class="font-bold text-slate-900 dark:text-white">Todo está tranquilo</h3>
+                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Tus comunidades aún no tienen actividad reciente.</p>
+                   </div>`;
+        }
+    } catch (e) { console.error(e); }
+}
+
+// ============================================================================
+// 3. TARJETAS Y COMPONENTES
+// ============================================================================
+
+function _renderFeedCard(post, user) {
+    const isLike = (post.likedBy || []).includes(user.uid);
+    const commentsCount = post.comments ? post.comments.length : 0;
+
+    return `
+    <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group animate-fade-in relative" id="feed-post-${post.id}">
+        
+        <!-- Header Post -->
+        <div class="flex items-start justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <img src="${post.author?.avatar || 'https://ui-avatars.com/api/?name=User'}" class="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 object-cover border border-gray-100 dark:border-slate-800">
+                <div>
+                    <h4 class="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
+                        ${post.author?.name || 'Usuario'} 
+                        ${post.author?.role === 'admin' ? '<i class="fas fa-check-circle text-[#1890ff] text-xs" title="Admin"></i>' : ''}
+                    </h4>
+                    <div class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <span>${App.ui.formatDate(post.createdAt)}</span>
+                        <span>•</span>
+                        <a href="#community/${post.communityId}" class="hover:text-[#1890ff] transition-colors font-medium flex items-center gap-1">
+                            <i class="fas ${post.communityIcon || 'fa-users'} text-[10px]"></i> ${post.communityName}
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            ${user.uid === post.authorId ? `
+            <button onclick="App.api.deletePost('${post.id}').then(() => document.getElementById('feed-post-${post.id}').remove())" class="text-slate-300 hover:text-red-500 dark:hover:text-red-400 p-2 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10" title="Eliminar">
+                <i class="fas fa-trash-alt"></i>
+            </button>` : ''}
+        </div>
+
+        <!-- Contenido -->
+        <div class="pl-0 md:pl-[52px]">
+            ${post.title ? `<h3 class="font-bold text-lg text-slate-900 dark:text-slate-100 mb-2 leading-snug cursor-pointer hover:text-[#1890ff] transition-colors">${post.title}</h3>` : ''}
+            
+            <p class="text-slate-600 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line mb-4 font-medium">${post.content}</p>
+            
+            ${post.image ? `
+            <div class="mb-4 rounded-xl overflow-hidden border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 shadow-sm">
+                <img src="${post.image}" class="w-full max-h-[500px] object-cover hover:scale-[1.01] transition-transform duration-500 cursor-zoom-in" onclick="window.open(this.src)">
+            </div>` : ''}
+
+            <!-- Footer / Acciones -->
+            <div class="flex items-center gap-6 pt-2 border-t border-gray-100 dark:border-slate-800">
+                <button onclick="App.dashboard.handleLike('${post.id}')" class="flex items-center gap-2 text-xs font-bold ${isLike ? 'text-red-500' : 'text-slate-500 dark:text-slate-400 hover:text-red-500'} transition-colors group/like">
+                    <i class="${isLike ? 'fas' : 'far'} fa-heart text-sm group-active/like:scale-125 transition-transform"></i> 
+                    <span id="feed-likes-count-${post.id}">${post.likes || 0}</span>
                 </button>
+                
+                <button onclick="App.dashboard.toggleComments('${post.id}')" class="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-[#1890ff] transition-colors group/comment">
+                    <i class="far fa-comment-alt text-sm"></i> 
+                    <span>${commentsCount > 0 ? `${commentsCount} comentarios` : 'Responder'}</span>
+                </button>
+
+                <button class="ml-auto text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-2 transition-colors py-2 px-3 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg">
+                    <i class="fas fa-share"></i> Compartir
+                </button>
+            </div>
+
+            <!-- Sección Comentarios -->
+            <div id="feed-comments-${post.id}" class="hidden pt-4 mt-2 border-t border-dashed border-gray-100 dark:border-slate-800 animate-fade-in">
+                <div class="flex gap-3 mb-4">
+                    <img src="${user.avatar}" class="w-8 h-8 rounded-full border border-gray-100 dark:border-slate-800">
+                    <div class="flex-1 relative">
+                        <input type="text" id="feed-comment-input-${post.id}" 
+                               placeholder="Escribe una respuesta..." 
+                               class="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white outline-none focus:border-[#1890ff] focus:ring-1 focus:ring-[#1890ff] pr-10 transition-all font-medium" 
+                               onkeydown="if(event.key==='Enter') App.dashboard.addComment('${post.id}')">
+                        <button onclick="App.dashboard.addComment('${post.id}')" class="absolute right-2 top-1.5 text-[#1890ff] hover:bg-blue-50 dark:hover:bg-slate-800 p-1.5 rounded-lg transition-colors">
+                            <i class="fas fa-paper-plane text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="feed-comments-list-${post.id}" class="space-y-3">
+                    ${(post.comments || []).map(c => `
+                        <div class="flex gap-2 group/comm">
+                            <img src="${c.authorAvatar}" class="w-6 h-6 rounded-full border border-gray-100 dark:border-slate-800 mt-1">
+                            <div class="bg-gray-50 dark:bg-slate-800/50 p-2.5 rounded-2xl rounded-tl-none flex-1 border border-transparent dark:border-slate-800">
+                                <div class="flex justify-between items-baseline mb-0.5">
+                                    <span class="text-xs font-bold text-slate-900 dark:text-white">${c.authorName}</span>
+                                    <span class="text-[9px] text-slate-400 font-medium">${App.ui.formatDate(c.createdAt)}</span>
+                                </div>
+                                <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">${c.content}</p>
+                            </div>
+                        </div>`).join('')}
+                </div>
             </div>
         </div>
     </div>`;
 }
 
-// NUEVO: WIDGET DE COMUNIDAD SUGERIDA
-function _renderSuggestedCommunityWidget(c) {
+function _renderRightSidebar(user, progressData) {
     return `
-    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm relative group mb-6">
-        <div class="bg-gradient-to-r from-[#1890ff] to-blue-600 p-4 text-white flex justify-between items-center">
-            <h3 class="font-bold text-sm flex items-center gap-2"><i class="fas fa-star text-yellow-300"></i> Recomendado</h3>
+    <div class="space-y-6">
+        
+        <!-- WIDGET 1: PROGRESO -->
+        <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-xs uppercase tracking-wider flex items-center gap-2">
+                <i class="fas fa-bolt text-yellow-500"></i> Continuar Aprendiendo
+            </h3>
+            
+            ${progressData ? `
+            <div class="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 border border-gray-100 dark:border-slate-700/50">
+                <div class="relative aspect-video rounded-lg overflow-hidden mb-3 group cursor-pointer border border-gray-200 dark:border-slate-700" onclick="window.location.hash='${progressData.link}'">
+                    <img src="${progressData.image}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                    <div class="absolute inset-0 bg-black/20 flex items-center justify-center group-hover:bg-black/10 transition-colors">
+                        <div class="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-[#1890ff] shadow-lg scale-90 group-hover:scale-100 transition-transform"><i class="fas fa-play text-xs"></i></div>
+                    </div>
+                    <div class="absolute bottom-0 left-0 h-1 bg-[#1890ff]" style="width: ${progressData.percentage}%"></div>
+                </div>
+                <h4 class="font-bold text-slate-900 dark:text-white text-xs line-clamp-1 mb-1">${progressData.classTitle}</h4>
+                <p class="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1 mb-3">${progressData.courseTitle}</p>
+                <a href="${progressData.link}" class="block w-full bg-[#1890ff] hover:bg-blue-600 text-white font-bold py-2 rounded-lg text-center text-[10px] transition-colors">Continuar Clase</a>
+            </div>` 
+            : 
+            `<div class="text-center py-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
+                <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-2"><i class="fas fa-check"></i></div>
+                <p class="text-xs font-bold text-emerald-700 dark:text-emerald-400">¡Todo al día!</p>
+            </div>`}
         </div>
-        <div class="p-5">
-            <div class="flex items-center gap-3 mb-3">
-                <div class="w-12 h-12 rounded-xl bg-blue-50 text-[#1890ff] flex items-center justify-center text-xl shadow-sm border border-blue-100">
-                    <i class="fas ${c.icon || 'fa-users'}"></i>
-                </div>
-                <div>
-                    <h4 class="font-bold text-slate-900 text-sm leading-tight group-hover:text-[#1890ff] transition-colors">${c.name}</h4>
-                    <span class="text-[10px] text-slate-400 font-bold uppercase">${c.category || 'General'}</span>
-                </div>
+
+        <!-- WIDGET 2: LISTA COMUNIDADES -->
+        <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-xs uppercase tracking-wider">Tus Espacios</h3>
+            <div class="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar">
+                ${(user.joinedCommunities||[]).map(id => {
+                    const c = App.state.cache.communities[id];
+                    if(!c) return '';
+                    return `<a href="#community/${c.id}" class="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg group transition-colors">
+                        <div class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 text-xs shrink-0"><i class="fas ${c.icon}"></i></div>
+                        <span class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-[#1890ff] truncate flex-1">${c.name}</span>
+                        <i class="fas fa-chevron-right text-[8px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                    </a>`;
+                }).join('')}
             </div>
-            <p class="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">${c.description || 'Únete para aprender más sobre este tema.'}</p>
-            <button onclick="window.location.hash='#landing/${c.id}'" class="w-full py-2 bg-slate-50 text-slate-700 font-bold text-xs rounded-lg hover:bg-[#1890ff] hover:text-white transition-all border border-slate-100 hover:border-transparent">
-                Ver Comunidad
+            <!-- Redirección corregida a #discovery -->
+            <button onclick="window.location.hash='#discovery'" class="w-full mt-4 py-2 text-[10px] font-bold text-slate-500 hover:text-[#1890ff] hover:bg-gray-50 dark:hover:bg-slate-800 border border-dashed border-gray-200 dark:border-slate-700 rounded-lg transition-all">
+                <i class="fas fa-compass mr-1"></i> Explorar más
             </button>
         </div>
     </div>`;
 }
 
-function _renderSmallLiveItem(live) {
+function _renderEmptyState() {
     return `
-    <a href="#community/${live.communityId}/live" class="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors group">
-        <div class="w-10 h-10 rounded-lg ${live.isLiveNow ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'} flex flex-col items-center justify-center border border-transparent group-hover:border-slate-200 shrink-0">
-            <i class="fas fa-video text-sm ${live.isLiveNow ? 'animate-pulse' : ''}"></i>
+    <div class="flex flex-col items-center justify-center py-20 bg-white dark:bg-[#0f172a] rounded-3xl border-2 border-dashed border-gray-200 dark:border-slate-700 text-center px-6 animate-fade-in">
+        <div class="w-20 h-20 bg-blue-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+            <i class="fas fa-rocket text-3xl text-[#1890ff]"></i>
         </div>
-        <div class="min-w-0">
-            <h4 class="text-xs font-bold text-slate-900 truncate group-hover:text-[#1890ff] transition-colors">${live.title}</h4>
-            <p class="text-[10px] text-slate-400 truncate">${App.ui.formatDate(live.date)}</p>
-        </div>
-    </a>`;
-}
-
-function _renderSmartContinueWidget(data) {
-    if (data.type === 'new_user') {
-        return `
-        <div class="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-8 text-white relative overflow-hidden shadow-lg group">
-            <div class="relative z-10 max-w-lg">
-                <h2 class="text-2xl font-heading font-extrabold mb-2">Comienza tu viaje</h2>
-                <p class="text-slate-300 mb-6 text-sm leading-relaxed">Únete a tu primera comunidad para acceder a contenido premium.</p>
-                <button onclick="App.renderDashboard('explore')" class="bg-white text-slate-900 px-6 py-2.5 rounded-xl font-bold shadow-lg hover:bg-slate-100 transition-all text-sm">Explorar Catálogo</button>
-            </div>
-            <i class="fas fa-rocket text-8xl absolute -right-6 -bottom-6 opacity-10 transform rotate-12 group-hover:rotate-0 transition-transform duration-500"></i>
-        </div>`;
-    }
-    if (data.type === 'all_done') {
-        return `<div class="bg-emerald-50 text-emerald-900 p-6 rounded-2xl flex items-center gap-4 border border-emerald-100"><i class="fas fa-check-circle text-3xl text-emerald-500"></i><div><h2 class="text-lg font-bold">¡Todo al día!</h2><p class="text-sm opacity-80">Has completado tus pendientes.</p></div></div>`;
-    }
-    return `
-    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row cursor-pointer group relative"
-         onclick="window.location.hash='#community/${data.communityId}/clases/${data.courseId}'">
-        <div class="absolute top-0 left-0 bg-[#1890ff] w-1 h-full"></div>
-        <div class="w-full md:w-1/3 lg:w-[200px] h-40 md:h-auto relative bg-slate-900 overflow-hidden">
-            ${data.image ? `<img src="${data.image}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700">` : ''}
-            <div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition-colors">
-                <div class="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center text-[#1890ff] shadow-lg transform scale-90 group-hover:scale-110 transition-transform"><i class="fas fa-play ml-1 text-xs"></i></div>
-            </div>
-        </div>
-        <div class="p-6 flex-1 flex flex-col justify-center">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="text-[10px] font-bold text-[#1890ff] uppercase tracking-wider bg-blue-50 px-2 py-1 rounded">Continuar</span>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">${data.communityName}</span>
-            </div>
-            <h3 class="text-lg font-heading font-bold text-slate-900 mb-1 group-hover:text-[#1890ff] transition-colors line-clamp-1">${data.classTitle}</h3>
-            <p class="text-xs text-slate-500 font-medium mb-4">${data.courseTitle} • Clase ${data.classIndex}</p>
-            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-1">
-                <div class="bg-gradient-to-r from-[#1890ff] to-blue-400 h-full rounded-full" style="width: ${data.progress}%"></div>
-            </div>
-        </div>
-    </div>`;
-}
-
-function _renderExploreCard(c, user) {
-    const isJoined = user.joinedCommunities && user.joinedCommunities.includes(c.id);
-    const access = App.api.checkAccess(user, c.id);
-    
-    let actionBtn;
-    if (isJoined) {
-        if (access.allowed) {
-            actionBtn = `<button class="w-full py-2.5 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200 transition-colors">Ingresar</button>`;
-        } else {
-            actionBtn = `<button class="w-full py-2.5 rounded-lg bg-red-50 text-red-500 font-bold text-xs border border-red-100">Expirado</button>`;
-        }
-    } else {
-        actionBtn = `<button class="w-full py-2.5 rounded-lg bg-[#1890ff] text-white font-bold text-xs shadow-md hover:bg-blue-600 transition-colors">Ver Detalles</button>`;
-    }
-    
-    const clickAction = isJoined && access.allowed ? `window.location.hash='#community/${c.id}'` : `window.location.hash='#landing/${c.id}'`;
-
-    return `
-    <div class="bento-card group flex flex-col h-full bg-white hover:border-[#1890ff] transition-colors cursor-pointer" onclick="${clickAction}">
-        <div class="h-32 relative overflow-hidden border-b border-slate-100 bg-slate-50">
-            ${c.logoUrl ? `<img src="${c.logoUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">` : ''}
-            ${isJoined ? `<div class="absolute top-3 right-3 bg-white/90 backdrop-blur text-[#1890ff] px-2 py-1 rounded text-[10px] font-bold shadow-sm uppercase"><i class="fas fa-check-circle"></i> Miembro</div>` : ''}
-        </div>
-        <div class="p-5 flex-1 flex flex-col">
-            <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-lg bg-blue-50 text-[#1890ff] flex items-center justify-center text-lg shadow-sm border border-blue-100">
-                    <i class="fas ${c.icon || 'fa-users'}"></i>
-                </div>
-                <div>
-                    <h3 class="font-bold text-slate-900 text-sm leading-tight group-hover:text-[#1890ff] transition-colors">${c.name}</h3>
-                    <span class="text-[10px] text-slate-400 font-bold uppercase">${c.category || 'General'}</span>
-                </div>
-            </div>
-            <p class="text-xs text-slate-500 line-clamp-2 mb-4 flex-1">${c.description || 'Sin descripción.'}</p>
-            <div class="mt-auto pt-4 border-t border-slate-50">${actionBtn}</div>
-        </div>
-    </div>`;
-}
-
-function _renderBentoPost(post, user) {
-    const isLiked = post.likedBy && post.likedBy.includes(user.uid);
-    const comments = post.comments || [];
-    const cName = post.communityData ? post.communityData.name : 'Comunidad';
-    
-    return `
-    <div class="bento-card p-6 bg-white border border-slate-200/60 hover:border-slate-300 transition-colors relative">
-        <div class="flex justify-between items-start mb-4">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-blue-50 text-[#1890ff] flex items-center justify-center text-lg shadow-sm">
-                    <i class="fas ${post.communityData?.icon || 'fa-users'}"></i>
-                </div>
-                <div>
-                    <h4 class="font-bold text-slate-900 text-sm leading-tight">${cName}</h4>
-                    <div class="flex gap-2 items-center">
-                        <span class="text-[10px] text-slate-400 font-bold">${post.author?.name || 'Usuario'}</span>
-                        <span class="text-[10px] text-slate-300">•</span>
-                        <span class="text-[10px] text-slate-400 font-medium">${App.ui.formatDate(post.createdAt)}</span>
-                    </div>
-                </div>
-            </div>
-            ${user.role === 'admin' ? `
-            <button onclick="App.dashboard.openEditModal('${post.id}', '${encodeURIComponent(post.content)}')" class="text-slate-300 hover:text-slate-600"><i class="fas fa-ellipsis-h"></i></button>` : ''}
-        </div>
-        <div class="pl-[52px]">
-            ${post.title ? `<h3 class="text-base font-heading font-bold text-slate-900 mb-2">${post.title}</h3>` : ''}
-            <p class="text-sm text-slate-600 leading-relaxed mb-4 whitespace-pre-line">${post.content}</p>
-            ${post.image ? `<div class="rounded-xl overflow-hidden border border-slate-100 mb-4 shadow-sm relative group cursor-pointer"><img src="${post.image}" class="w-full max-h-80 object-cover"></div>` : ''}
-            <div class="flex items-center gap-6 pt-2 border-t border-slate-50">
-                 <button onclick="App.dashboard.handleLike('${post.id}')" class="flex items-center gap-2 text-xs font-bold transition-colors py-1 px-2 rounded-lg hover:bg-slate-50 ${isLiked ? 'text-red-500' : 'text-slate-400 hover:text-red-500'}">
-                    <i class="${isLiked ? 'fas' : 'far'} fa-heart text-sm"></i> <span>${post.likes || 0}</span>
-                </button>
-                <button onclick="App.dashboard.toggleComments('${post.id}')" class="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-[#1890ff] transition-colors py-1 px-2 rounded-lg hover:bg-slate-50">
-                    <i class="far fa-comment-alt text-sm"></i> <span>${comments.length}</span>
-                </button>
-            </div>
-            <div id="dash-comments-${post.id}" class="hidden mt-4 pt-4 border-t border-slate-50 space-y-3 animate-fade-in">
-                 ${comments.length > 0 ? comments.slice(0,3).map(c => `
-                    <div class="flex gap-3 text-xs">
-                        <img src="${c.authorAvatar || 'https://ui-avatars.com/api/?name=U'}" class="w-6 h-6 rounded-full bg-slate-100 object-cover">
-                        <div class="bg-slate-50 px-3 py-2 rounded-2xl rounded-tl-none text-slate-700 flex-1 border border-slate-100">
-                            <span class="font-bold text-slate-900 block text-[10px] mb-0.5">${c.authorName}</span>
-                            ${c.content}
-                        </div>
-                    </div>`).join('') : ''}
-                 <form onsubmit="App.dashboard.submitComment(event, '${post.id}')" class="flex gap-2 mt-2 items-center">
-                    <img src="${user.avatar}" class="w-6 h-6 rounded-full bg-slate-100 object-cover opacity-50">
-                    <input name="comment" class="flex-1 bg-transparent border-b border-slate-200 py-1.5 text-xs outline-none focus:border-[#1890ff] transition-colors placeholder-slate-400" placeholder="Escribe una respuesta...">
-                    <button class="text-[#1890ff] font-bold text-xs hover:underline">Enviar</button>
-                 </form>
-            </div>
-        </div>
-    </div>`;
-}
-
-function _renderEmptyState(type = 'default') {
-    if (type === 'news') {
-        return `
-        <div class="p-8 text-center border-dashed border-2 border-slate-200 rounded-2xl bg-slate-50/50">
-            <i class="far fa-newspaper text-slate-300 text-3xl mb-3"></i>
-            <p class="text-slate-500 text-xs font-medium">Todo tranquilo en el feed.</p>
-        </div>`;
-    }
-    return `
-    <div class="flex flex-col items-center justify-center py-20 text-center animate-enter">
-        <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6 text-3xl text-[#1890ff] shadow-sm ring-8 ring-blue-50/50"><i class="fas fa-rocket"></i></div>
-        <h2 class="text-2xl font-heading font-bold text-slate-900 mb-2">¡Tu viaje comienza aquí!</h2>
-        <p class="text-slate-500 max-w-sm mb-8 text-sm">Aún no te has unido a ninguna comunidad. Explora el catálogo para empezar.</p>
-        <button onclick="App.renderDashboard('explore')" class="bg-[#1890ff] text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-600 transition-all flex items-center gap-2">
-            Explorar Comunidades <i class="fas fa-arrow-right"></i>
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-2">¡Tu feed está vacío!</h2>
+        <p class="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
+            Únete a comunidades para llenar este espacio de contenido interesante.
+        </p>
+        <!-- Redirección corregida a #discovery -->
+        <button onclick="window.location.hash='#discovery'" class="bg-[#1890ff] hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:-translate-y-1 transition-all">
+            Explorar Comunidades
         </button>
     </div>`;
 }
 
-// Helpers Modales (Reutilizados del código original para mantener funcionalidad)
-function _toggleModal(name, show) {
-    const m = document.getElementById(`${name}-modal`);
-    const p = document.getElementById(`${name}-panel`);
-    const b = document.getElementById('modal-overlay'); // Asumiendo overlay global en index.html
-    if(!m) return;
-    if(show) {
-        m.classList.remove('hidden');
-        if(b) b.classList.remove('hidden', 'opacity-0');
-        requestAnimationFrame(() => {
-            if(p) { p.classList.remove('scale-95', 'opacity-0'); p.classList.add('scale-100', 'opacity-100'); }
-        });
-    } else {
-        if(p) { p.classList.remove('scale-100', 'opacity-100'); p.classList.add('scale-95', 'opacity-0'); }
-        if(b) b.classList.add('opacity-0');
-        setTimeout(() => { m.classList.add('hidden'); if(b) b.classList.add('hidden'); }, 300);
-    }
-}
+// ============================================================================
+// 4. LÓGICA DE INTERACCIÓN (LIKES, COMENTARIOS, POSTS)
+// ============================================================================
 
-// 6. HELPERS AUXILIARES (FIX FEED LOADING)
-async function _loadPostsForFeed(communities, user) {
-    const feedList = document.getElementById('feed-list');
-    if(!feedList) return;
+function _calculateUserProgress(user) {
+    if (!user.joinedCommunities || user.joinedCommunities.length === 0) return null;
+    let target = null;
+    const completed = user.completedModules || [];
 
-    let globalFeed = [];
-    
-    // Ejecución paralela
-    await Promise.all(communities.map(async (c) => {
-        try {
-            const posts = await App.api.getPosts(c.id, 'all'); 
-            posts.forEach(p => p.communityData = { name: c.name, id: c.id, icon: c.icon });
-            globalFeed.push(...posts);
-        } catch (err) {
-            console.warn(`Error fetching posts for community ${c.id}:`, err);
+    for (const cid of user.joinedCommunities) {
+        const community = App.state.cache.communities[cid];
+        if (!community || !community.courses) continue;
+        for (const course of community.courses) {
+            if (!course.classes) continue;
+            const nextClass = course.classes.find(c => !completed.includes(`${cid}_${c.id}`));
+            if (nextClass) {
+                const total = course.classes.length;
+                const done = course.classes.filter(c => completed.includes(`${cid}_${c.id}`)).length;
+                target = {
+                    communityId: cid, communityName: community.name,
+                    courseId: course.id, courseTitle: course.title,
+                    classTitle: nextClass.title,
+                    image: course.image || 'https://via.placeholder.com/300',
+                    percentage: Math.round((done/total)*100),
+                    link: `#community/${cid}/clases/${course.id}`
+                };
+                break;
+            }
         }
-    }));
-    
-    // Ordenar y Limitar
-    globalFeed.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    globalFeed = globalFeed.slice(0, 15);
-
-    // FIX: Siempre remover skeleton, incluso si está vacío
-    if (globalFeed.length > 0) {
-        feedList.innerHTML = globalFeed.map(post => _renderBentoPost(post, user)).join('');
-    } else {
-        feedList.innerHTML = _renderEmptyState('news');
+        if (target) break;
     }
+    return target;
 }
 
-// Funciones de Renderizado de Modales (Z-Index Actualizado a 200)
+App.dashboard.handleLike = async (postId) => {
+    const btn = document.querySelector(`#feed-likes-count-${postId}`)?.parentElement;
+    if (!btn) return;
+    
+    // Toggle Visual Inmediato
+    const icon = btn.querySelector('i');
+    const span = btn.querySelector('span');
+    let val = parseInt(span.innerText);
+    const isLiked = btn.classList.contains('text-red-500');
+
+    if (isLiked) {
+        btn.classList.remove('text-red-500'); btn.classList.add('text-slate-500', 'dark:text-slate-400');
+        icon.classList.replace('fas', 'far');
+        span.innerText = Math.max(0, val - 1);
+    } else {
+        btn.classList.add('text-red-500'); btn.classList.remove('text-slate-500', 'dark:text-slate-400');
+        icon.classList.replace('far', 'fas');
+        span.innerText = val + 1;
+    }
+
+    try { await App.api.toggleLike(postId); } catch(e) { console.error(e); }
+};
+
+App.dashboard.toggleComments = (postId) => {
+    const el = document.getElementById(`feed-comments-${postId}`);
+    if (el) {
+        el.classList.toggle('hidden');
+        if (!el.classList.contains('hidden')) {
+            setTimeout(() => document.getElementById(`feed-comment-input-${postId}`).focus(), 100);
+        }
+    }
+};
+
+App.dashboard.addComment = async (postId) => {
+    const input = document.getElementById(`feed-comment-input-${postId}`);
+    const txt = input.value.trim();
+    if (!txt) return;
+
+    const user = App.state.currentUser;
+    const comment = {
+        id: 'cm_' + Date.now(),
+        authorId: user.uid,
+        authorName: user.name,
+        authorAvatar: user.avatar,
+        content: txt,
+        createdAt: new Date().toISOString()
+    };
+
+    // Insertar en DOM
+    const html = `
+    <div class="flex gap-2 animate-slide-up">
+        <img src="${comment.authorAvatar}" class="w-6 h-6 rounded-full border border-gray-100 dark:border-slate-800 mt-1">
+        <div class="bg-gray-50 dark:bg-slate-800/50 p-2.5 rounded-2xl rounded-tl-none flex-1 border border-transparent dark:border-slate-800">
+            <div class="flex justify-between items-baseline mb-0.5">
+                <span class="text-xs font-bold text-slate-900 dark:text-white">${comment.authorName}</span>
+                <span class="text-[9px] text-slate-400">Ahora</span>
+            </div>
+            <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">${comment.content}</p>
+        </div>
+    </div>`;
+    
+    const list = document.getElementById(`feed-comments-list-${postId}`);
+    if(list) list.insertAdjacentHTML('beforeend', html);
+    input.value = '';
+
+    try {
+        await window.F.updateDoc(window.F.doc(window.F.db, "posts", postId), {
+            comments: window.F.arrayUnion(comment)
+        });
+    } catch (e) { App.ui.toast("Error al comentar", "error"); }
+};
+
+// ============================================================================
+// 5. MODALES (CREAR POST & PERFIL)
+// ============================================================================
+
 function _renderPostModal() {
-    return `<div id="post-modal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-slate-900/20 backdrop-blur-sm"><div id="post-panel" class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl transform scale-95 opacity-0 transition-all duration-300 flex flex-col max-h-[90vh]"><div class="p-6 border-b border-slate-100 flex justify-between items-center"><h2 class="text-lg font-heading font-bold text-slate-900">Crear Publicación</h2><button onclick="App.dashboard.closePostModal()"><i class="fas fa-times"></i></button></div><div class="p-8 space-y-6 overflow-y-auto"><div class="space-y-2"><label class="text-xs font-bold text-slate-400 uppercase">Comunidad</label><select id="post-community-select" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"></select></div><div class="space-y-4"><input type="text" id="post-title" class="w-full px-0 py-2 bg-transparent border-b border-slate-200 font-bold text-xl outline-none" placeholder="Título..."><textarea id="post-content" rows="5" class="w-full p-4 bg-slate-50 border-none rounded-xl outline-none resize-none text-sm" placeholder="Contenido..."></textarea></div><div class="flex items-center gap-4"><button onclick="document.getElementById('post-file-input').click()" class="flex items-center gap-2 text-xs font-bold text-slate-500 bg-slate-100 px-4 py-2 rounded-lg hover:bg-slate-200"><i class="fas fa-image"></i> Imagen</button><input type="file" id="post-file-input" class="hidden" accept="image/*"><input type="text" id="post-image-url" class="flex-1 px-3 py-2 bg-transparent border-b border-slate-200 text-xs outline-none" placeholder="URL Imagen..."></div></div><div class="p-6 border-t border-slate-100 flex justify-end gap-3"><button onclick="App.dashboard.closePostModal()" class="px-6 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-50">Cancelar</button><button onclick="App.dashboard.submitPost()" id="btn-submit-post" class="bg-[#1890ff] text-white px-8 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-600">Publicar</button></div></div></div>`;
+    return `
+    <div id="post-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" id="post-backdrop" onclick="App.dashboard.closePostModal()"></div>
+        <div class="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl transform scale-95 opacity-0 transition-all duration-300 pointer-events-auto flex flex-col relative z-10" id="post-panel">
+            
+            <div class="p-5 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-800/50 rounded-t-3xl">
+                <h2 class="text-lg font-bold text-slate-900 dark:text-white">Crear Publicación</h2>
+                <button onclick="App.dashboard.closePostModal()"><i class="fas fa-times text-slate-400 hover:text-slate-900 dark:hover:text-white"></i></button>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 ml-1">¿Dónde publicar?</label>
+                    <select id="post-community-select" class="w-full p-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white transition-colors cursor-pointer text-sm">
+                        <option value="">Selecciona una comunidad...</option>
+                        ${(App.state.currentUser?.joinedCommunities || []).map(cid => {
+                            const c = App.state.cache.communities[cid];
+                            return c ? `<option value="${cid}">${c.name}</option>` : '';
+                        }).join('')}
+                    </select>
+                </div>
+                
+                <input type="text" id="post-title" placeholder="Título (Opcional)" class="w-full p-2.5 bg-transparent border-b border-gray-200 dark:border-slate-800 text-lg font-bold text-slate-900 dark:text-white outline-none focus:border-[#1890ff]">
+                
+                <textarea id="post-content" rows="5" class="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] resize-none dark:text-white text-sm" placeholder="Comparte tus ideas..."></textarea>
+            </div>
+            
+            <div class="p-5 border-t border-gray-100 dark:border-slate-800 flex justify-end bg-gray-50/50 dark:bg-slate-800/50 rounded-b-3xl">
+                <button onclick="App.dashboard.submitPost()" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2.5 rounded-xl font-bold shadow-lg hover:scale-105 transition-transform text-sm">Publicar</button>
+            </div>
+        </div>
+    </div>`;
 }
-function _renderEditPostModal() { return `<div id="dash-edit-modal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-slate-900/20 backdrop-blur-sm"><div id="dash-edit-panel" class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl transform scale-95 opacity-0 transition-all duration-300 flex flex-col"><div class="p-6 border-b border-slate-100 flex justify-between items-center"><h2 class="text-lg font-bold">Editar</h2><button onclick="App.dashboard.closeEditModal()"><i class="fas fa-times"></i></button></div><div class="p-8"><input type="hidden" id="dash-edit-post-id"><textarea id="dash-edit-content" rows="8" class="w-full p-4 bg-slate-50 border-none rounded-xl outline-none resize-none text-sm"></textarea></div><div class="p-6 border-t border-slate-100 flex justify-end gap-3"><button onclick="App.dashboard.closeEditModal()" class="px-6 py-2 font-bold text-slate-500">Cancelar</button><button onclick="App.dashboard.saveEditPost()" id="btn-save-edit" class="bg-[#1890ff] text-white px-8 py-2 rounded-xl font-bold">Guardar</button></div></div></div>`; }
-function _renderProfileModal(user) { return `<div id="profile-modal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-slate-900/20 backdrop-blur-sm"><div id="profile-panel" class="bg-white w-full max-w-md rounded-3xl shadow-2xl transform scale-95 opacity-0 transition-all duration-300 overflow-hidden"><div class="h-32 bg-gradient-to-r from-slate-800 to-slate-900 relative"><button onclick="App.dashboard.closeProfileModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/20 text-white flex items-center justify-center"><i class="fas fa-times"></i></button></div><div class="px-8 pb-8 -mt-12 relative"><div class="flex justify-center mb-6"><div class="relative group"><img src="${user.avatar}" class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-xl bg-white"><input type="file" id="profile-file-input" class="hidden"><label for="profile-file-input" class="absolute inset-0 cursor-pointer"></label></div></div><div class="space-y-5"><div class="text-center mb-6"><h2 class="text-xl font-bold">Tu Perfil</h2></div><div class="space-y-1"><label class="text-xs font-bold text-slate-900 uppercase">Nombre</label><input type="text" id="profile-name" value="${user.name}" class="w-full py-3 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-[#1890ff]"></div><div class="space-y-1"><label class="text-xs font-bold text-slate-900 uppercase">Rol</label><input type="text" id="profile-role-desc" value="${user.roleDescription || ''}" class="w-full py-3 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-[#1890ff]"></div><button onclick="App.dashboard.saveProfile()" id="btn-save-profile" class="w-full bg-[#1890ff] text-white py-3.5 rounded-xl font-bold shadow-lg mt-4">Guardar</button></div></div></div></div>`; }
+
+function _renderProfileModal(user) {
+    return `
+    <div id="profile-modal" class="fixed inset-0 z-[80] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" id="profile-backdrop" onclick="App.dashboard.closeProfileModal()"></div>
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl transform scale-95 opacity-0 transition-all duration-300 pointer-events-auto overflow-hidden relative z-10" id="profile-panel">
+            
+            <div class="h-28 bg-gradient-to-r from-slate-900 to-slate-800 relative">
+                <button onclick="App.dashboard.closeProfileModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/50 text-white hover:bg-white hover:text-black transition-colors flex items-center justify-center backdrop-blur-sm z-10"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="px-8 pb-8 -mt-10 relative">
+                <div class="flex justify-center mb-4">
+                    <div class="relative group">
+                        <img id="profile-avatar-prev" src="${user.avatar}" class="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-slate-800 shadow-xl bg-white dark:bg-slate-800">
+                        <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-[2px]" onclick="App.ui.toast('Cambio de avatar: Próximamente', 'info')">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="text-center mb-4"><h2 class="text-lg font-bold text-slate-900 dark:text-white">Editar Perfil</h2><p class="text-xs text-slate-500">${user.email}</p></div>
+                    
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide ml-1">Nombre</label>
+                        <input type="text" id="profile-name" value="${user.name}" class="w-full py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-[#1890ff] transition-colors dark:text-white text-sm">
+                    </div>
+                    
+                    <button onclick="App.dashboard.saveProfile()" id="btn-save-profile" class="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-3 rounded-xl font-bold shadow-lg mt-2 text-sm hover:scale-[1.02] transition-transform">
+                        Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+// Handlers Modales
+App.dashboard.openPostModal = () => { document.getElementById('post-modal').classList.remove('hidden'); const p = document.getElementById('post-panel'); setTimeout(() => { p.classList.remove('scale-95', 'opacity-0'); p.classList.add('scale-100', 'opacity-100'); }, 10); document.getElementById('post-backdrop').classList.remove('opacity-0'); };
+App.dashboard.closePostModal = () => { const m = document.getElementById('post-modal'); const p = document.getElementById('post-panel'); const b = document.getElementById('post-backdrop'); p.classList.remove('scale-100', 'opacity-100'); p.classList.add('scale-95', 'opacity-0'); b.classList.add('opacity-0'); setTimeout(() => m.classList.add('hidden'), 300); };
+App.dashboard.openProfileModal = () => { document.getElementById('profile-modal').classList.remove('hidden'); const p = document.getElementById('profile-panel'); setTimeout(() => { p.classList.remove('scale-95', 'opacity-0'); p.classList.add('scale-100', 'opacity-100'); }, 10); document.getElementById('profile-backdrop').classList.remove('opacity-0'); };
+App.dashboard.closeProfileModal = () => { const m = document.getElementById('profile-modal'); const p = document.getElementById('profile-panel'); const b = document.getElementById('profile-backdrop'); p.classList.remove('scale-100', 'opacity-100'); p.classList.add('scale-95', 'opacity-0'); b.classList.add('opacity-0'); setTimeout(() => m.classList.add('hidden'), 300); };
+
+// Handlers Submit
+App.dashboard.submitPost = async () => {
+    const cid = document.getElementById('post-community-select').value;
+    const title = document.getElementById('post-title').value.trim();
+    const content = document.getElementById('post-content').value.trim();
+    if(!cid) return App.ui.toast("Selecciona una comunidad", "warning");
+    if(!content) return App.ui.toast("Escribe algo para publicar", "warning");
+    
+    try {
+        await App.api.createPost({ 
+            communityId: cid, channelId: 'general', title: title, content: content, 
+            authorId: App.state.currentUser.uid, author: App.state.currentUser, isOfficial: false 
+        });
+        App.ui.toast("¡Publicado!", "success");
+        App.dashboard.closePostModal();
+        document.getElementById('post-content').value = '';
+        document.getElementById('post-title').value = '';
+        App.renderDashboard();
+    } catch(e) { console.error(e); App.ui.toast("Error al publicar", "error"); }
+};
+
+App.dashboard.saveProfile = async () => {
+    const newName = document.getElementById('profile-name').value.trim();
+    if (!newName) return App.ui.toast("Nombre inválido", "warning");
+    
+    const btn = document.getElementById('btn-save-profile');
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Guardando...';
+    
+    try {
+        await App.api.updateProfile(App.state.currentUser.uid, { name: newName });
+        App.ui.toast("Perfil actualizado", "success");
+        App.dashboard.closeProfileModal();
+        App.renderDashboard();
+    } catch(e) { 
+        App.ui.toast("Error al guardar", "error"); 
+        btn.innerHTML = 'Guardar Cambios';
+    }
+};
