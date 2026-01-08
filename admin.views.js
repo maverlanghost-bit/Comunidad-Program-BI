@@ -1,11 +1,9 @@
 /**
- * admin.views.js (V25.0 - MASTER ADMIN PANEL)
+ * admin.views.js (V26.0 - PLANS MANAGER)
  * Panel de Control Unificado: Gestión de Comunidades, Ventas, Usuarios y Moderación.
- * * CARACTERÍSTICAS COMPLETAS:
- * - Dashboard: KPIs y Gráficos de distribución de usuarios.
- * - Gestión de Comunidades: CRUD completo con configuración de Ventas (Precios, Trial, Landing) y Discovery (Sugeridos).
- * - Moderación: Eliminación y edición de posts de usuarios.
- * - Usuarios: Listado y gestión básica.
+ * * MEJORAS V26.0:
+ * - GESTIÓN DE PLANES: Nuevo constructor de planes (Membership Tiers) en el modal de comunidad.
+ * - IMAGEN PORTADA: Campo añadido para gestionar la imagen de la landing page.
  */
 
 window.App = window.App || {};
@@ -142,7 +140,7 @@ async function _loadAdminOverview() {
                         <p class="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-xs relative z-10">Base de datos Firestore conectada y sincronizada en tiempo real.</p>
                         <div class="mt-6 flex gap-2">
                             <span class="px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold relative z-10">Online</span>
-                            <span class="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold relative z-10">V25.0</span>
+                            <span class="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold relative z-10">V26.0</span>
                         </div>
                     </div>
                 </div>
@@ -156,7 +154,7 @@ async function _loadAdminOverview() {
     }
 }
 
-// --- TAB 3: COMUNIDADES (Gestión Unificada) ---
+// --- TAB 3: COMUNIDADES (Gestión Unificada con Planes) ---
 async function _loadAdminCommunities() {
     const container = document.getElementById('admin-content');
     try {
@@ -169,39 +167,52 @@ async function _loadAdminCommunities() {
 
         container.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            ${communities.map(c => `
-            <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 hover:shadow-xl hover:-translate-y-1 transition-all group relative ${c.isSuggested ? 'ring-2 ring-yellow-400 ring-offset-2 dark:ring-offset-slate-900' : ''}">
-                ${c.isSuggested ? '<div class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[9px] font-bold px-2 py-1 rounded-bl-xl z-20 shadow-sm"><i class="fas fa-star"></i> DESTACADA</div>' : ''}
-                
-                <div class="flex items-start justify-between mb-4">
-                    <div class="w-12 h-12 rounded-xl bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-xl text-slate-700 dark:text-slate-200 border border-gray-100 dark:border-slate-700">
-                        <i class="fas ${c.icon || 'fa-users'}"></i>
-                    </div>
-                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="App.admin.editCommunity('${c.id}')" class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-800 text-slate-500 hover:text-[#1890ff] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center justify-center"><i class="fas fa-pen text-xs"></i></button>
-                        <button onclick="App.admin.deleteCommunity('${c.id}')" class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center"><i class="fas fa-trash text-xs"></i></button>
-                    </div>
-                </div>
-                
-                <h3 class="font-heading font-bold text-slate-900 dark:text-white mb-2 truncate">${c.name}</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mb-4 line-clamp-2 min-h-[2.5em]">${c.description || 'Sin descripción'}</p>
-                
-                <div class="flex flex-wrap gap-2 mb-4">
-                    <span class="px-2 py-1 rounded-md bg-gray-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase border border-gray-200 dark:border-slate-700">${c.category || 'General'}</span>
-                    ${c.isPublic !== false ? 
-                        '<span class="px-2 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold uppercase">Pública</span>' : 
-                        '<span class="px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase"><i class="fas fa-lock mr-1"></i> Privada</span>'}
-                </div>
+            ${communities.map(c => {
+                // Lógica visual de precio
+                let priceDisplay = 'Gratis';
+                if (c.plans && c.plans.length > 0) {
+                    const prices = c.plans.map(p => parseFloat(p.price));
+                    const minPrice = Math.min(...prices);
+                    const maxPrice = Math.max(...prices);
+                    if (minPrice === 0) priceDisplay = `Gratis - $${maxPrice}`;
+                    else if (minPrice === maxPrice) priceDisplay = `$${minPrice}`;
+                    else priceDisplay = `Desde $${minPrice}`;
+                } else if (c.priceMonthly) {
+                    priceDisplay = `$${c.priceMonthly}/mes`;
+                }
 
-                <div class="pt-4 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
-                    <div class="text-xs font-bold text-slate-500 dark:text-slate-400">
-                        <i class="fas fa-users mr-1"></i> ${c.membersCount || 0}
+                return `
+                <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 hover:shadow-xl hover:-translate-y-1 transition-all group relative ${c.isSuggested ? 'ring-2 ring-yellow-400 ring-offset-2 dark:ring-offset-slate-900' : ''}">
+                    ${c.isSuggested ? '<div class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[9px] font-bold px-2 py-1 rounded-bl-xl z-20 shadow-sm"><i class="fas fa-star"></i> DESTACADA</div>' : ''}
+                    
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-xl text-slate-700 dark:text-slate-200 border border-gray-100 dark:border-slate-700 overflow-hidden">
+                            ${c.image ? `<img src="${c.image}" class="w-full h-full object-cover">` : `<i class="fas ${c.icon || 'fa-users'}"></i>`}
+                        </div>
+                        <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="App.admin.editCommunity('${c.id}')" class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-800 text-slate-500 hover:text-[#1890ff] hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center justify-center"><i class="fas fa-pen text-xs"></i></button>
+                            <button onclick="App.admin.deleteCommunity('${c.id}')" class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center"><i class="fas fa-trash text-xs"></i></button>
+                        </div>
                     </div>
-                    <div class="text-xs font-bold text-slate-900 dark:text-white">
-                        ${c.priceMonthly ? `$${c.priceMonthly}/mes` : 'Gratis'}
+                    
+                    <h3 class="font-heading font-bold text-slate-900 dark:text-white mb-2 truncate">${c.name}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4 line-clamp-2 min-h-[2.5em]">${c.description || 'Sin descripción'}</p>
+                    
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <span class="px-2 py-1 rounded-md bg-gray-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase border border-gray-200 dark:border-slate-700">${c.category || 'General'}</span>
+                        ${c.plans ? `<span class="px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase">${c.plans.length} Planes</span>` : ''}
                     </div>
-                </div>
-            </div>`).join('')}
+
+                    <div class="pt-4 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
+                        <div class="text-xs font-bold text-slate-500 dark:text-slate-400">
+                            <i class="fas fa-users mr-1"></i> ${c.membersCount || 0}
+                        </div>
+                        <div class="text-xs font-bold text-slate-900 dark:text-white">
+                            ${priceDisplay}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('')}
         </div>`;
     } catch (e) {
         console.error(e);
@@ -229,7 +240,6 @@ async function _loadAdminUsers() {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-slate-800" id="users-table-body">
-                        <!-- Se llena dinámicamente -->
                         <tr><td colspan="4" class="p-8 text-center"><i class="fas fa-circle-notch fa-spin text-[#1890ff]"></i> Cargando usuarios...</td></tr>
                     </tbody>
                 </table>
@@ -359,6 +369,9 @@ function _initRolesChart(roles) {
 // ==========================================
 window.App.admin = {
     
+    // Almacén temporal de planes mientras se edita la comunidad
+    tempPlans: [],
+
     // --- GESTIÓN DE COMUNIDADES ---
     
     openCommunityModal: () => {
@@ -368,8 +381,8 @@ window.App.admin = {
         document.getElementById('modal-title').innerText = "Nueva Comunidad";
         document.getElementById('btn-save-community').innerText = "Crear Comunidad";
         
-        // Reset Inputs
-        ['comm-id','comm-name','comm-icon','comm-desc','comm-price-m','comm-price-y','comm-trial','comm-video','comm-features'].forEach(id => {
+        // Reset Inputs Generales
+        ['comm-id','comm-name','comm-icon','comm-desc','comm-video', 'comm-image'].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.value = '';
         });
@@ -378,6 +391,10 @@ window.App.admin = {
         document.getElementById('comm-cat').value = 'General';
         document.getElementById('comm-public').checked = true;
         document.getElementById('comm-suggested').checked = false;
+
+        // Reset Planes
+        App.admin.tempPlans = [];
+        App.admin.renderPlansList();
 
         m.classList.remove('hidden');
     },
@@ -398,20 +415,36 @@ window.App.admin = {
             document.getElementById('comm-icon').value = comm.icon || '';
             document.getElementById('comm-desc').value = comm.description || '';
             document.getElementById('comm-cat').value = comm.category || 'General';
-            
-            // Sales Fields
-            document.getElementById('comm-price-m').value = comm.priceMonthly || '';
-            document.getElementById('comm-price-y').value = comm.priceYearly || '';
-            document.getElementById('comm-trial').value = comm.trialDays || '';
             document.getElementById('comm-video').value = comm.videoUrl || '';
-            document.getElementById('comm-features').value = (comm.features || []).join('\n');
+            document.getElementById('comm-image').value = comm.image || '';
             
             // Toggles
             document.getElementById('comm-public').checked = comm.isPublic !== false; // Default true
             document.getElementById('comm-suggested').checked = comm.isSuggested === true;
 
+            // Cargar Planes (o Migrar Legacy)
+            if (comm.plans && Array.isArray(comm.plans) && comm.plans.length > 0) {
+                App.admin.tempPlans = comm.plans;
+            } else if (comm.priceMonthly || comm.priceYearly) {
+                // Migración visual de datos antiguos a un plan "Estándar"
+                App.admin.tempPlans = [{
+                    id: 'legacy_' + Date.now(),
+                    name: 'Plan Estándar (Legacy)',
+                    price: comm.priceMonthly || 0,
+                    interval: 'month',
+                    trialDays: comm.trialDays || 0,
+                    paymentUrl: comm.paymentUrl || '',
+                    features: comm.features || [],
+                    recommended: true
+                }];
+                App.ui.toast("Precios antiguos convertidos a Plan Estándar", "info");
+            } else {
+                App.admin.tempPlans = [];
+            }
+            App.admin.renderPlansList();
+
             m.classList.remove('hidden');
-        } catch (e) { App.ui.toast("Error cargando datos", "error"); }
+        } catch (e) { console.error(e); App.ui.toast("Error cargando datos", "error"); }
     },
 
     saveCommunity: async () => {
@@ -428,18 +461,22 @@ window.App.admin = {
             icon: document.getElementById('comm-icon').value.trim() || 'fa-users',
             description: document.getElementById('comm-desc').value.trim(),
             category: document.getElementById('comm-cat').value,
-            // Ventas
-            priceMonthly: parseFloat(document.getElementById('comm-price-m').value) || 0,
-            priceYearly: parseFloat(document.getElementById('comm-price-y').value) || 0,
-            trialDays: parseInt(document.getElementById('comm-trial').value) || 0,
             videoUrl: document.getElementById('comm-video').value.trim(),
-            features: document.getElementById('comm-features').value.split('\n').filter(l => l.trim().length > 0),
+            image: document.getElementById('comm-image').value.trim(),
+            // Planes System (Reemplaza precios individuales)
+            plans: App.admin.tempPlans,
             // Config
             isPublic: document.getElementById('comm-public').checked,
             isSuggested: document.getElementById('comm-suggested').checked,
-            isPrivate: !document.getElementById('comm-public').checked, // Compatibilidad legacy
+            isPrivate: !document.getElementById('comm-public').checked,
             updatedAt: new Date().toISOString()
         };
+
+        // Campos Legacy para compatibilidad (Opcional, se pueden dejar en 0 o calcular desde el plan base)
+        if (App.admin.tempPlans.length > 0) {
+            data.priceMonthly = App.admin.tempPlans[0].price; // Referencia rápida
+            data.membersCount = data.membersCount || 0;
+        }
 
         try {
             if (id) {
@@ -466,6 +503,63 @@ window.App.admin = {
             App.ui.toast("Comunidad eliminada", "success");
             App.renderAdmin('communities');
         } catch(e) { App.ui.toast("Error al eliminar", "error"); }
+    },
+
+    // --- GESTIÓN INTERNA DE PLANES (EN MEMORIA) ---
+
+    renderPlansList: () => {
+        const list = document.getElementById('plans-list');
+        if (!list) return;
+
+        if (App.admin.tempPlans.length === 0) {
+            list.innerHTML = `<div class="text-center py-4 text-slate-400 text-sm italic bg-gray-50 dark:bg-slate-800 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">No hay planes configurados. Añade uno abajo.</div>`;
+            return;
+        }
+
+        list.innerHTML = App.admin.tempPlans.map((p, idx) => `
+            <div class="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 relative group">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <h5 class="font-bold text-slate-900 dark:text-white text-sm">${p.name} ${p.recommended ? '<span class="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded ml-1">TOP</span>' : ''}</h5>
+                        <p class="text-xs text-slate-500 font-mono">${p.price === 0 ? 'Gratis' : `$${p.price}/${p.interval}`} ${p.trialDays > 0 ? `(${p.trialDays}d Trial)` : ''}</p>
+                    </div>
+                    <button onclick="App.admin.removePlan(${idx})" class="text-red-400 hover:text-red-600 bg-white dark:bg-slate-900 p-1.5 rounded-lg shadow-sm border border-gray-100 dark:border-slate-600 transition-colors"><i class="fas fa-trash text-xs"></i></button>
+                </div>
+                <div class="text-[10px] text-slate-400 truncate"><i class="fas fa-link mr-1"></i> ${p.paymentUrl || 'Link directo'}</div>
+            </div>
+        `).join('');
+    },
+
+    addPlan: () => {
+        const name = document.getElementById('plan-name').value.trim();
+        const price = parseFloat(document.getElementById('plan-price').value) || 0;
+        const interval = document.getElementById('plan-interval').value;
+        const trial = parseInt(document.getElementById('plan-trial').value) || 0;
+        const link = document.getElementById('plan-link').value.trim();
+        const feats = document.getElementById('plan-features').value.split(',').map(s=>s.trim()).filter(s=>s);
+        const rec = document.getElementById('plan-rec').checked;
+
+        if (!name) return App.ui.toast("Nombre del plan requerido", "warning");
+
+        App.admin.tempPlans.push({
+            id: 'plan_' + Date.now(),
+            name, price, interval, trialDays: trial, paymentUrl: link, features: feats, recommended: rec
+        });
+
+        // Limpiar inputs
+        document.getElementById('plan-name').value = '';
+        document.getElementById('plan-price').value = '';
+        document.getElementById('plan-trial').value = '';
+        document.getElementById('plan-link').value = '';
+        document.getElementById('plan-features').value = '';
+        document.getElementById('plan-rec').checked = false;
+
+        App.admin.renderPlansList();
+    },
+
+    removePlan: (idx) => {
+        App.admin.tempPlans.splice(idx, 1);
+        App.admin.renderPlansList();
     },
 
     // --- MODERACIÓN DE POSTS ---
@@ -551,41 +645,69 @@ function _renderCommunityModalUnified() {
                     </div>
                 </div>
 
-                <!-- SECCIÓN 2: ESTRATEGIA DE VENTA (SKOOL STYLE) -->
+                <!-- SECCIÓN 2: ASSETS VISUALES (Nuevo) -->
                 <div class="space-y-4">
-                    <h4 class="text-xs font-bold uppercase tracking-widest text-[#1890ff] mb-2 border-b border-gray-100 dark:border-slate-800 pb-2 flex items-center gap-2"><i class="fas fa-tag"></i> 2. Estrategia de Venta</h4>
+                    <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 border-b border-gray-100 dark:border-slate-800 pb-2 flex items-center gap-2"><i class="fas fa-photo-video"></i> 2. Visuales</h4>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="space-y-1">
-                            <label class="text-sm font-bold text-slate-700 dark:text-slate-300">Precio Mensual ($)</label>
-                            <input type="number" id="comm-price-m" class="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white font-mono" placeholder="0">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-sm font-bold text-slate-700 dark:text-slate-300">Precio Anual ($)</label>
-                            <input type="number" id="comm-price-y" class="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white font-mono" placeholder="0">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-sm font-bold text-slate-700 dark:text-slate-300">Días de Prueba</label>
-                            <input type="number" id="comm-trial" class="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white font-mono" placeholder="Ej: 7">
-                        </div>
-                    </div>
-
                     <div class="space-y-1">
-                        <label class="text-sm font-bold text-slate-700 dark:text-slate-300">Video de Portada (YouTube URL)</label>
-                        <input type="text" id="comm-video" class="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white text-sm" placeholder="https://youtube.com/watch?v=...">
-                        <p class="text-[10px] text-slate-400">Este video se reproducirá automáticamente en la Landing Page de ventas.</p>
+                        <label class="text-sm font-bold text-slate-700 dark:text-slate-300">Imagen Portada (URL)</label>
+                        <input type="text" id="comm-image" class="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white text-sm placeholder:text-slate-400" placeholder="https://...">
+                        <p class="text-[10px] text-slate-400">Imagen grande para el Hero de la Landing y la Tarjeta.</p>
                     </div>
-
                     <div class="space-y-1">
-                        <label class="text-sm font-bold text-slate-700 dark:text-slate-300">Características / Beneficios (Lista)</label>
-                        <textarea id="comm-features" rows="4" class="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white resize-none" placeholder="Acceso a mentorías en vivo&#10;Certificado oficial&#10;Grupo privado de Discord..."></textarea>
-                        <p class="text-[10px] text-slate-400">Escribe una característica por línea.</p>
+                        <label class="text-sm font-bold text-slate-700 dark:text-slate-300">Video Promocional (YouTube URL)</label>
+                        <input type="text" id="comm-video" class="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white text-sm placeholder:text-slate-400" placeholder="https://youtube.com/watch?v=...">
                     </div>
                 </div>
 
-                <!-- SECCIÓN 3: VISIBILIDAD -->
+                <!-- SECCIÓN 3: GESTOR DE PLANES (Nuevo Sistema) -->
                 <div class="space-y-4">
-                    <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 border-b border-gray-100 dark:border-slate-800 pb-2 flex items-center gap-2"><i class="fas fa-eye"></i> 3. Visibilidad</h4>
+                    <h4 class="text-xs font-bold uppercase tracking-widest text-[#1890ff] mb-2 border-b border-gray-100 dark:border-slate-800 pb-2 flex items-center gap-2"><i class="fas fa-tags"></i> 3. Planes de Acceso</h4>
+                    
+                    <!-- Lista de Planes Existentes -->
+                    <div id="plans-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <!-- Renderizado dinámico -->
+                    </div>
+
+                    <!-- Formulario Nuevo Plan -->
+                    <div class="bg-gray-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-gray-200 dark:border-slate-700">
+                        <h5 class="text-xs font-bold text-slate-500 uppercase mb-3">Agregar Nuevo Plan</h5>
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-3">
+                            <div class="md:col-span-4">
+                                <input type="text" id="plan-name" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="Nombre (ej: Pro)">
+                            </div>
+                            <div class="md:col-span-2">
+                                <input type="number" id="plan-price" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="$$">
+                            </div>
+                            <div class="md:col-span-3">
+                                <select id="plan-interval" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white">
+                                    <option value="month">Mensual</option>
+                                    <option value="year">Anual</option>
+                                    <option value="one_time">Único</option>
+                                    <option value="forever">Gratis</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-3">
+                                <input type="number" id="plan-trial" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="Días Trial">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                            <input type="text" id="plan-link" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="URL de Pago (Stripe/PayPal)">
+                            <input type="text" id="plan-features" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="Características (sep por comas)">
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="plan-rec" class="w-4 h-4 rounded text-[#1890ff] accent-[#1890ff]">
+                                <label for="plan-rec" class="text-xs font-bold text-slate-500 cursor-pointer">Recomendado</label>
+                            </div>
+                            <button onclick="App.admin.addPlan()" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg text-xs font-bold hover:opacity-90 transition-opacity">Añadir Plan</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 4: VISIBILIDAD -->
+                <div class="space-y-4">
+                    <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 border-b border-gray-100 dark:border-slate-800 pb-2 flex items-center gap-2"><i class="fas fa-eye"></i> 4. Visibilidad</h4>
                     
                     <div class="flex flex-col gap-3">
                         <div class="flex items-center gap-3 bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-slate-700">
