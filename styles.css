@@ -64,7 +64,6 @@ html, body {
     width: 100%;
     margin: 0;
     padding: 0;
-    /* overflow: hidden; <- REMOVIDO: Permitimos scroll nativo en vistas públicas */ 
     background-color: var(--bg-app);
     color: var(--text-primary);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -73,7 +72,6 @@ html, body {
     scroll-behavior: smooth;
 }
 
-/* Restaurar overflow hidden solo para la App Interna (Dashboard/LMS) cuando está activa */
 body.app-mode {
     overflow: hidden;
 }
@@ -86,8 +84,6 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 /* =============================================================================
    3. NEW DISCOVERY HERO & ANIMATIONS (PROGRAMBI V3.0)
    ============================================================================= */
-
-/* Fondo Tech con Patrón de Grid */
 .hero-tech-bg {
     background-color: var(--bg-app);
     background-image: 
@@ -99,7 +95,6 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     animation: panBackground 60s linear infinite;
 }
 
-/* Glassmorphism Refinado */
 .glass-panel {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(12px);
@@ -111,12 +106,10 @@ body.dark-mode .glass-panel {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Animaciones de Flotación */
 .animate-float { animation: float 6s ease-in-out infinite; }
 .animate-float-delayed { animation: float 7s ease-in-out 1s infinite; }
 .animate-pulse-glow { animation: pulseGlow 3s infinite; }
 
-/* KEYFRAMES COMPLETOS (Restaurados) */
 @keyframes float {
     0% { transform: translateY(0px); }
     50% { transform: translateY(-15px); }
@@ -135,7 +128,6 @@ body.dark-mode .glass-panel {
     100% { background-position: 100% 100%, 100% 100%, 0 0, 0 0; }
 }
 
-/* Gradiente de Texto Tech */
 .text-gradient-tech {
     background: linear-gradient(135deg, #1890ff 0%, #00d2ff 50%, #8b5cf6 100%);
     -webkit-background-clip: text;
@@ -230,7 +222,6 @@ body.sidebar-is-pinned main.app-layout {
 .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Faltaba esta animación usada en los dropdowns y toasts de JS */
 .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 @keyframes slideUp { 
     from { opacity: 0; transform: translateY(20px) scale(0.95); } 
@@ -258,3 +249,195 @@ body.dark-mode .text-gray-400, body.dark-mode .text-slate-400 { color: var(--tex
 /* Grid Background Pattern Utility */
 .bg-grid-slate-100 { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(241 245 249 / 0.5)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e"); }
 body.dark-mode .bg-grid-slate-100 { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(30 41 59 / 0.5)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e"); }
+
+/* =============================================================================
+   8. LANDING PAGE V2 (SKOOL + PREMIUM HYBRID) - NEW
+   ============================================================================= */
+
+/* Contenedor Lateral Pegajoso */
+.sticky-sidebar-container {
+    position: -webkit-sticky;
+    position: sticky;
+    top: calc(var(--header-height) + 2rem); /* Altura del header + espacio */
+    height: fit-content;
+    z-index: 40;
+}
+
+/* Efecto Glow para el Video/Imagen Principal */
+.video-glow-container {
+    position: relative;
+    border-radius: 1.5rem; /* rounded-3xl */
+    overflow: hidden;
+    box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-light);
+}
+
+/* Luz ambiental detrás del video */
+.glow-backdrop {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 105%;
+    height: 105%;
+    background: var(--accent-gradient);
+    filter: blur(60px);
+    opacity: 0.2;
+    z-index: -1;
+    border-radius: 2rem;
+    pointer-events: none;
+}
+
+/* Navegación tipo "Píldora" */
+.nav-pill {
+    padding: 0.6rem 1.25rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+.nav-pill:hover {
+    background: var(--bg-surface-alt);
+    color: var(--text-primary);
+}
+
+.nav-pill.active {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--border-light);
+}
+body.dark-mode .nav-pill.active {
+    background: var(--bg-surface-alt);
+    border-color: var(--border-light);
+}
+
+/* Power Card (Tarjeta de Conversión Lateral) */
+.power-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    border-radius: 1.5rem;
+    box-shadow: var(--shadow-card);
+    transition: transform 0.3s ease;
+}
+.power-card:hover {
+    border-color: var(--accent-primary);
+}
+
+/* Lista de Beneficios (Checks) */
+.check-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+}
+
+.check-list-item i {
+    color: #10b981; /* Green 500 */
+    margin-top: 0.25rem;
+    flex-shrink: 0;
+}
+
+/* =============================================================================
+   9. TOGGLE SWITCH & WELCOME MODAL (V57.0 - SUPER PLAN FEATURES)
+   ============================================================================= */
+
+/* Toggle Switch Personalizado (iOS Style) */
+.toggle-checkbox {
+    display: none;
+}
+
+.toggle-label {
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-rail {
+    width: 44px;
+    height: 24px;
+    background-color: var(--border-light); /* Default OFF */
+    border-radius: 9999px;
+    transition: background-color 0.3s ease;
+    position: relative;
+    border: 1px solid transparent;
+}
+body.dark-mode .toggle-rail {
+    background-color: #334155;
+    border-color: #475569;
+}
+
+.toggle-circle {
+    width: 20px;
+    height: 20px;
+    background-color: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 1px;
+    left: 2px;
+    transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Estado Activado */
+.toggle-checkbox:checked + .toggle-label .toggle-rail {
+    background-color: #10b981; /* Green 500 - Success */
+    border-color: #10b981;
+}
+
+.toggle-checkbox:checked + .toggle-label .toggle-circle {
+    transform: translateX(20px);
+}
+
+/* Welcome Modal / Confetti Popup */
+.welcome-overlay {
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+}
+
+.welcome-card {
+    animation: popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-origin: center center;
+}
+
+@keyframes popIn {
+    0% { opacity: 0; transform: scale(0.8) translateY(40px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Animación de entrada para los elementos internos */
+.animate-delay-100 { animation-delay: 100ms; }
+.animate-delay-200 { animation-delay: 200ms; }
+.animate-delay-300 { animation-delay: 300ms; }
+
+/* Confetti CSS Simple */
+.confetti-piece {
+    position: absolute;
+    width: 8px;
+    height: 14px;
+    background-color: #ffd700;
+    top: -20px;
+    opacity: 0;
+    animation: confettiFall 3s linear infinite;
+}
+
+.confetti-piece:nth-child(2n) { background-color: #1890ff; }
+.confetti-piece:nth-child(3n) { background-color: #ff5252; }
+.confetti-piece:nth-child(4n) { background-color: #10b981; }
+
+@keyframes confettiFall {
+    0% { transform: translateY(-100%) rotate(0deg); opacity: 1; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { transform: translateY(80vh) rotate(720deg); opacity: 0; }
+}

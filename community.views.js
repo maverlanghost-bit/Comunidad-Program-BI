@@ -1,11 +1,10 @@
 /**
- * community.views.js (V38.3 - GOLD MASTER INTEGRATED)
+ * community.views.js (V45.0 - TRIAL & ACCESS CONTROL)
  * Motor de Vistas de Comunidad Interna.
- * * VERSIÓN DEFINITIVA V38.3:
- * - INTEGRIDAD: Código 100% completo. No falta ninguna función V34.
- * - ADMIN: Incluye Modal de Edición (Precio/Pagos) + Configuración Live + Canales.
- * - SOCIAL: Feed, Comentarios, Likes, Chat en tiempo real y Moderación.
- * - LIVE: Cuenta regresiva y gestión de eventos.
+ * * MEJORAS V45.0:
+ * - ACCESS GUARD: Redirección automática a Landing Page si el usuario no es miembro.
+ * - TRIAL UX: Banner de "7 días restantes" con botón de actualización de plan.
+ * - CORE: Mantiene toda la funcionalidad de Feed, Chat, Live y Admin intacta.
  */
 
 window.App = window.App || {};
@@ -60,6 +59,21 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
         }
     }
 
+    // ------------------------------------------------------------------------
+    // [NUEVO] ACCESS GUARD (Guardia de Tráfico)
+    // Si el usuario NO es miembro y NO es admin, redirigir a la Landing de Ventas.
+    // ------------------------------------------------------------------------
+    const isMember = (user.joinedCommunities || []).includes(cid);
+    const isAdmin = user.role === 'admin';
+
+    if (!isMember && !isAdmin) {
+        // Redirección forzada a la Landing Page Pública para venta/planes
+        console.log(`🔒 Acceso denegado a ${cid}. Redirigiendo a Landing de Ventas.`);
+        window.location.hash = `#comunidades/${cid}`; 
+        return;
+    }
+    // ------------------------------------------------------------------------
+
     // 2. Renderizar Estructura Base (Solo si cambia el contexto o es render inicial)
     const root = document.getElementById('community-root');
     const currentCid = root ? root.dataset.cid : null;
@@ -94,7 +108,7 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
         // Inyectar TODOS los modales (Post, Live, Channels, Edit Community)
         _injectModals(community, user);
     } else {
-        // Actualización ligera: Solo tabs del header
+        // Actualización ligera: Solo tabs del header (Mantiene estado de scroll si es posible)
         const headerWrapper = document.getElementById('comm-header-wrapper');
         if (headerWrapper) {
             headerWrapper.innerHTML = _renderCommunityHeader(community, activeTab, user);
@@ -108,7 +122,7 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
     if (window.liveInterval) { clearInterval(window.liveInterval); window.liveInterval = null; }
 
     // Reset scroll si cambiamos de tab (UX)
-    if(container) container.scrollTop = 0;
+    if(container && isNewRender) container.scrollTop = 0;
 
     switch (activeTab) {
         case 'inicio':
@@ -152,7 +166,7 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
                         <i class="fas fa-users"></i>
                     </div>
                     <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Directorio de Miembros</h3>
-                    <p class="text-slate-500 dark:text-slate-400 max-w-md mx-auto">Próximamente podrás ver y conectar con los ${community.membersCount} estudiantes de esta comunidad.</p>
+                    <p class="text-slate-500 dark:text-slate-400 max-w-md mx-auto">Próximamente podrás ver y conectar con los ${community.membersCount || 0} estudiantes de esta comunidad.</p>
                 </div>`;
             break;
             
@@ -178,76 +192,103 @@ function _renderCommunityHeader(c, activeTab, user) {
         return activeTab === tabName ? tabActive : tabInactive;
     };
 
-    return `
-        <div class="max-w-[1600px] mx-auto px-4 lg:px-8">
-            
-            <!-- Top Bar: Info + Acciones -->
-            <div class="h-20 flex items-center justify-between">
-                
-                <!-- Info Izquierda -->
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1890ff] to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 shrink-0">
-                        <i class="fas ${c.icon || 'fa-users'} text-xl"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <h1 class="font-heading font-black text-xl text-slate-900 dark:text-white leading-tight truncate flex items-center gap-2">
-                            ${c.name}
-                            ${c.isPrivate ? '<i class="fas fa-lock text-xs text-slate-400" title="Privada"></i>' : ''}
-                        </h1>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide truncate max-w-[300px]">
-                            ${c.description || 'Comunidad de aprendizaje'}
-                        </p>
-                    </div>
-                </div>
+    // ------------------------------------------------------------------------
+    // [NUEVO] LOGICA DEL BANNER DE TRIAL
+    // Simulamos que el usuario está en periodo de prueba
+    // ------------------------------------------------------------------------
+    const isTrial = true; // Flag simulado (debería venir del backend: user.memberships[cid].isTrial)
+    const daysLeft = 7;   // Días restantes simulados
 
-                <!-- Acciones Derecha -->
-                <div class="flex items-center gap-3">
-                    ${!isMember ? 
-                        `<button onclick="App.api.joinCommunity('${c.id}').then(()=>App.renderCommunity('${c.id}'))" class="bg-[#1890ff] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/30 animate-pulse">Unirse</button>` : 
-                        `<div class="hidden md:flex items-center gap-2 text-[10px] font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full border border-green-100 dark:border-green-900/30">
-                            <i class="fas fa-check-circle"></i> Miembro
-                         </div>`
-                    }
+    const trialBanner = isTrial ? `
+        <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white px-4 py-2 text-xs font-bold flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6 shadow-inner relative z-50">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-stopwatch animate-pulse"></i>
+                <span class="tracking-wide">TU PERIODO DE PRUEBA TERMINA EN <span class="bg-white/20 px-1.5 py-0.5 rounded text-white">${daysLeft} DÍAS</span></span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="hidden md:inline opacity-80 font-normal">No pierdas tu progreso.</span>
+                <button onclick="window.location.href='#comunidades/${c.id}'" class="bg-white text-indigo-700 px-4 py-1 rounded-full hover:bg-indigo-50 transition-all shadow-sm uppercase tracking-wider text-[10px] transform hover:scale-105 font-black border border-indigo-100 flex items-center gap-1">
+                    <i class="fas fa-star text-yellow-500"></i> Actualizar Plan
+                </button>
+            </div>
+        </div>
+    ` : '';
+    // ------------------------------------------------------------------------
+
+    return `
+        <div class="w-full bg-white dark:bg-[#0f172a] shadow-sm relative z-50 flex flex-col">
+            
+            ${trialBanner} <!-- Inserción del Banner Superior -->
+
+            <div class="max-w-[1600px] w-full mx-auto px-4 lg:px-8">
+                <!-- Top Bar: Info + Acciones -->
+                <div class="h-20 flex items-center justify-between">
                     
-                    <!-- BOTÓN CONFIGURACIÓN (Tuerca) -->
-                    <div class="relative" id="community-settings-wrapper">
-                        <button onclick="App.community.toggleSettings()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-[#1890ff] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors">
-                            <i class="fas fa-cog"></i>
-                        </button>
+                    <!-- Info Izquierda -->
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1890ff] to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 shrink-0">
+                            <i class="fas ${c.icon || 'fa-users'} text-xl"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <h1 class="font-heading font-black text-xl text-slate-900 dark:text-white leading-tight truncate flex items-center gap-2">
+                                ${c.name}
+                                ${c.isPrivate ? '<i class="fas fa-lock text-xs text-slate-400" title="Privada"></i>' : ''}
+                            </h1>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide truncate max-w-[300px]">
+                                ${c.description || 'Comunidad de aprendizaje'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Acciones Derecha -->
+                    <div class="flex items-center gap-3">
+                        ${!isMember ? 
+                            `<button onclick="App.api.joinCommunity('${c.id}').then(()=>App.renderCommunity('${c.id}'))" class="bg-[#1890ff] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/30 animate-pulse">Unirse</button>` : 
+                            `<div class="hidden md:flex items-center gap-2 text-[10px] font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full border border-green-100 dark:border-green-900/30">
+                                <i class="fas fa-check-circle"></i> Miembro
+                            </div>`
+                        }
                         
-                        <!-- Dropdown Menu -->
-                        <div id="community-settings-menu" class="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 hidden animate-slide-up overflow-hidden z-50">
-                            ${isAdmin ? `
-                            <button onclick="App.community.openEditCommunityModal()" class="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors border-b border-gray-50 dark:border-slate-800">
-                                <i class="fas fa-edit w-5 text-center text-slate-400"></i> Editar Comunidad
-                            </button>` : ''}
-                            
-                            <!-- Opción Abandonar -->
-                            <button onclick="App.community.leave('${c.id}')" class="w-full text-left px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors">
-                                <i class="fas fa-sign-out-alt w-5 text-center"></i> Abandonar Comunidad
+                        <!-- BOTÓN CONFIGURACIÓN (Tuerca) -->
+                        <div class="relative" id="community-settings-wrapper">
+                            <button onclick="App.community.toggleSettings()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-[#1890ff] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors">
+                                <i class="fas fa-cog"></i>
                             </button>
+                            
+                            <!-- Dropdown Menu -->
+                            <div id="community-settings-menu" class="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 hidden animate-slide-up overflow-hidden z-50">
+                                ${isAdmin ? `
+                                <button onclick="App.community.openEditCommunityModal()" class="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors border-b border-gray-50 dark:border-slate-800">
+                                    <i class="fas fa-edit w-5 text-center text-slate-400"></i> Editar Comunidad
+                                </button>` : ''}
+                                
+                                <!-- Opción Abandonar -->
+                                <button onclick="App.community.leave('${c.id}')" class="w-full text-left px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors">
+                                    <i class="fas fa-sign-out-alt w-5 text-center"></i> Abandonar Comunidad
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Navegación Tabs -->
-            <div class="flex items-center gap-1 overflow-x-auto custom-scrollbar -mb-px">
-                <a href="#comunidades/${c.id}/inicio" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('inicio')}">
-                    <i class="fas fa-stream"></i> Muro
-                </a>
-                <a href="#comunidades/${c.id}/clases" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('clases')}">
-                    <i class="fas fa-graduation-cap"></i> Aula
-                </a>
-                <a href="#comunidades/${c.id}/chat" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('chat')}">
-                    <i class="fas fa-comments"></i> Chat
-                </a>
-                <a href="#comunidades/${c.id}/live" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('live')}">
-                    <i class="fas fa-video ${activeTab === 'live' ? 'text-red-500 animate-pulse' : ''}"></i> En Vivo
-                </a>
-                <a href="#comunidades/${c.id}/miembros" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('miembros')}">
-                    <i class="fas fa-users"></i> Miembros
-                </a>
+                <!-- Navegación Tabs -->
+                <div class="flex items-center gap-1 overflow-x-auto custom-scrollbar -mb-px">
+                    <a href="#comunidades/${c.id}/inicio" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('inicio')}">
+                        <i class="fas fa-stream"></i> Muro
+                    </a>
+                    <a href="#comunidades/${c.id}/clases" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('clases')}">
+                        <i class="fas fa-graduation-cap"></i> Aula
+                    </a>
+                    <a href="#comunidades/${c.id}/chat" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('chat')}">
+                        <i class="fas fa-comments"></i> Chat
+                    </a>
+                    <a href="#comunidades/${c.id}/live" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('live')}">
+                        <i class="fas fa-video ${activeTab === 'live' ? 'text-red-500 animate-pulse' : ''}"></i> En Vivo
+                    </a>
+                    <a href="#comunidades/${c.id}/miembros" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('miembros')}">
+                        <i class="fas fa-users"></i> Miembros
+                    </a>
+                </div>
             </div>
         </div>
     `;

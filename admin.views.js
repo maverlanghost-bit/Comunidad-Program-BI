@@ -1,9 +1,11 @@
 /**
- * admin.views.js (V26.0 - PLANS MANAGER)
+ * admin.views.js (V30.0 - SLUGS & VALIDATION MASTER)
  * Panel de Control Unificado: Gestión de Comunidades, Ventas, Usuarios y Moderación.
- * * MEJORAS V26.0:
- * - GESTIÓN DE PLANES: Nuevo constructor de planes (Membership Tiers) en el modal de comunidad.
- * - IMAGEN PORTADA: Campo añadido para gestionar la imagen de la landing page.
+ * * MEJORAS V30.0:
+ * - SLUGS AMIGABLES: Generación automática de IDs basados en el nombre (ej: /python-avanzado).
+ * - VALIDACIÓN: Prevención de nombres duplicados al crear comunidades.
+ * - PLANES: Sistema completo de gestión de membresías.
+ * - MODERACIÓN: Herramientas para editar y eliminar contenido.
  */
 
 window.App = window.App || {};
@@ -140,7 +142,7 @@ async function _loadAdminOverview() {
                         <p class="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-xs relative z-10">Base de datos Firestore conectada y sincronizada en tiempo real.</p>
                         <div class="mt-6 flex gap-2">
                             <span class="px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold relative z-10">Online</span>
-                            <span class="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold relative z-10">V26.0</span>
+                            <span class="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold relative z-10">V30.0</span>
                         </div>
                     </div>
                 </div>
@@ -195,7 +197,8 @@ async function _loadAdminCommunities() {
                         </div>
                     </div>
                     
-                    <h3 class="font-heading font-bold text-slate-900 dark:text-white mb-2 truncate">${c.name}</h3>
+                    <h3 class="font-heading font-bold text-slate-900 dark:text-white mb-1 truncate">${c.name}</h3>
+                    <div class="text-[10px] text-slate-400 font-mono mb-2 truncate">ID: ${c.id}</div>
                     <p class="text-xs text-slate-500 dark:text-slate-400 mb-4 line-clamp-2 min-h-[2.5em]">${c.description || 'Sin descripción'}</p>
                     
                     <div class="flex flex-wrap gap-2 mb-4">
@@ -410,7 +413,7 @@ window.App.admin = {
             document.getElementById('modal-title').innerText = "Editar Comunidad";
             document.getElementById('btn-save-community').innerText = "Guardar Cambios";
 
-            document.getElementById('comm-id').value = comm.id;
+            document.getElementById('comm-id').value = comm.id; // slug (readonly en teoría, pero editable en backend si necesario)
             document.getElementById('comm-name').value = comm.name || '';
             document.getElementById('comm-icon').value = comm.icon || '';
             document.getElementById('comm-desc').value = comm.description || '';
@@ -449,21 +452,45 @@ window.App.admin = {
 
     saveCommunity: async () => {
         const btn = document.getElementById('btn-save-community');
-        const id = document.getElementById('comm-id').value;
+        let id = document.getElementById('comm-id').value;
         const name = document.getElementById('comm-name').value.trim();
         
         if (!name) return App.ui.toast("El nombre es obligatorio", "warning");
 
         btn.disabled = true; btn.innerHTML = "Procesando...";
 
+        // GENERAR SLUG AMIGABLE SI ES NUEVA
+        if (!id) {
+            // "Curso Python" -> "curso-python"
+            id = name.toLowerCase()
+                .replace(/[^a-z0-9\s-]/g, '') // Eliminar caracteres especiales
+                .replace(/\s+/g, '-')         // Espacios a guiones
+                .replace(/-+/g, '-');         // Guiones múltiples a uno solo
+            
+            if (id.length < 3) id += "-edu"; // Asegurar longitud mínima
+
+            // VALIDAR DUPLICADOS
+            try {
+                const docRef = window.F.doc(window.F.db, "communities", id);
+                const docSnap = await window.F.getDoc(docRef);
+                if (docSnap.exists()) {
+                    btn.disabled = false; btn.innerHTML = "Crear Comunidad";
+                    return App.ui.toast(`El nombre "${name}" ya existe (ID: ${id}). Elige otro.`, "error");
+                }
+            } catch(e) {
+                console.error("Error verificando duplicado", e);
+            }
+        }
+
         const data = {
+            id: id, // Asegurar que el ID vaya en el objeto
             name: name,
             icon: document.getElementById('comm-icon').value.trim() || 'fa-users',
             description: document.getElementById('comm-desc').value.trim(),
             category: document.getElementById('comm-cat').value,
             videoUrl: document.getElementById('comm-video').value.trim(),
             image: document.getElementById('comm-image').value.trim(),
-            // Planes System (Reemplaza precios individuales)
+            // Planes System
             plans: App.admin.tempPlans,
             // Config
             isPublic: document.getElementById('comm-public').checked,
@@ -472,27 +499,26 @@ window.App.admin = {
             updatedAt: new Date().toISOString()
         };
 
-        // Campos Legacy para compatibilidad (Opcional, se pueden dejar en 0 o calcular desde el plan base)
+        // Campos Legacy para compatibilidad
         if (App.admin.tempPlans.length > 0) {
-            data.priceMonthly = App.admin.tempPlans[0].price; // Referencia rápida
+            data.priceMonthly = App.admin.tempPlans[0].price;
             data.membersCount = data.membersCount || 0;
         }
 
         try {
-            if (id) {
-                await App.api.updateCommunity(id, data);
-                App.ui.toast("Comunidad actualizada", "success");
-            } else {
-                await App.api.createCommunity(data);
-                App.ui.toast("Comunidad creada", "success");
-            }
+            // USAR SETDOC PARA FORZAR EL ID PERSONALIZADO (SLUG)
+            await window.F.setDoc(window.F.doc(window.F.db, "communities", id), data, { merge: true });
+            
+            App.ui.toast(id === document.getElementById('comm-id').value ? "Comunidad actualizada" : "Comunidad creada con éxito", "success");
+            
             App.admin.closeCommunityModal();
             App.renderAdmin('communities');
         } catch (e) {
             console.error(e);
-            App.ui.toast("Error al guardar", "error");
+            App.ui.toast("Error al guardar en Firestore", "error");
         } finally {
             btn.disabled = false;
+            btn.innerHTML = id === document.getElementById('comm-id').value ? "Guardar Cambios" : "Crear Comunidad";
         }
     },
 
@@ -620,6 +646,7 @@ function _renderCommunityModalUnified() {
                         <div class="space-y-1">
                             <label class="text-sm font-bold text-slate-700 dark:text-slate-300">Nombre</label>
                             <input type="text" id="comm-name" class="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white transition-colors placeholder:text-slate-400" placeholder="Ej: Python Masterclass">
+                            <p class="text-[10px] text-slate-400">Esto generará la URL: /comunidades/python-masterclass</p>
                         </div>
                         <div class="space-y-1">
                             <label class="text-sm font-bold text-slate-700 dark:text-slate-300">Categoría</label>

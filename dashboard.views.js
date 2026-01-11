@@ -1,10 +1,10 @@
 /**
- * dashboard.views.js (V37.0 - CLEANUP)
+ * dashboard.views.js (V38.0 - ANTI-CRASH FIX)
  * Motor del Panel de Usuario.
- * * CAMBIOS V37.0:
- * - REFACTOR: Eliminados Tabs "Mi Feed" / "Explorar". El dashboard es SOLO Feed.
- * - NAV: Botones de "Explorar" redirigen a #discovery.
- * - UX: Header simplificado.
+ * * FIX PANTALLA BLANCA (FEED):
+ * - SAFETY: Se añadió protección robusta para 'user.name'. Si no existe, usa el email o un genérico. Evita el crash de .split().
+ * - CACHE: Inicialización defensiva de 'App.state.cache' para evitar errores si el usuario entra directo al feed.
+ * - UX: Se mejoró el mensaje de estado vacío para usuarios nuevos.
  */
 
 window.App = window.App || {};
@@ -23,6 +23,10 @@ window.App.renderDashboard = async () => {
         return; 
     }
 
+    // [FIX V38.0] Inicialización de Caché Defensiva
+    if (!App.state.cache) App.state.cache = {};
+    if (!App.state.cache.communities) App.state.cache.communities = {};
+
     // 2. Precarga de Datos (Comunidades)
     if (user.joinedCommunities && user.joinedCommunities.length > 0) {
         try {
@@ -37,6 +41,10 @@ window.App.renderDashboard = async () => {
 
     // 3. Cálculo de Progreso (Widget Derecho)
     const progressData = _calculateUserProgress(user);
+
+    // [FIX V38.0] Nombre Seguro (Evita crash si user.name es null)
+    const displayName = user.name || user.displayName || user.email || 'Estudiante';
+    const safeName = displayName.includes(' ') ? displayName.split(' ')[0] : displayName;
 
     // 4. Sidebar Global (Izquierdo) - Activo: 'feed'
     const sidebarHTML = App.sidebar && App.sidebar.render ? App.sidebar.render('feed') : '';
@@ -54,7 +62,7 @@ window.App.renderDashboard = async () => {
                 <div class="flex items-center gap-6 animate-enter min-w-0">
                     <div>
                         <h1 class="text-xl font-heading font-bold text-slate-900 dark:text-white tracking-tight truncate hidden md:block">
-                            Hola, ${user.name.split(' ')[0]} 👋
+                            Hola, ${safeName} 👋
                         </h1>
                         <p class="text-xs text-slate-500 dark:text-slate-400 font-medium md:hidden">Tu Actividad</p>
                     </div>
@@ -83,7 +91,7 @@ window.App.renderDashboard = async () => {
                     
                     <!-- Avatar Perfil (Trigger Modal) -->
                     <button onclick="App.dashboard.openProfileModal()" class="w-10 h-10 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden border border-gray-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1890ff] transition-all relative group flex-shrink-0">
-                        <img src="${user.avatar}" class="w-full h-full object-cover">
+                        <img src="${user.avatar || 'https://ui-avatars.com/api/?name='+safeName}" class="w-full h-full object-cover">
                     </button>
                 </div>
             </header>
@@ -136,7 +144,7 @@ async function _loadDashboardContent(user) {
         <div class="space-y-6">
             <!-- Caja Crear Post (Visual) -->
             <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-4 cursor-pointer hover:border-gray-300 dark:hover:border-slate-600 transition-colors group" onclick="App.dashboard.openPostModal()">
-                <img src="${user.avatar}" class="w-11 h-11 rounded-full bg-gray-100 dark:bg-slate-800 object-cover">
+                <img src="${user.avatar || 'https://ui-avatars.com/api/?name=U'}" class="w-11 h-11 rounded-full bg-gray-100 dark:bg-slate-800 object-cover">
                 <div class="flex-1 bg-gray-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 text-slate-400 dark:text-slate-500 text-sm font-medium group-hover:bg-gray-100 dark:group-hover:bg-slate-800 transition-colors">
                     Comparte tu progreso, dudas o ideas...
                 </div>
@@ -154,6 +162,9 @@ async function _loadDashboardContent(user) {
         let allPosts = [];
         
         for (const cid of joined) {
+            // Protección contra IDs de comunidad inválidos
+            if (!cid || !App.state.cache.communities[cid]) continue;
+
             const posts = await App.api.getPosts(cid, 'all');
             const commName = App.state.cache.communities[cid]?.name || 'Comunidad';
             const commIcon = App.state.cache.communities[cid]?.icon || 'fa-users';
@@ -199,7 +210,7 @@ function _renderFeedCard(post, user) {
         <!-- Header Post -->
         <div class="flex items-start justify-between mb-4">
             <div class="flex items-center gap-3">
-                <img src="${post.author?.avatar || 'https://ui-avatars.com/api/?name=User'}" class="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 object-cover border border-gray-100 dark:border-slate-800">
+                <img src="${post.author?.avatar || 'https://ui-avatars.com/api/?name='+(post.author?.name || 'User')}" class="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 object-cover border border-gray-100 dark:border-slate-800">
                 <div>
                     <h4 class="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
                         ${post.author?.name || 'Usuario'} 
@@ -252,7 +263,7 @@ function _renderFeedCard(post, user) {
             <!-- Sección Comentarios -->
             <div id="feed-comments-${post.id}" class="hidden pt-4 mt-2 border-t border-dashed border-gray-100 dark:border-slate-800 animate-fade-in">
                 <div class="flex gap-3 mb-4">
-                    <img src="${user.avatar}" class="w-8 h-8 rounded-full border border-gray-100 dark:border-slate-800">
+                    <img src="${user.avatar || 'https://ui-avatars.com/api/?name=U'}" class="w-8 h-8 rounded-full border border-gray-100 dark:border-slate-800">
                     <div class="flex-1 relative">
                         <input type="text" id="feed-comment-input-${post.id}" 
                                placeholder="Escribe una respuesta..." 
@@ -361,8 +372,12 @@ function _calculateUserProgress(user) {
     const completed = user.completedModules || [];
 
     for (const cid of user.joinedCommunities) {
+        // [FIX V38.0] Verificación de caché
+        if (!App.state.cache.communities || !App.state.cache.communities[cid]) continue;
+        
         const community = App.state.cache.communities[cid];
         if (!community || !community.courses) continue;
+        
         for (const course of community.courses) {
             if (!course.classes) continue;
             const nextClass = course.classes.find(c => !completed.includes(`${cid}_${c.id}`));
@@ -427,8 +442,8 @@ App.dashboard.addComment = async (postId) => {
     const comment = {
         id: 'cm_' + Date.now(),
         authorId: user.uid,
-        authorName: user.name,
-        authorAvatar: user.avatar,
+        authorName: user.name || 'Estudiante',
+        authorAvatar: user.avatar || '',
         content: txt,
         createdAt: new Date().toISOString()
     };
@@ -436,7 +451,7 @@ App.dashboard.addComment = async (postId) => {
     // Insertar en DOM
     const html = `
     <div class="flex gap-2 animate-slide-up">
-        <img src="${comment.authorAvatar}" class="w-6 h-6 rounded-full border border-gray-100 dark:border-slate-800 mt-1">
+        <img src="${comment.authorAvatar || 'https://ui-avatars.com/api/?name=U'}" class="w-6 h-6 rounded-full border border-gray-100 dark:border-slate-800 mt-1">
         <div class="bg-gray-50 dark:bg-slate-800/50 p-2.5 rounded-2xl rounded-tl-none flex-1 border border-transparent dark:border-slate-800">
             <div class="flex justify-between items-baseline mb-0.5">
                 <span class="text-xs font-bold text-slate-900 dark:text-white">${comment.authorName}</span>
@@ -478,6 +493,8 @@ function _renderPostModal() {
                     <select id="post-community-select" class="w-full p-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] dark:text-white transition-colors cursor-pointer text-sm">
                         <option value="">Selecciona una comunidad...</option>
                         ${(App.state.currentUser?.joinedCommunities || []).map(cid => {
+                            // Protección contra cache nulo
+                            if (!App.state.cache.communities) return '';
                             const c = App.state.cache.communities[cid];
                             return c ? `<option value="${cid}">${c.name}</option>` : '';
                         }).join('')}
@@ -509,7 +526,7 @@ function _renderProfileModal(user) {
             <div class="px-8 pb-8 -mt-10 relative">
                 <div class="flex justify-center mb-4">
                     <div class="relative group">
-                        <img id="profile-avatar-prev" src="${user.avatar}" class="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-slate-800 shadow-xl bg-white dark:bg-slate-800">
+                        <img id="profile-avatar-prev" src="${user.avatar || 'https://via.placeholder.com/150'}" class="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-slate-800 shadow-xl bg-white dark:bg-slate-800">
                         <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-[2px]" onclick="App.ui.toast('Cambio de avatar: Próximamente', 'info')">
                             <i class="fas fa-camera"></i>
                         </div>
@@ -521,7 +538,7 @@ function _renderProfileModal(user) {
                     
                     <div class="space-y-1">
                         <label class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide ml-1">Nombre</label>
-                        <input type="text" id="profile-name" value="${user.name}" class="w-full py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-[#1890ff] transition-colors dark:text-white text-sm">
+                        <input type="text" id="profile-name" value="${user.name || ''}" class="w-full py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-[#1890ff] transition-colors dark:text-white text-sm" placeholder="Tu nombre">
                     </div>
                     
                     <button onclick="App.dashboard.saveProfile()" id="btn-save-profile" class="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-3 rounded-xl font-bold shadow-lg mt-2 text-sm hover:scale-[1.02] transition-transform">
