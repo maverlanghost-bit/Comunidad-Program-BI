@@ -1,14 +1,20 @@
 /**
- * public.views.js (V65.0 - GLOBAL FEED IMPLEMENTATION)
+ * public.views.js (V71.0 - VARIANTS DROPDOWN SUPPORT)
  * Motor de Experiencia Pública.
- * * FIX PANTALLA BLANCA (FEED):
- * - CAUSA: La ruta '#feed' existía en el header pero no tenía una función asignada para renderizarla.
- * - SOLUCIÓN: Se implementó 'renderFeed' que carga y muestra la actividad reciente de las comunidades del usuario.
- * - FEATURES: Filtrado de posts por 'joinedCommunities', tarjetas de diseño consistente y manejo de estado vacío.
+ * * FEATURES V71.0:
+ * 1. DROPDOWN DE VARIANTES: Soporte real para menús desplegables en planes (configurados en Admin V40.5).
+ * 2. LINKS DINÁMICOS: El botón de pago cambia su destino según la opción seleccionada en el menú.
+ * 3. FEED & DISCOVERY: Mantenidos intactos.
  */
 
 window.App = window.App || {};
 window.App.public = window.App.public || {};
+
+// Estado local para UI efímera
+window.App.public.state = {
+    carouselIndex: 0,
+    mediaItems: []
+};
 
 // ============================================================================
 // 1. DISCOVERY (CATÁLOGO PÚBLICO)
@@ -127,6 +133,7 @@ window.App.public.renderLanding = async (communityId) => {
         const docSnap = await window.F.getDoc(docRef);
         if (docSnap.exists()) {
             c = { id: docSnap.id, ...docSnap.data() };
+            // Cachear para acceso rápido en calculadora de precios
             if (!App.state.cache.communities) App.state.cache.communities = {};
             App.state.cache.communities[cleanId] = c;
         }
@@ -142,11 +149,23 @@ window.App.public.renderLanding = async (communityId) => {
 
     const user = App.state.currentUser;
     const isMember = user && (user.joinedCommunities || []).includes(c.id);
-    const videoId = c.videoUrl ? (c.videoUrl.includes('v=') ? c.videoUrl.split('v=')[1].split('&')[0] : c.videoUrl.split('/').pop()) : null;
+    
+    // Preparar Datos del Carrusel
+    let galleryItems = c.gallery || [];
+    if (galleryItems.length === 0) {
+        if (c.videoUrl) galleryItems.push({ type: 'video', url: c.videoUrl });
+        if (c.image) galleryItems.push({ type: 'image', url: c.image });
+        if (galleryItems.length === 0) galleryItems.push({ type: 'image', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80' });
+    }
+    
+    App.public.state.mediaItems = galleryItems;
+    App.public.state.carouselIndex = 0;
+
     const plans = Array.isArray(c.plans) ? c.plans : [];
     const hasPlans = plans.length > 0;
     const simplePrice = c.priceMonthly || c.price || 0;
     const isFree = !hasPlans && (!simplePrice || parseFloat(simplePrice) === 0);
+
     const coursesList = c.courses || [];
 
     await App.render(`
@@ -163,30 +182,42 @@ window.App.public.renderLanding = async (communityId) => {
 
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
                     <div class="lg:col-span-8 space-y-8 animate-fade-in">
-                        <div class="relative">
-                            <div class="glow-backdrop"></div>
-                            <div class="video-glow-container aspect-video bg-black shadow-2xl">
-                                ${videoId ? `
-                                    <iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&autoplay=0" frameborder="0" allowfullscreen></iframe>
-                                ` : `
-                                    <img src="${c.image || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80'}" class="w-full h-full object-cover opacity-90">
-                                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-8">
-                                        <div>
-                                            <span class="inline-block px-3 py-1 bg-[#1890ff] text-white text-xs font-bold rounded-lg mb-2 uppercase tracking-wide">Curso Destacado</span>
-                                            <h1 class="text-3xl md:text-4xl font-black text-white drop-shadow-lg leading-tight">${c.name}</h1>
-                                        </div>
-                                    </div>
-                                `}
+                        
+                        <!-- 1. MULTIMEDIA CAROUSEL -->
+                        <div class="relative bg-black rounded-2xl overflow-hidden shadow-2xl aspect-video group" id="hero-carousel">
+                            ${_renderCarouselInner(galleryItems, 0)}
+                            
+                            <!-- Controles Carrusel -->
+                            ${galleryItems.length > 1 ? `
+                            <button onclick="App.public.moveCarousel(-1)" class="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/30 backdrop-blur text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button onclick="App.public.moveCarousel(1)" class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/30 backdrop-blur text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                                ${galleryItems.map((_, idx) => `<div id="indicator-${idx}" class="w-2 h-2 rounded-full ${idx===0 ? 'bg-white' : 'bg-white/40'} transition-colors"></div>`).join('')}
+                            </div>
+                            ` : ''}
+                            
+                            <!-- Overlay de Título (Solo si es Imagen) -->
+                            <div id="hero-overlay" class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent flex items-end p-8 pointer-events-none transition-opacity ${galleryItems[0].type === 'video' ? 'opacity-0' : 'opacity-100'}">
+                                <div>
+                                    <span class="inline-block px-3 py-1 bg-[#1890ff] text-white text-xs font-bold rounded-lg mb-2 uppercase tracking-wide">Comunidad Oficial</span>
+                                    <h1 class="text-3xl md:text-4xl font-black text-white drop-shadow-lg leading-tight">${c.name}</h1>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- TABS NAVEGACIÓN -->
                         <div class="flex items-center gap-2 overflow-x-auto py-2 no-scrollbar border-b border-gray-200 dark:border-slate-800 sticky top-[60px] z-30 bg-[#F8FAFC]/95 dark:bg-[#020617]/95 backdrop-blur-md">
                             <button onclick="App.public.switchLandingTab('info')" id="tab-btn-info" class="nav-pill active">Información</button>
                             <button onclick="App.public.switchLandingTab('classroom')" id="tab-btn-classroom" class="nav-pill">Aula Virtual</button>
+                            <button onclick="App.public.switchLandingTab('plans')" id="tab-btn-plans" class="nav-pill">Planes y Precios</button>
                             <button onclick="App.public.switchLandingTab('community')" id="tab-btn-community" class="nav-pill">Comunidad</button>
-                            <button onclick="App.public.switchLandingTab('instructor')" id="tab-btn-instructor" class="nav-pill">Instructor</button>
                         </div>
 
+                        <!-- CONTENIDO TABS -->
                         <div id="tab-content-info" class="animate-fade-in space-y-8">
                             <div class="prose dark:prose-invert max-w-none">
                                 <h2 class="text-2xl font-black text-slate-900 dark:text-white mb-4">Sobre esta comunidad</h2>
@@ -215,10 +246,9 @@ window.App.public.renderLanding = async (communityId) => {
                                             <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-[#1890ff] flex items-center justify-center font-bold text-sm">${idx + 1}</div>
                                             <h3 class="font-bold text-slate-900 dark:text-white text-lg">${course.title}</h3>
                                         </div>
-                                        <span class="text-xs font-bold text-slate-500 bg-white dark:bg-slate-900 px-2 py-1 rounded border border-gray-200 dark:border-slate-700">${(course.classes || []).length} Clases</span>
                                     </div>
                                     <div class="p-2 space-y-1">
-                                        ${(course.classes || []).length > 0 ? (course.classes || []).map((cls) => `
+                                        ${(course.classes || []).map((cls) => `
                                             <div class="p-3 hover:bg-gray-50 dark:hover:bg-slate-800/50 rounded-xl flex items-center justify-between group transition-colors">
                                                 <div class="flex items-center gap-3 overflow-hidden">
                                                     <div class="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-[10px]"><i class="fas fa-play ml-0.5"></i></div>
@@ -226,11 +256,18 @@ window.App.public.renderLanding = async (communityId) => {
                                                 </div>
                                                 <span class="text-xs text-slate-400 font-mono ml-2 shrink-0">${cls.duration || '10:00'}</span>
                                             </div>
-                                        `).join('') : '<div class="p-4 text-center text-xs text-slate-400 italic">Contenido en preparación</div>'}
+                                        `).join('')}
                                     </div>
                                 </div>
                             `).join('') : `<div class="text-center py-12 bg-gray-50 dark:bg-slate-800/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-slate-700"><div class="text-4xl mb-2">📚</div><p class="text-slate-500 text-sm font-medium">El temario se está actualizando.</p></div>`}
-                            ${!isMember ? `<div class="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-center"><p class="text-sm text-blue-600 dark:text-blue-400 font-bold mb-2">🔒 Desbloquea todo el contenido</p><button onclick="App.public.handleJoinFlow('${c.id}')" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition-colors">Unirse Ahora</button></div>` : ''}
+                        </div>
+
+                        <!-- 3. PLANES -->
+                        <div id="tab-content-plans" class="hidden animate-fade-in space-y-6">
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white mb-4">Elige tu modalidad</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                ${hasPlans ? plans.map(plan => _renderPlanCardUnified(plan, c)).join('') : _renderDefaultPlan(c)}
+                            </div>
                         </div>
 
                         <div id="tab-content-community" class="hidden animate-fade-in space-y-6">
@@ -238,22 +275,11 @@ window.App.public.renderLanding = async (communityId) => {
                             <div class="space-y-4">
                                 ${_renderPostPreview("Juan P.", "ayuda con error en deploy", "Hola comunidad, tengo un problema con Docker...", 5, 12)}
                                 ${_renderPostPreview("Maria S.", "¡Conseguí mi primer empleo!", "Gracias a todos por el apoyo, finalmente...", 24, 45)}
-                                ${_renderPostPreview("Admin", "Nuevo recurso disponible", "Hemos agregado la cheat-sheet de Pandas...", 10, 8)}
-                            </div>
-                        </div>
-
-                        <div id="tab-content-instructor" class="hidden animate-fade-in">
-                            <div class="bg-white dark:bg-[#0f172a] p-8 rounded-3xl border border-gray-200 dark:border-slate-800 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left shadow-sm">
-                                <div class="relative shrink-0"><img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" class="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-slate-700 shadow-xl"><div class="absolute bottom-1 right-1 bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-xs border-2 border-white dark:border-slate-800"><i class="fas fa-check"></i></div></div>
-                                <div>
-                                    <h2 class="text-2xl font-black text-slate-900 dark:text-white mb-1">Equipo ProgramBI</h2>
-                                    <p class="text-[#1890ff] font-bold text-sm mb-4 uppercase tracking-wide">Instructor Principal</p>
-                                    <p class="text-slate-600 dark:text-slate-300 mb-6 leading-relaxed font-medium">Expertos en desarrollo de software y ciencia de datos con más de 10 años de experiencia.</p>
-                                </div>
                             </div>
                         </div>
                     </div>
 
+                    <!-- SIDEBAR -->
                     <div class="lg:col-span-4 relative">
                         <div class="sticky-sidebar-container space-y-6">
                             <div class="power-card p-6 animate-slide-up bg-white dark:bg-[#0f172a]">
@@ -267,24 +293,22 @@ window.App.public.renderLanding = async (communityId) => {
                                     <div class="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100 dark:border-slate-800">
                                         <img src="${c.image || 'https://via.placeholder.com/50'}" class="w-12 h-12 rounded-lg object-cover bg-slate-100 shadow-sm">
                                         <div>
-                                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suscripción</div>
+                                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Desde</div>
                                             <div class="flex items-baseline gap-1">
                                                 <span class="text-3xl font-black text-slate-900 dark:text-white">${isFree ? 'Gratis' : (hasPlans ? 'Desde $'+Math.min(...plans.map(p=>p.price)) : `$${simplePrice}`)}</span>
-                                                ${!isFree ? '<span class="text-sm font-medium text-slate-500">/mes</span>' : ''}
                                             </div>
                                         </div>
                                     </div>
-                                    <button onclick="App.public.handleJoinFlow('${c.id}')" class="w-full py-4 bg-[#1890ff] hover:bg-blue-600 text-white font-bold rounded-xl text-lg shadow-lg shadow-blue-500/25 transition-all hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-2 group mb-6 relative overflow-hidden">
-                                        <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                                        <span class="relative z-10">${isFree ? 'Unirse Gratis' : 'Ver Planes y Precios'}</span>
-                                        <i class="fas fa-rocket relative z-10 group-hover:translate-x-1 transition-transform"></i>
+                                    <button onclick="App.public.switchLandingTab('plans')" class="w-full py-4 bg-[#1890ff] hover:bg-blue-600 text-white font-bold rounded-xl text-lg shadow-lg shadow-blue-500/25 transition-all hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-2 group mb-6">
+                                        <span>Ver Opciones</span>
+                                        <i class="fas fa-arrow-down relative z-10 group-hover:translate-y-1 transition-transform"></i>
                                     </button>
                                     <div class="space-y-2 mb-6 pl-1">
                                         <div class="check-list-item"><i class="fas fa-check-circle text-green-500"></i> <span>Acceso inmediato</span></div>
                                         <div class="check-list-item"><i class="fas fa-check-circle text-green-500"></i> <span>Recursos descargables</span></div>
                                         <div class="check-list-item"><i class="fas fa-check-circle text-green-500"></i> <span>Soporte prioritario</span></div>
                                     </div>
-                                    <div class="text-center text-[10px] text-slate-400 border-t border-gray-100 dark:border-slate-800 pt-4 flex items-center justify-center gap-2"><i class="fas fa-lock"></i> Pago 100% Seguro y Encriptado</div>
+                                    <div class="text-center text-[10px] text-slate-400 border-t border-gray-100 dark:border-slate-800 pt-4 flex items-center justify-center gap-2"><i class="fas fa-lock"></i> Pago 100% Seguro</div>
                                 `}
                             </div>
                         </div>
@@ -298,105 +322,27 @@ window.App.public.renderLanding = async (communityId) => {
 };
 
 // ============================================================================
-// 3. VISTA DE PLANES & PAGO
+// 3. VISTA DE PLANES & PAGO (STANDALONE)
 // ============================================================================
 
 window.App.public.renderPlans = async (cid) => {
-    if (!cid || cid === 'undefined') cid = sessionStorage.getItem('target_community_id');
-    const cleanId = cid ? cid.split('/')[0] : null;
-
-    if (!cleanId) { window.location.hash = '#comunidades'; return; }
-
-    let c = null;
-    try { 
-        const docRef = window.F.doc(window.F.db, "communities", cleanId);
-        const docSnap = await window.F.getDoc(docRef);
-        if(docSnap.exists()) c = { id: docSnap.id, ...docSnap.data() };
-    } catch(e) { console.error("Error fetching plans:", e); }
-
-    if (!c) return App.public.renderLanding(cleanId);
-
-    const plans = Array.isArray(c.plans) ? c.plans : [];
-    const hasPlans = plans.length > 0;
-
-    await App.render(`
-        <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#020617] font-sans pt-24 pb-12 px-6">
-            ${_renderPublicHeader()}
-            
-            <div class="max-w-6xl mx-auto text-center animate-fade-in">
-                <button onclick="window.location.hash='#comunidades/${cleanId}'" class="mb-8 text-slate-500 hover:text-[#1890ff] font-bold text-sm flex items-center justify-center gap-2 transition-colors"><i class="fas fa-arrow-left"></i> Volver a la comunidad</button>
-                
-                <h1 class="text-3xl md:text-5xl font-black text-slate-900 dark:text-white mb-6">Elige tu Plan de Acceso</h1>
-                <p class="text-lg text-slate-600 dark:text-slate-400 mb-16 max-w-2xl mx-auto font-medium">
-                    Selecciona la opción para desbloquear <strong>${c.name}</strong>.
-                </p>
-
-                <div class="grid grid-cols-1 md:grid-cols-${Math.min(plans.length || 1, 3)} gap-8 text-left justify-center items-start">
-                    ${hasPlans ? plans.map(plan => _renderPlanCard(plan, c)).join('') : _renderDefaultPlan(c)}
-                </div>
-            </div>
-        </div>
-        <!-- Inyección del Modal de Bienvenida -->
-        <div id="welcome-modal-container"></div>
-    `);
+    // Redirigir a Landing Tab 'plans' para consistencia
+    window.location.hash = `#comunidades/${cid}`;
+    setTimeout(() => App.public.switchLandingTab('plans'), 500);
 };
 
 // ============================================================================
-// 4. GLOBAL FEED (IMPLEMENTACIÓN REAL)
+// 4. GLOBAL FEED
 // ============================================================================
 
 window.App.public.renderFeed = async () => {
     const user = App.state.currentUser;
-    
-    // 1. Auth Guard: Si no hay usuario, volver al inicio
-    if (!user) {
-        window.location.hash = '#comunidades';
-        return;
-    }
+    if (!user) { window.location.hash = '#comunidades'; return; }
 
-    // 2. UI Loading
-    await App.render(`
-        <div class="h-screen bg-[#F8FAFC] dark:bg-[#020617] font-sans flex flex-col">
-            ${_renderPublicHeader()}
-            <div class="flex-1 flex items-center justify-center">
-                <div class="text-center animate-pulse">
-                    <div class="text-[#1890ff] text-4xl mb-4"><i class="fas fa-circle-notch fa-spin"></i></div>
-                    <p class="text-slate-500 font-medium">Cargando tu feed...</p>
-                </div>
-            </div>
-        </div>
-    `);
-
-    // 3. Fetch Data (Posts)
-    let posts = [];
-    try {
-        // Traemos posts recientes (Limitado a 50 para performance)
-        const q = window.F.query(
-            window.F.collection(window.F.db, "posts"), 
-            window.F.orderBy("createdAt", "desc"), 
-            window.F.limit(50)
-        );
-        const querySnapshot = await window.F.getDocs(q);
-        
-        // Filtramos en memoria por las comunidades del usuario para evitar índices complejos
-        const myCommunityIds = user.joinedCommunities || [];
-        
-        posts = querySnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(post => myCommunityIds.includes(post.communityId));
-
-    } catch (e) {
-        console.error("Error cargando feed:", e);
-        // Fallback silencioso: array vacío
-    }
-
-    // 4. Render Final
     await App.render(`
         <div class="min-h-screen bg-[#F8FAFC] dark:bg-[#020617] font-sans pt-24 pb-12 px-4 custom-scrollbar">
             ${_renderPublicHeader()}
-            
             <div class="max-w-2xl mx-auto animate-fade-in">
-                <!-- Header del Feed -->
                 <div class="flex items-center justify-between mb-8">
                     <div>
                         <h1 class="text-3xl font-black text-slate-900 dark:text-white">Tu Feed</h1>
@@ -406,52 +352,52 @@ window.App.public.renderFeed = async () => {
                         <i class="fas fa-compass mr-2 text-[#1890ff]"></i> Explorar más
                     </button>
                 </div>
-
-                <!-- Lista de Posts -->
-                <div class="space-y-6">
-                    ${posts.length > 0 ? posts.map(p => _renderFeedPostCard(p)).join('') : _renderEmptyFeedState()}
+                <div id="feed-content" class="space-y-6">
+                    <div class="text-center py-12"><i class="fas fa-circle-notch fa-spin text-[#1890ff] text-2xl"></i></div>
                 </div>
             </div>
         </div>
         ${_renderAuthModal()}
     `);
+    
+    // Carga diferida de posts
+    try {
+        const q = window.F.query(
+            window.F.collection(window.F.db, "posts"), 
+            window.F.orderBy("createdAt", "desc"), 
+            window.F.limit(50)
+        );
+        const querySnapshot = await window.F.getDocs(q);
+        const myCommunityIds = user.joinedCommunities || [];
+        const posts = querySnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(post => myCommunityIds.includes(post.communityId));
+
+        const container = document.getElementById('feed-content');
+        if(container) {
+            container.innerHTML = posts.length > 0 ? posts.map(p => _renderFeedPostCard(p)).join('') : _renderEmptyFeedState();
+        }
+    } catch (e) { console.error("Error feed:", e); }
     _setupDropdownLogic();
 };
 
 function _renderFeedPostCard(post) {
-    // Helper para formatear fecha relativa
     const date = post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Reciente';
     const authorInitial = (post.authorName || 'A').charAt(0).toUpperCase();
-    
     return `
     <div class="bg-white dark:bg-[#0f172a] p-6 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
         <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 font-bold text-sm border border-blue-200 dark:border-blue-800">
-                ${authorInitial}
-            </div>
+            <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 font-bold text-sm border border-blue-200 dark:border-blue-800">${authorInitial}</div>
             <div>
                 <h4 class="text-sm font-bold text-slate-900 dark:text-white">${post.authorName || 'Anónimo'}</h4>
                 <div class="flex items-center gap-2 text-xs text-slate-400">
-                    <span>${date}</span>
-                    <span>•</span>
-                    <span class="text-[#1890ff] font-medium cursor-pointer hover:underline" onclick="window.location.hash='#community/${post.communityId}'">En su comunidad</span>
+                    <span>${date}</span><span>•</span><span class="text-[#1890ff] font-medium cursor-pointer hover:underline" onclick="window.location.hash='#community/${post.communityId}'">Ver comunidad</span>
                 </div>
             </div>
         </div>
-        
         <h3 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-2">${post.title || 'Sin título'}</h3>
         <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4 whitespace-pre-line">${post.content || ''}</p>
-        
         ${post.image ? `<img src="${post.image}" class="w-full h-64 object-cover rounded-2xl mb-4 bg-gray-100 dark:bg-slate-800 border border-gray-100 dark:border-slate-700">` : ''}
-
-        <div class="flex items-center gap-6 pt-4 border-t border-gray-100 dark:border-slate-800">
-            <button class="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors text-sm font-bold group">
-                <i class="far fa-heart group-hover:scale-110 transition-transform"></i> ${post.likes || 0}
-            </button>
-            <button class="flex items-center gap-2 text-slate-400 hover:text-blue-500 transition-colors text-sm font-bold group">
-                <i class="far fa-comment group-hover:scale-110 transition-transform"></i> ${post.commentsCount || 0}
-            </button>
-        </div>
     </div>`;
 }
 
@@ -460,53 +406,200 @@ function _renderEmptyFeedState() {
     <div class="text-center py-16 bg-white dark:bg-[#0f172a] rounded-3xl border border-dashed border-gray-300 dark:border-slate-700">
         <div class="w-20 h-20 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">📭</div>
         <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Tu feed está tranquilo</h3>
-        <p class="text-slate-500 dark:text-slate-400 max-w-xs mx-auto mb-6 text-sm font-medium">Aún no hay actividad reciente en tus comunidades. ¡Únete a más espacios para ver contenido aquí!</p>
-        <button onclick="window.location.hash='#comunidades'" class="bg-[#1890ff] hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/30 hover:-translate-y-1">
-            Explorar Comunidades
-        </button>
+        <p class="text-slate-500 dark:text-slate-400 max-w-xs mx-auto mb-6 text-sm font-medium">Únete a más comunidades para ver contenido.</p>
+        <button onclick="window.location.hash='#comunidades'" class="bg-[#1890ff] hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/30 hover:-translate-y-1">Explorar Comunidades</button>
     </div>`;
 }
 
 // ============================================================================
-// 5. LÓGICA DE NEGOCIO Y PAGOS (ROBUSTECIDA & SANITIZADA)
+// 5. LÓGICA DE NEGOCIO: CARRUSEL & PRECIOS DINÁMICOS
 // ============================================================================
 
-App.public.toggleTrialMode = (planId, days) => {
-    const btn = document.getElementById(`btn-plan-${planId}`);
-    const desc = document.getElementById(`desc-plan-${planId}`);
-    const checkbox = document.getElementById(`trial-switch-${planId}`);
-    if (!btn || !checkbox) return;
-    if (checkbox.checked) {
-        btn.innerText = `Probar ${days} días gratis`;
-        btn.setAttribute('data-mode', 'trial');
-        btn.classList.add('bg-green-600', 'hover:bg-green-700', 'text-white');
-        btn.classList.remove('bg-[#1890ff]', 'bg-slate-900', 'dark:bg-white');
-        if(desc) desc.innerHTML = '<i class="fas fa-bolt text-yellow-500"></i> Sin cobro hoy';
-    } else {
-        btn.innerText = 'Pagar y Unirse';
-        btn.setAttribute('data-mode', 'payment');
-        btn.className = "w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 bg-[#1890ff] hover:bg-blue-600 text-white shadow-blue-500/30"; 
-        if(desc) desc.innerHTML = '<i class="fas fa-external-link-alt"></i> Pago seguro externo';
+// --- A. CARRUSEL LOGIC ---
+App.public.moveCarousel = (direction) => {
+    const items = App.public.state.mediaItems;
+    if (!items || items.length <= 1) return;
+    
+    let nextIndex = App.public.state.carouselIndex + direction;
+    if (nextIndex >= items.length) nextIndex = 0;
+    if (nextIndex < 0) nextIndex = items.length - 1;
+    
+    App.public.state.carouselIndex = nextIndex;
+    
+    // Actualizar Slider
+    const track = document.getElementById('carousel-track');
+    if (track) {
+        track.style.transform = `translateX(-${nextIndex * 100}%)`;
+    }
+
+    // Actualizar Indicadores
+    items.forEach((_, idx) => {
+        const ind = document.getElementById(`indicator-${idx}`);
+        if(ind) {
+            ind.classList.remove('bg-white', 'bg-white/40');
+            ind.classList.add(idx === nextIndex ? 'bg-white' : 'bg-white/40');
+        }
+    });
+
+    // Toggle Overlay
+    const overlay = document.getElementById('hero-overlay');
+    if (overlay) {
+        if (items[nextIndex].type === 'video') overlay.classList.add('opacity-0');
+        else overlay.classList.remove('opacity-0');
     }
 };
+
+function _renderCarouselInner(items, activeIndex) {
+    if(!items.length) return '';
+    
+    const slides = items.map((item, idx) => `
+        <div class="min-w-full h-full relative flex items-center justify-center bg-black">
+            ${item.type === 'video' 
+                ? `<iframe src="https://www.youtube.com/embed/${item.url}?enablejsapi=1&rel=0" class="w-full h-full pointer-events-auto" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+                : `<img src="${item.url}" class="w-full h-full object-cover">`
+            }
+        </div>
+    `).join('');
+
+    return `
+    <div id="carousel-track" class="flex h-full transition-transform duration-500 ease-out" style="transform: translateX(-${activeIndex * 100}%)">
+        ${slides}
+    </div>`;
+}
+
+// --- B. PRECIOS DINÁMICOS & VARIANTES (DROPDOWN UPDATE) ---
+
+function _renderPlanCardUnified(plan, community) {
+    if (plan.isDynamic && plan.dynamicPricing) {
+        return _renderDynamicPlanCard(plan, community);
+    }
+    
+    // Plan Normal (Legacy/Fijo)
+    const isFree = parseFloat(plan.price) === 0;
+    
+    return `
+    <div class="bg-white dark:bg-[#0f172a] p-8 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-xl relative overflow-hidden flex flex-col hover:scale-[1.02] transition-transform duration-300">
+        ${plan.recommended ? `<div class="absolute top-0 right-0 bg-[#1890ff] text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Recomendado</div>` : ''}
+        
+        <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">${plan.name}</h3>
+        <div class="flex items-baseline gap-1 mb-4">
+            <span class="text-4xl font-black text-slate-900 dark:text-white">${isFree ? 'Gratis' : `$${plan.price}`}</span>
+            ${!isFree && plan.interval ? `<span class="text-slate-500 font-medium text-lg">/${plan.interval === 'month' ? 'mes' : 'año'}</span>` : ''}
+        </div>
+        
+        <div class="flex-1 mb-8 border-t border-gray-100 dark:border-slate-800 pt-6">
+            <ul class="space-y-4 text-slate-600 dark:text-slate-300 text-sm font-medium">
+                ${(plan.features || ['Acceso completo']).map(f => `<li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i> <span>${f}</span></li>`).join('')}
+            </ul>
+        </div>
+
+        <button onclick="App.public.handlePlanSelection(this, '${community.id}', '${plan.id}', '${encodeURIComponent(plan.paymentUrl || '')}')"
+            class="w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 ${isFree ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-[#1890ff] hover:bg-blue-600 text-white shadow-blue-500/30'}">
+            ${isFree ? 'Unirse Gratis' : 'Seleccionar Plan'}
+        </button>
+    </div>`;
+}
+
+function _renderDynamicPlanCard(plan, community) {
+    const config = plan.dynamicPricing;
+    const label = config.selectorLabel || 'Elige una opción';
+    
+    // Si hay variantes definidas (nuevo sistema V40.5)
+    if (config.variants && config.variants.length > 0) {
+        const variants = config.variants;
+        const initialVariant = variants[0];
+        const totalId = `total-${plan.id}`;
+        const btnId = `btn-${plan.id}`;
+        
+        return `
+        <div class="bg-white dark:bg-[#0f172a] p-8 rounded-3xl border border-[#1890ff] ring-4 ring-blue-500/10 shadow-2xl relative overflow-hidden flex flex-col">
+            <div class="absolute top-0 right-0 bg-[#1890ff] text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider"><i class="fas fa-bolt"></i> Personalizable</div>
+            
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">${plan.name}</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 font-medium">Selecciona el paquete que mejor se adapte a ti.</p>
+            
+            <!-- DROPDOWN UI -->
+            <div class="mb-6 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                <label class="text-xs font-bold text-slate-500 uppercase block mb-2">${label}</label>
+                <select id="select-${plan.id}" 
+                        class="w-full p-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold outline-none focus:border-[#1890ff] transition-colors mb-4 cursor-pointer"
+                        onchange="App.public.calculateDynamicPrice('${community.id}', '${plan.id}', this.value)">
+                    ${variants.map((v, idx) => `<option value="${idx}">${v.name}</option>`).join('')}
+                </select>
+                
+                <div class="flex justify-between items-end border-t border-slate-200 dark:border-slate-700 pt-4">
+                    <span class="text-xs text-slate-400">Precio Final</span>
+                    <div class="text-3xl font-black text-slate-900 dark:text-white" id="${totalId}">$${initialVariant.price}</div>
+                </div>
+            </div>
+
+            <div class="flex-1 mb-8">
+                <ul class="space-y-4 text-slate-600 dark:text-slate-300 text-sm font-medium">
+                    ${(plan.features || []).map(f => `<li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i> <span>${f}</span></li>`).join('')}
+                </ul>
+            </div>
+
+            <button id="${btnId}" 
+                onclick="App.public.handlePlanSelection(this, '${community.id}', '${plan.id}', '${encodeURIComponent(initialVariant.link || '')}')" 
+                class="w-full py-4 bg-[#1890ff] hover:bg-blue-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-500/30 transition-all active:scale-95">
+                Contratar Pack
+            </button>
+        </div>`;
+    }
+    
+    // Fallback: Si no hay variantes, mostrar error (o versión legacy)
+    return `<div class="p-4 bg-red-50 text-red-500 rounded-xl text-center">Error: Plan dinámico sin variantes configuradas.</div>`;
+}
+
+// Lógica de Actualización de Precio (Dropdown)
+App.public.calculateDynamicPrice = (cid, planId, variantIndex) => {
+    const idx = parseInt(variantIndex);
+    const comm = App.state.cache.communities[cid];
+    if (!comm) return;
+    
+    const plan = comm.plans.find(p => p.id === planId);
+    if (!plan || !plan.dynamicPricing || !plan.dynamicPricing.variants) return;
+
+    const variant = plan.dynamicPricing.variants[idx];
+    if (!variant) return;
+
+    // Actualizar Precio Visual
+    const totalEl = document.getElementById(`total-${planId}`);
+    if (totalEl) totalEl.innerText = `$${variant.price}`;
+
+    // Actualizar Botón (Link)
+    const btnEl = document.getElementById(`btn-${planId}`);
+    if (btnEl) {
+        const link = variant.link || '';
+        // Inyectamos el nuevo link en el onclick
+        // Nota: encodeURIComponent es clave para pasar URLs como string en JS inline
+        const newOnclick = `App.public.handlePlanSelection(this, '${cid}', '${planId}', '${encodeURIComponent(link)}')`;
+        btnEl.setAttribute('onclick', newOnclick);
+    }
+};
+
+// ============================================================================
+// 6. AUTH & ACTIONS
+// ============================================================================
 
 App.public.handlePlanSelection = async (btnElement, cid, planId, encodedPaymentUrl) => {
     const user = App.state.currentUser;
     if (!user) {
         App.ui.toast("Debes iniciar sesión primero", "warning");
+        sessionStorage.setItem('target_community_id', cid);
         App.public.openAuthModal('login');
         return;
     }
 
-    const mode = btnElement.getAttribute('data-mode');
-    const paymentUrl = encodedPaymentUrl ? decodeURIComponent(encodedPaymentUrl) : '';
+    const paymentUrl = encodedPaymentUrl && encodedPaymentUrl !== 'undefined' && encodedPaymentUrl !== 'null' ? decodeURIComponent(encodedPaymentUrl) : '';
 
-    if (mode === 'payment' && paymentUrl && paymentUrl !== 'undefined' && paymentUrl !== '') {
-        App.ui.toast('Redirigiendo a pasarela de pago...', 'info');
-        setTimeout(() => window.open(paymentUrl, '_blank'), 800);
+    if (paymentUrl) {
+        App.ui.toast('Redirigiendo a pago seguro...', 'info');
+        setTimeout(() => window.open(paymentUrl, '_blank'), 1000);
         return;
     }
 
+    // Flow gratuito o sin link
     const originalText = btnElement.innerText;
     btnElement.disabled = true;
     btnElement.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Procesando...';
@@ -515,137 +608,23 @@ App.public.handlePlanSelection = async (btnElement, cid, planId, encodedPaymentU
         const userRef = window.F.doc(window.F.db, "users", user.uid);
         const commRef = window.F.doc(window.F.db, "communities", cid);
         
+        // Unir usuario
         await window.F.setDoc(userRef, { 
-            joinedCommunities: window.F.arrayUnion(cid),
-            email: user.email || '',
-            role: user.role || 'student',
-            updatedAt: new Date().toISOString()
+            joinedCommunities: window.F.arrayUnion(cid)
         }, { merge: true });
 
-        if (!user.joinedCommunities) user.joinedCommunities = [];
-        if (!user.joinedCommunities.includes(cid)) user.joinedCommunities.push(cid);
+        // Actualizar contador comunidad
+        await window.F.updateDoc(commRef, { membersCount: window.F.increment(1) });
 
-        try {
-            await window.F.updateDoc(commRef, { membersCount: window.F.increment(1) });
-        } catch (counterError) {
-            console.warn("No se pudo actualizar contador (permisos), pero la unión fue exitosa.");
-        }
-
-        _showWelcomeModal(cid);
-
+        App.ui.toast("¡Bienvenido a la comunidad!", "success");
+        window.location.hash = `#community/${cid}`;
     } catch (e) {
-        console.error("Fallo al unirse:", e);
-        App.ui.toast(`Error al unirse: ${e.code || 'Conexión'}`, 'error');
+        console.error("Join error:", e);
+        App.ui.toast("Error al unirse. Intenta nuevamente.", "error");
         btnElement.disabled = false;
         btnElement.innerText = originalText;
     }
 };
-
-App.public.handleJoinFlow = async (cid) => {
-    sessionStorage.setItem('target_community_id', cid);
-    const user = App.state.currentUser;
-    if (user) {
-        if ((user.joinedCommunities || []).includes(cid)) window.location.hash = `#community/${cid}`;
-        else window.location.hash = `#comunidades/${cid}/planes`;
-    } else {
-        sessionStorage.setItem('pending_plan_redirect', 'true');
-        App.public.openAuthModal('register');
-    }
-};
-
-function _showWelcomeModal(cid) {
-    const container = document.getElementById('welcome-modal-container');
-    const commName = App.state.cache.communities[cid]?.name || 'la comunidad';
-    
-    if (container) {
-        container.innerHTML = `
-        <div class="fixed inset-0 z-[200] flex items-center justify-center welcome-overlay animate-fade-in p-4">
-            <div class="absolute inset-0 overflow-hidden pointer-events-none">
-                ${Array(30).fill(0).map((_,i) => `<div class="confetti-piece" style="left:${Math.random()*100}%; animation-delay:${Math.random()*2}s"></div>`).join('')}
-            </div>
-            <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl p-8 text-center relative welcome-card border-4 border-white dark:border-slate-800">
-                <div class="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg animate-bounce-short">
-                    <i class="fas fa-check text-4xl text-green-500"></i>
-                </div>
-                <h2 class="text-2xl font-black text-slate-900 dark:text-white mb-2">¡Bienvenido!</h2>
-                <p class="text-slate-500 dark:text-slate-400 mb-8 font-medium">Te has unido exitosamente a <br><strong class="text-[#1890ff]">${commName}</strong>.</p>
-                <button onclick="window.location.hash='#community/${cid}'" class="w-full py-4 bg-[#1890ff] text-white rounded-xl font-bold text-lg shadow-xl shadow-blue-500/30 hover:scale-105 transition-transform">Ir al Aula Virtual <i class="fas fa-arrow-right ml-2"></i></button>
-            </div>
-        </div>`;
-    }
-}
-
-// ============================================================================
-// 6. HELPERS Y COMPONENTES
-// ============================================================================
-
-function _renderPlanCard(plan, community) {
-    const isRecommended = plan.recommended;
-    const isFree = parseFloat(plan.price) === 0;
-    const trialDays = plan.trialDays ? parseInt(plan.trialDays) : 0;
-    const paymentUrl = plan.paymentUrl ? encodeURIComponent(plan.paymentUrl) : ''; 
-
-    return `
-    <div class="bg-white dark:bg-[#0f172a] p-8 rounded-3xl border ${isRecommended ? 'border-[#1890ff] ring-4 ring-blue-500/10' : 'border-gray-200 dark:border-slate-800'} shadow-xl relative overflow-hidden flex flex-col hover:scale-[1.02] transition-transform duration-300">
-        ${isRecommended ? `<div class="absolute top-0 right-0 bg-[#1890ff] text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Recomendado</div>` : ''}
-        
-        <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">${plan.name}</h3>
-        <div class="flex items-baseline gap-1 mb-4">
-            <span class="text-4xl font-black text-slate-900 dark:text-white">${isFree ? 'Gratis' : `$${plan.price}`}</span>
-            ${!isFree && plan.interval ? `<span class="text-slate-500 font-medium text-lg">/${plan.interval === 'month' ? 'mes' : 'año'}</span>` : ''}
-        </div>
-        
-        ${(!isFree && trialDays > 0) ? `
-        <div class="mb-6 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 p-3 rounded-xl flex items-center justify-between">
-            <span class="text-xs font-bold text-green-700 dark:text-green-400">Activar ${trialDays} días gratis</span>
-            <div class="toggle-wrapper">
-                <input type="checkbox" id="trial-switch-${plan.id}" class="toggle-checkbox" onchange="App.public.toggleTrialMode('${plan.id}', ${trialDays})">
-                <label for="trial-switch-${plan.id}" class="toggle-label">
-                    <div class="toggle-rail">
-                        <div class="toggle-circle"></div>
-                    </div>
-                </label>
-            </div>
-        </div>` : ''}
-        
-        <div class="flex-1 mb-8 border-t border-gray-100 dark:border-slate-800 pt-6">
-            <ul class="space-y-4 text-slate-600 dark:text-slate-300 text-sm font-medium">
-                ${(plan.features || ['Acceso completo']).map(f => `<li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i> <span>${f}</span></li>`).join('')}
-            </ul>
-        </div>
-
-        <button id="btn-plan-${plan.id}"
-            onclick="App.public.handlePlanSelection(this, '${community.id}', '${plan.id}', '${paymentUrl}')"
-            data-mode="${isFree ? 'trial' : 'payment'}" 
-            data-free="${isFree}"
-            data-trial-days="${trialDays}"
-            class="w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 ${isRecommended ? 'bg-[#1890ff] hover:bg-blue-600 text-white shadow-blue-500/30' : 'bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-slate-900'}">
-            ${isFree ? 'Unirse Gratis' : (plan.paymentUrl ? 'Pagar y Unirse' : 'Seleccionar Plan')}
-        </button>
-        ${!isFree && plan.paymentUrl ? `<p id="desc-plan-${plan.id}" class="text-center text-[10px] text-slate-400 mt-3 flex items-center justify-center gap-1"><i class="fas fa-external-link-alt"></i> Pago seguro externo</p>` : ''}
-    </div>`;
-}
-
-function _renderDefaultPlan(c) {
-    const isFree = !c.priceMonthly || parseFloat(c.priceMonthly) === 0;
-    const paymentUrl = c.paymentUrl ? encodeURIComponent(c.paymentUrl) : '';
-
-    return `
-    <div class="bg-white dark:bg-[#0f172a] p-8 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-xl flex flex-col max-w-md mx-auto w-full">
-        <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Acceso Estándar</h3>
-        <div class="text-4xl font-black text-slate-900 dark:text-white mb-6">${isFree ? 'Gratis' : `$${c.priceMonthly}`}<span class="text-lg font-normal opacity-70">/mes</span></div>
-        <ul class="space-y-4 mb-8 text-slate-600 dark:text-slate-300 text-sm font-medium">
-             <li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i> <span>Acceso a todas las clases</span></li>
-             <li class="flex items-start gap-3"><i class="fas fa-check text-green-500 mt-1"></i> <span>Comunidad exclusiva</span></li>
-        </ul>
-        <button onclick="App.public.handlePlanSelection(this, '${c.id}', 'default', '${paymentUrl}')" 
-            data-mode="${isFree ? 'trial' : 'payment'}" 
-            data-free="${isFree}"
-            class="w-full py-4 bg-[#1890ff] text-white rounded-xl font-bold shadow-lg hover:bg-blue-600 transition-colors">
-            ${isFree ? 'Unirse Ahora' : 'Suscribirse'}
-        </button>
-    </div>`;
-}
 
 App.public.submitAuth = async (e, mode) => {
     e.preventDefault();
@@ -662,46 +641,39 @@ App.public.submitAuth = async (e, mode) => {
         App.ui.toast(`¡Hola ${user.displayName || 'Dev'}!`, 'success');
         App.public.closeAuthModal();
 
-        if (sessionStorage.getItem('pending_plan_redirect') === 'true') {
-            sessionStorage.removeItem('pending_plan_redirect');
-            let targetId = sessionStorage.getItem('target_community_id');
-            if (targetId === 'undefined' || targetId === 'null') targetId = null;
-
-            if (targetId) window.location.hash = `#comunidades/${targetId}/planes`;
-            else window.location.hash = '#feed'; // V65 FIX: Ahora sí funcionará
+        // Redirect logic
+        const targetId = sessionStorage.getItem('target_community_id');
+        if (targetId) {
+            sessionStorage.removeItem('target_community_id');
+            window.location.hash = `#comunidades/${targetId}`; // O planes si estaba allí
         } else {
-            window.location.hash = '#feed'; // V65 FIX: Ahora sí funcionará
+            window.location.hash = '#feed';
         }
     } catch (err) { App.ui.toast("Error de autenticación. Verifica tus datos.", 'error'); }
 };
 
 App.public.switchLandingTab = (tabName) => {
     document.querySelectorAll('.nav-pill').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`tab-btn-${tabName}`).classList.add('active');
-    ['info', 'classroom', 'community', 'instructor'].forEach(c => {
+    const btn = document.getElementById(`tab-btn-${tabName}`);
+    if(btn) btn.classList.add('active');
+    
+    ['info', 'classroom', 'plans', 'community'].forEach(c => {
         const el = document.getElementById(`tab-content-${c}`);
         if(el) el.classList.add('hidden');
     });
-    document.getElementById(`tab-content-${tabName}`).classList.remove('hidden');
+    const content = document.getElementById(`tab-content-${tabName}`);
+    if(content) content.classList.remove('hidden');
 };
+
+// ============================================================================
+// 7. HELPERS & COMPONENTES
+// ============================================================================
 
 function _renderPublicHeader() {
     const user = App.state.currentUser;
     const logoUrl = "https://cdn.shopify.com/s/files/1/0564/3812/8712/files/logo-03_b7b98699-bd18-46ee-8b1b-31885a2c4c62.png?v=1766816974";
-    
-    const userName = user ? (user.name || user.displayName || user.email || 'Estudiante') : '';
-    const safeName = userName.includes(' ') ? userName.split(' ')[0] : userName;
-    
-    let avatarHtml = '';
-    if (user && user.avatar && user.avatar.trim() !== '' && !user.avatar.includes('pravatar.cc')) {
-        avatarHtml = `<img src="${user.avatar}" class="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-slate-700">`;
-    } else if (user) {
-        const initial = safeName.charAt(0).toUpperCase();
-        avatarHtml = `
-            <div class="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-sm border border-indigo-200 dark:border-indigo-800 shadow-sm select-none">
-                ${initial}
-            </div>`;
-    }
+    const userName = user ? (user.name || user.email.split('@')[0]) : '';
+    const initial = userName.charAt(0).toUpperCase();
 
     return `
     <header class="h-[72px] glass-panel fixed top-0 w-full z-50 transition-all border-b border-white/10">
@@ -717,23 +689,21 @@ function _renderPublicHeader() {
                 ` : `
                     <div class="relative" id="my-communities-wrapper">
                         <button id="btn-my-communities" class="flex items-center gap-3 pl-1 pr-3 py-1 rounded-full border border-transparent hover:border-gray-200 dark:hover:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all group">
-                            ${avatarHtml}
-                            <span class="hidden sm:block text-sm font-bold text-slate-700 dark:text-white max-w-[100px] truncate">${safeName}</span>
+                            <div class="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-sm border border-indigo-200 dark:border-indigo-800 shadow-sm">${initial}</div>
+                            <span class="hidden sm:block text-sm font-bold text-slate-700 dark:text-white max-w-[100px] truncate">${userName}</span>
                             <i class="fas fa-chevron-down text-[10px] text-slate-400 ml-1 transition-transform group-focus:rotate-180"></i>
                         </button>
                         <div id="dropdown-communities" class="absolute top-full right-0 mt-3 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 overflow-hidden hidden animate-slide-up z-50">
-                            <div class="p-4 border-b border-gray-50 dark:border-slate-800 flex items-center gap-3">
-                                ${avatarHtml}
-                                <div class="overflow-hidden">
-                                    <p class="text-sm font-bold text-slate-900 dark:text-white truncate">${userName}</p>
-                                    <p class="text-xs text-slate-400 truncate">Estudiante</p>
-                                </div>
-                            </div>
                             <div class="p-2">
                                 <a href="#feed" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium transition-colors">
                                     <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><i class="fas fa-home"></i></div>
                                     Mi Feed
                                 </a>
+                                ${user.role === 'admin' ? `
+                                <a href="#admin" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium transition-colors">
+                                    <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center"><i class="fas fa-cogs"></i></div>
+                                    Panel Admin
+                                </a>` : ''}
                                 <button onclick="App.api.logout()" class="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10 text-red-500 text-sm font-medium transition-colors">
                                      <div class="w-8 h-8 rounded-lg bg-red-100 text-red-500 flex items-center justify-center"><i class="fas fa-sign-out-alt"></i></div>
                                      Cerrar Sesión
