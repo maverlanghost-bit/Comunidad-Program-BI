@@ -1,10 +1,10 @@
 /**
- * dashboard.views.js (V38.0 - ANTI-CRASH FIX)
+ * dashboard.views.js (V55.0 - ARCHITECTURE CLEANUP & SINGLE SIDEBAR SOURCE)
  * Motor del Panel de Usuario.
- * * FIX PANTALLA BLANCA (FEED):
- * - SAFETY: Se añadió protección robusta para 'user.name'. Si no existe, usa el email o un genérico. Evita el crash de .split().
- * - CACHE: Inicialización defensiva de 'App.state.cache' para evitar errores si el usuario entra directo al feed.
- * - UX: Se mejoró el mensaje de estado vacío para usuarios nuevos.
+ * * CAMBIOS V55.0 (FIX DEFINITIVO):
+ * - CLEANUP: Eliminado renderizado redundante del Sidebar (ahora centralizado en core.js).
+ * - LAYOUT: Adaptación al Shell Layout (Flexbox) sin márgenes manuales.
+ * - CONSISTENCIA: Elimina el conflicto de doble menú en la ruta '#feed'.
  */
 
 window.App = window.App || {};
@@ -23,7 +23,7 @@ window.App.renderDashboard = async () => {
         return; 
     }
 
-    // [FIX V38.0] Inicialización de Caché Defensiva
+    // Inicialización de Caché Defensiva
     if (!App.state.cache) App.state.cache = {};
     if (!App.state.cache.communities) App.state.cache.communities = {};
 
@@ -42,63 +42,78 @@ window.App.renderDashboard = async () => {
     // 3. Cálculo de Progreso (Widget Derecho)
     const progressData = _calculateUserProgress(user);
 
-    // [FIX V38.0] Nombre Seguro (Evita crash si user.name es null)
-    const displayName = user.name || user.displayName || user.email || 'Estudiante';
-    const safeName = displayName.includes(' ') ? displayName.split(' ')[0] : displayName;
+    // NOTA V55.0: Eliminado renderizado manual del sidebar. 
+    // El sidebar ahora es gestionado globalmente por core.js (Shell Layout).
 
-    // 4. Sidebar Global (Izquierdo) - Activo: 'feed'
-    const sidebarHTML = App.sidebar && App.sidebar.render ? App.sidebar.render('feed') : '';
-
-    // 5. Renderizado del Marco
+    // 4. Renderizado del Marco
+    // Usamos App.render para inyectar el contenido en el #main-scroll-wrapper del Shell
     await App.render(`
-        ${sidebarHTML}
         
-        <main class="app-layout min-h-screen bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300 pb-20 md:pb-0 flex flex-col relative">
+        <main class="app-layout min-h-full bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300 pb-20 md:pb-0 flex flex-col relative w-full">
             
-            <!-- HEADER FLOTANTE (Simplificado) -->
-            <header class="h-[80px] px-6 md:px-10 flex items-center justify-between shrink-0 z-30 sticky top-0 bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-xl border-b border-gray-200 dark:border-slate-800 transition-colors">
-                
-                <!-- IZQUIERDA: TÍTULO -->
-                <div class="flex items-center gap-6 animate-enter min-w-0">
-                    <div>
-                        <h1 class="text-xl font-heading font-bold text-slate-900 dark:text-white tracking-tight truncate hidden md:block">
-                            Hola, ${safeName} 👋
-                        </h1>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 font-medium md:hidden">Tu Actividad</p>
-                    </div>
-                </div>
-
-                <!-- DERECHA: BÚSQUEDA GLOBAL + ACCIONES RÁPIDAS -->
-                <div class="flex items-center gap-4 flex-1 justify-end pl-4">
+            <!-- HEADER COMPACTO UNIFICADO -->
+            <header class="sticky top-0 z-40 w-full bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 transition-colors shadow-sm">
+                <div class="max-w-[1600px] w-full mx-auto px-4 lg:px-6 h-[72px] flex items-center justify-between gap-4">
                     
-                    <!-- Buscador -->
-                    <div class="relative z-50 w-full max-w-[320px] hidden md:block group">
-                        <input type="text" placeholder="Buscar en comunidades..." 
-                               class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-10 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#1890ff] transition-all"
-                               oninput="App.search.handleInput(event)">
-                        <i class="fas fa-search absolute left-3.5 top-3 text-slate-400 group-focus-within:text-[#1890ff] transition-colors"></i>
+                    <!-- IZQUIERDA: Saludo + Navegación Global -->
+                    <div class="flex items-center gap-6 min-w-0 flex-1">
+                        <div class="flex items-center gap-3 shrink-0">
+                            <!-- Avatar Pequeño (Estilo Logo) -->
+                            <div class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700 shrink-0">
+                                <i class="fas fa-home text-lg"></i>
+                            </div>
+                            <div class="hidden md:block min-w-0">
+                                <h1 class="font-heading font-black text-lg text-slate-900 dark:text-white leading-tight truncate">
+                                    Inicio
+                                </h1>
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide truncate">
+                                    Panel General
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Separador Vertical -->
+                        <div class="h-8 w-px bg-gray-200 dark:bg-slate-700 hidden md:block"></div>
+
+                        <!-- Navegación Funcional -->
+                        <nav class="hidden md:flex items-center gap-1 overflow-x-auto custom-scrollbar">
+                            <a href="#feed" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 text-[#1890ff] bg-blue-50 dark:bg-blue-900/20">
+                                <i class="fas fa-stream text-xs"></i> <span>Mi Feed</span>
+                            </a>
+                            <a href="#discovery" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-slate-800">
+                                <i class="fas fa-compass text-xs"></i> <span>Explorar</span>
+                            </a>
+                        </nav>
+                    </div>
+
+                    <!-- DERECHA: Búsqueda + Acciones -->
+                    <div class="flex items-center gap-4 flex-1 justify-end pl-4">
                         
-                        <!-- Resultados de Búsqueda -->
-                        <div id="global-search-results" class="hidden absolute top-full right-0 w-full mt-2 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 overflow-hidden z-[100] max-h-[500px] overflow-y-auto custom-scrollbar animate-slide-up"></div>
+                        <!-- Buscador -->
+                        <div class="relative z-50 w-full max-w-[280px] hidden lg:block group">
+                            <input type="text" placeholder="Buscar..." 
+                                   class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-9 py-2 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#1890ff] transition-all font-medium"
+                                   oninput="App.search.handleInput(event)">
+                            <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs group-focus-within:text-[#1890ff] transition-colors"></i>
+                            <div id="global-search-results" class="hidden absolute top-full right-0 w-full mt-2 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 overflow-hidden z-[100] max-h-[400px] overflow-y-auto custom-scrollbar animate-slide-up"></div>
+                        </div>
+
+                        <!-- Botón Crear Post (SOLO ADMIN) -->
+                        ${user.role === 'admin' ? `
+                        <button onclick="App.dashboard.openPostModal()" class="w-9 h-9 rounded-xl bg-[#1890ff] text-white flex items-center justify-center hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/30 active:scale-95 flex-shrink-0" title="Crear Publicación">
+                            <i class="fas fa-plus text-xs"></i>
+                        </button>` : ''}
+                        
+                        <!-- Avatar Perfil -->
+                        <button onclick="App.dashboard.openProfileModal()" class="w-9 h-9 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden border-2 border-white dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1890ff] transition-all relative group flex-shrink-0 shadow-sm">
+                            <img src="${user.avatar || 'https://ui-avatars.com/api/?name='+(user.name||'User')}" class="w-full h-full object-cover">
+                        </button>
                     </div>
-
-                    <div class="h-8 w-px bg-gray-200 dark:bg-slate-700 mx-1 hidden sm:block"></div>
-
-                    <!-- Botón Crear Post -->
-                    <button onclick="App.dashboard.openPostModal()" class="w-10 h-10 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center hover:bg-[#1890ff] dark:hover:bg-[#1890ff] dark:hover:text-white transition-colors shadow-lg hover:shadow-blue-500/30 active:scale-95 flex-shrink-0" title="Crear Publicación">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                    
-                    <!-- Avatar Perfil (Trigger Modal) -->
-                    <button onclick="App.dashboard.openProfileModal()" class="w-10 h-10 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden border border-gray-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1890ff] transition-all relative group flex-shrink-0">
-                        <img src="${user.avatar || 'https://ui-avatars.com/api/?name='+safeName}" class="w-full h-full object-cover">
-                    </button>
                 </div>
             </header>
 
             <!-- CONTENIDO PRINCIPAL SCROLLABLE -->
-            <div class="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 w-full relative z-0" id="dashboard-scroller">
-                <!-- Contenedor Max-Width 1600px -->
+            <div class="flex-1 w-full relative z-0 p-6 md:p-8" id="dashboard-scroller">
                 <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     
                     <!-- COLUMNA PRINCIPAL (FEED) -->
@@ -119,7 +134,7 @@ window.App.renderDashboard = async () => {
         ${_renderPostModal()}
     `);
 
-    // 6. Cargar Contenido del Feed
+    // 5. Cargar Contenido del Feed
     _loadDashboardContent(user);
 };
 
@@ -132,6 +147,7 @@ async function _loadDashboardContent(user) {
     if (!container) return;
 
     const joined = user.joinedCommunities || [];
+    const isAdmin = user.role === 'admin';
     
     // Estado Vacío (Sin comunidades)
     if (joined.length === 0) {
@@ -142,14 +158,15 @@ async function _loadDashboardContent(user) {
     // Renderizar Skeleton mientras carga
     container.innerHTML = `
         <div class="space-y-6">
-            <!-- Caja Crear Post (Visual) -->
-            <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-4 cursor-pointer hover:border-gray-300 dark:hover:border-slate-600 transition-colors group" onclick="App.dashboard.openPostModal()">
-                <img src="${user.avatar || 'https://ui-avatars.com/api/?name=U'}" class="w-11 h-11 rounded-full bg-gray-100 dark:bg-slate-800 object-cover">
-                <div class="flex-1 bg-gray-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 text-slate-400 dark:text-slate-500 text-sm font-medium group-hover:bg-gray-100 dark:group-hover:bg-slate-800 transition-colors">
-                    Comparte tu progreso, dudas o ideas...
+            <!-- Caja Crear Post (SOLO ADMIN) -->
+            ${isAdmin ? `
+            <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-900 transition-colors group" onclick="App.dashboard.openPostModal()">
+                <img src="${user.avatar || 'https://ui-avatars.com/api/?name=U'}" class="w-11 h-11 rounded-full bg-gray-100 dark:bg-slate-800 object-cover border border-gray-100 dark:border-slate-700">
+                <div class="flex-1 bg-gray-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 text-slate-400 dark:text-slate-500 text-sm font-medium group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors border border-transparent group-hover:border-gray-100 dark:group-hover:border-slate-700">
+                    Comparte tu progreso o anuncios...
                 </div>
                 <button class="w-11 h-11 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center shadow-md hover:scale-105 transition-transform"><i class="fas fa-plus"></i></button>
-            </div>
+            </div>` : ''}
             
             <!-- Lista de Posts -->
             <div id="feed-list" class="space-y-6">
@@ -203,6 +220,8 @@ async function _loadDashboardContent(user) {
 function _renderFeedCard(post, user) {
     const isLike = (post.likedBy || []).includes(user.uid);
     const commentsCount = post.comments ? post.comments.length : 0;
+    const isAuthor = post.authorId === user.uid;
+    const isAdmin = user.role === 'admin';
 
     return `
     <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group animate-fade-in relative" id="feed-post-${post.id}">
@@ -219,15 +238,15 @@ function _renderFeedCard(post, user) {
                     <div class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                         <span>${App.ui.formatDate(post.createdAt)}</span>
                         <span>•</span>
-                        <a href="#community/${post.communityId}" class="hover:text-[#1890ff] transition-colors font-medium flex items-center gap-1">
+                        <a href="#comunidades/${post.communityId}" class="hover:text-[#1890ff] transition-colors font-medium flex items-center gap-1">
                             <i class="fas ${post.communityIcon || 'fa-users'} text-[10px]"></i> ${post.communityName}
                         </a>
                     </div>
                 </div>
             </div>
             
-            ${user.uid === post.authorId ? `
-            <button onclick="App.api.deletePost('${post.id}').then(() => document.getElementById('feed-post-${post.id}').remove())" class="text-slate-300 hover:text-red-500 dark:hover:text-red-400 p-2 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10" title="Eliminar">
+            ${(isAuthor || isAdmin) ? `
+            <button onclick="App.api.deletePost('${post.id}').then(() => document.getElementById('feed-post-${post.id}').remove())" class="text-slate-300 hover:text-red-500 dark:hover:text-red-400 p-2 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 opacity-0 group-hover:opacity-100" title="Eliminar">
                 <i class="fas fa-trash-alt"></i>
             </button>` : ''}
         </div>
@@ -300,7 +319,7 @@ function _renderRightSidebar(user, progressData) {
         <!-- WIDGET 1: PROGRESO -->
         <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
             <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-xs uppercase tracking-wider flex items-center gap-2">
-                <i class="fas fa-bolt text-yellow-500"></i> Continuar Aprendiendo
+                <i class="fas fa-bolt text-yellow-500"></i> Continuar Aprendiendo267268269270271272273274275276277278279280281282283284285286287288289290291292293294$0
             </h3>
             
             ${progressData ? `
@@ -330,14 +349,13 @@ function _renderRightSidebar(user, progressData) {
                 ${(user.joinedCommunities||[]).map(id => {
                     const c = App.state.cache.communities[id];
                     if(!c) return '';
-                    return `<a href="#community/${c.id}" class="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg group transition-colors">
+                    return `<a href="#comunidades/${c.id}" class="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg group transition-colors">
                         <div class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 text-xs shrink-0"><i class="fas ${c.icon}"></i></div>
                         <span class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-[#1890ff] truncate flex-1">${c.name}</span>
                         <i class="fas fa-chevron-right text-[8px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity"></i>
                     </a>`;
                 }).join('')}
             </div>
-            <!-- Redirección corregida a #discovery -->
             <button onclick="window.location.hash='#discovery'" class="w-full mt-4 py-2 text-[10px] font-bold text-slate-500 hover:text-[#1890ff] hover:bg-gray-50 dark:hover:bg-slate-800 border border-dashed border-gray-200 dark:border-slate-700 rounded-lg transition-all">
                 <i class="fas fa-compass mr-1"></i> Explorar más
             </button>
@@ -355,7 +373,6 @@ function _renderEmptyState() {
         <p class="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
             Únete a comunidades para llenar este espacio de contenido interesante.
         </p>
-        <!-- Redirección corregida a #discovery -->
         <button onclick="window.location.hash='#discovery'" class="bg-[#1890ff] hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:-translate-y-1 transition-all">
             Explorar Comunidades
         </button>
@@ -372,7 +389,6 @@ function _calculateUserProgress(user) {
     const completed = user.completedModules || [];
 
     for (const cid of user.joinedCommunities) {
-        // [FIX V38.0] Verificación de caché
         if (!App.state.cache.communities || !App.state.cache.communities[cid]) continue;
         
         const community = App.state.cache.communities[cid];
@@ -390,7 +406,7 @@ function _calculateUserProgress(user) {
                     classTitle: nextClass.title,
                     image: course.image || 'https://via.placeholder.com/300',
                     percentage: Math.round((done/total)*100),
-                    link: `#community/${cid}/clases/${course.id}`
+                    link: `#comunidades/${cid}/clases/${course.id}`
                 };
                 break;
             }

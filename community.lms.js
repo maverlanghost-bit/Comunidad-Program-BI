@@ -1,10 +1,13 @@
 /**
- * community.lms.js (V25.0 - SUPER CLASS 3.0 PRODUCTION)
+ * community.lms.js (V26.0 - FIX: SCROLL & LAYOUT ADAPTATION)
  * Motor LMS Completo: Catálogo, Player Estándar, MODO SUPER CLASE (IDE + NOTAS) y Administración.
- * * CARACTERÍSTICAS COMPLETAS:
+ * * CAMBIOS V26.0:
+ * - FIX SCROLL: Contenedores de Catálogo y Player aislados con 'h-full overflow-y-auto'.
+ * - LAYOUT: Adaptación 'w-full relative' para respetar el margen dinámico de la Sidebar V47.
+ * - CARACTERÍSTICAS:
  * - Catálogo: Grid visual con progreso y badges.
  * - Player: Reproductor de video con lista de reproducción y seguimiento.
- * - Super Clase: Entorno de desarrollo (IDE) redimensionable con notas y consola.
+ * - Super Clase: Entorno de desarrollo (IDE) redimensionable (Modal Fullscreen).
  * - Administración: CRUD total de cursos y clases.
  */
 
@@ -33,87 +36,90 @@ window.App.lms.renderCatalog = (container, community, user, isAdmin) => {
         }
     }
 
+    // FIX V26.0: Wrapper de Scroll explícito para garantizar desplazamiento
     container.innerHTML = `
-        <div class="max-w-7xl mx-auto py-8 animate-fade-in px-4 lg:px-8">
-            <!-- Header Sección -->
-            <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4 border-b border-gray-200 dark:border-slate-800 pb-6 transition-colors">
-                <div>
-                    <h2 class="text-2xl md:text-3xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight">Rutas de Aprendizaje</h2>
-                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 font-medium">
-                        Explora los ${courses.length} cursos disponibles en esta comunidad.
-                    </p>
+        <div class="w-full h-full overflow-y-auto custom-scrollbar relative">
+            <div class="max-w-7xl mx-auto py-8 animate-fade-in px-4 lg:px-8">
+                <!-- Header Sección -->
+                <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4 border-b border-gray-200 dark:border-slate-800 pb-6 transition-colors">
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight">Rutas de Aprendizaje</h2>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 font-medium">
+                            Explora los ${courses.length} cursos disponibles en esta comunidad.
+                        </p>
+                    </div>
+                    ${isAdmin ? `
+                    <button onclick="App.lms.openCreateCourseModal('${commId}')" 
+                            class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:opacity-90 transition-all flex items-center gap-2 active:scale-95">
+                        <i class="fas fa-plus-circle"></i> <span>Crear Nuevo Curso</span>
+                    </button>` : ''}
                 </div>
-                ${isAdmin ? `
-                <button onclick="App.lms.openCreateCourseModal('${commId}')" 
-                        class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:opacity-90 transition-all flex items-center gap-2 active:scale-95">
-                    <i class="fas fa-plus-circle"></i> <span>Crear Nuevo Curso</span>
-                </button>` : ''}
-            </div>
 
-            <!-- Grid de Cursos -->
-            ${courses.length > 0 ? `
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
-                ${courses.map(course => {
-                    // Cálculo de Progreso
-                    const total = course.classes ? course.classes.length : 0;
-                    const completed = (course.classes || []).filter(cls => 
-                        (user.completedModules || []).includes(`${commId}_${cls.id}`)
-                    ).length;
-                    const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+                <!-- Grid de Cursos -->
+                ${courses.length > 0 ? `
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                    ${courses.map(course => {
+                        // Cálculo de Progreso
+                        const total = course.classes ? course.classes.length : 0;
+                        const completed = (course.classes || []).filter(cls => 
+                            (user.completedModules || []).includes(`${commId}_${cls.id}`)
+                        ).length;
+                        const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
 
-                    return `
-                    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden hover:shadow-xl hover:-translate-y-1 hover:border-[#1890ff]/30 transition-all duration-300 group cursor-pointer flex flex-col h-full relative" 
-                         onclick="window.location.hash='#community/${commId}/clases/${course.id}'">
-                        
-                        <!-- Portada -->
-                        <div class="h-44 relative overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
-                            ${course.image 
-                                ? `<img src="${course.image}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">` 
-                                : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="fas fa-image text-3xl"></i></div>`
-                            }
-                            <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent"></div>
+                        return `
+                        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden hover:shadow-xl hover:-translate-y-1 hover:border-[#1890ff]/30 transition-all duration-300 group cursor-pointer flex flex-col h-full relative" 
+                             onclick="window.location.hash='#community/${commId}/clases/${course.id}'">
                             
-                            <!-- Badges -->
-                            <div class="absolute top-3 right-3 flex gap-2">
-                                ${course.isSuperClass ? `<span class="bg-indigo-600/90 backdrop-blur text-white px-2 py-1 rounded-lg text-[10px] font-bold border border-white/20 shadow-sm"><i class="fas fa-code mr-1"></i> IDE</span>` : ''}
-                                <span class="bg-black/40 backdrop-blur text-white px-2.5 py-1 rounded-lg text-[10px] font-bold border border-white/20 shadow-sm">${total} Clases</span>
-                            </div>
-                            
-                            <!-- Barra de Progreso Visual -->
-                            ${progress > 0 ? `<div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-700/30 backdrop-blur-sm"><div class="h-full bg-[#1890ff] shadow-[0_0_10px_rgba(24,144,255,0.8)]" style="width: ${progress}%"></div></div>` : ''}
-                        </div>
-
-                        <!-- Información -->
-                        <div class="p-5 flex-1 flex flex-col relative">
-                            <h3 class="font-heading font-bold text-lg text-slate-900 dark:text-white mb-2 line-clamp-2 group-hover:text-[#1890ff] transition-colors">${course.title}</h3>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mb-6 line-clamp-3 flex-1">${course.description || 'Sin descripción.'}</p>
-                            
-                            <div class="flex items-center justify-between mt-auto border-t border-gray-100 dark:border-slate-800/50 pt-4">
-                                <span class="text-[10px] font-bold uppercase tracking-wider ${progress === 100 ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}">
-                                    ${progress === 100 ? '<i class="fas fa-check-circle mr-1"></i> Completado' : (progress > 0 ? `${progress}% Completado` : 'No Iniciado')}
-                                </span>
-                                <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-300 group-hover:bg-[#1890ff] group-hover:text-white transition-all shadow-sm">
-                                    <i class="fas fa-arrow-right text-xs"></i>
+                            <!-- Portada -->
+                            <div class="h-44 relative overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
+                                ${course.image 
+                                    ? `<img src="${course.image}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">` 
+                                    : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="fas fa-image text-3xl"></i></div>`
+                                }
+                                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent"></div>
+                                
+                                <!-- Badges -->
+                                <div class="absolute top-3 right-3 flex gap-2">
+                                    ${course.isSuperClass ? `<span class="bg-indigo-600/90 backdrop-blur text-white px-2 py-1 rounded-lg text-[10px] font-bold border border-white/20 shadow-sm"><i class="fas fa-code mr-1"></i> IDE</span>` : ''}
+                                    <span class="bg-black/40 backdrop-blur text-white px-2.5 py-1 rounded-lg text-[10px] font-bold border border-white/20 shadow-sm">${total} Clases</span>
                                 </div>
+                                
+                                <!-- Barra de Progreso Visual -->
+                                ${progress > 0 ? `<div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-700/30 backdrop-blur-sm"><div class="h-full bg-[#1890ff] shadow-[0_0_10px_rgba(24,144,255,0.8)]" style="width: ${progress}%"></div></div>` : ''}
                             </div>
 
-                            <!-- Botones Admin (Hover) -->
-                            ${isAdmin ? `
-                            <div class="absolute top-3 left-3 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onclick="event.stopPropagation(); App.lms.openEditCourseModal('${commId}', '${course.id}')" class="w-8 h-8 bg-white/90 text-slate-600 rounded-lg flex items-center justify-center hover:text-[#1890ff] shadow-lg"><i class="fas fa-pen text-xs"></i></button>
-                                <button onclick="event.stopPropagation(); App.lms.deleteCourse('${course.id}', '${commId}')" class="w-8 h-8 bg-white/90 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-500 hover:text-white shadow-lg"><i class="fas fa-trash text-xs"></i></button>
-                            </div>` : ''}
-                        </div>
-                    </div>`;
-                }).join('')}
-            </div>` : `
-            <div class="py-24 text-center border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-3xl">
-                <div class="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-                    <i class="fas fa-books text-slate-300 dark:text-slate-600"></i>
-                </div>
-                <h3 class="text-xl font-bold text-slate-900 dark:text-white">Catálogo Vacío</h3>
-                <p class="text-slate-500 dark:text-slate-400 mt-2">No hay cursos disponibles en este momento.</p>
-            </div>`}
+                            <!-- Información -->
+                            <div class="p-5 flex-1 flex flex-col relative">
+                                <h3 class="font-heading font-bold text-lg text-slate-900 dark:text-white mb-2 line-clamp-2 group-hover:text-[#1890ff] transition-colors">${course.title}</h3>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mb-6 line-clamp-3 flex-1">${course.description || 'Sin descripción.'}</p>
+                                
+                                <div class="flex items-center justify-between mt-auto border-t border-gray-100 dark:border-slate-800/50 pt-4">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider ${progress === 100 ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}">
+                                        ${progress === 100 ? '<i class="fas fa-check-circle mr-1"></i> Completado' : (progress > 0 ? `${progress}% Completado` : 'No Iniciado')}
+                                    </span>
+                                    <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-300 group-hover:bg-[#1890ff] group-hover:text-white transition-all shadow-sm">
+                                        <i class="fas fa-arrow-right text-xs"></i>
+                                    </div>
+                                </div>
+
+                                <!-- Botones Admin (Hover) -->
+                                ${isAdmin ? `
+                                <div class="absolute top-3 left-3 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="event.stopPropagation(); App.lms.openEditCourseModal('${commId}', '${course.id}')" class="w-8 h-8 bg-white/90 text-slate-600 rounded-lg flex items-center justify-center hover:text-[#1890ff] shadow-lg"><i class="fas fa-pen text-xs"></i></button>
+                                    <button onclick="event.stopPropagation(); App.lms.deleteCourse('${course.id}', '${commId}')" class="w-8 h-8 bg-white/90 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-500 hover:text-white shadow-lg"><i class="fas fa-trash text-xs"></i></button>
+                                </div>` : ''}
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>` : `
+                <div class="py-24 text-center border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-3xl">
+                    <div class="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                        <i class="fas fa-books text-slate-300 dark:text-slate-600"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 dark:text-white">Catálogo Vacío</h3>
+                    <p class="text-slate-500 dark:text-slate-400 mt-2">No hay cursos disponibles en este momento.</p>
+                </div>`}
+            </div>
         </div>`;
 };
 
@@ -132,9 +138,10 @@ window.App.lms.renderPlayer = (container, community, courseId, user, isAdmin) =>
         document.body.insertAdjacentHTML('beforeend', _renderAddClassModalLocal());
     }
 
+    // FIX V26.0: Uso de 'h-full w-full' y 'relative' para asegurar ajuste al padre flex
     container.innerHTML = `
-        <div class="min-h-full bg-[#F8FAFC] dark:bg-[#020617] animate-enter p-4 lg:p-6 overflow-y-auto custom-scrollbar transition-colors">
-            <div class="max-w-[1600px] mx-auto">
+        <div class="w-full h-full bg-[#F8FAFC] dark:bg-[#020617] animate-enter p-4 lg:p-6 overflow-y-auto custom-scrollbar transition-colors relative">
+            <div class="max-w-[1600px] mx-auto pb-20">
                 <!-- Navegación -->
                 <div class="flex items-center gap-4 mb-4">
                     <button onclick="window.location.hash='#community/${commId}/clases'" class="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-slate-500 hover:text-[#1890ff] transition-all flex items-center justify-center shadow-sm">
@@ -258,9 +265,13 @@ window.App.lms.renderSuperClass = async (commId, courseId) => {
 
     if (!cls) return App.ui.toast("Selecciona una clase", "error");
 
-    // Construcción del Layout Super Clase (Overlay)
+    // Bloquear scroll del body para experiencia inmersiva
+    document.body.style.overflow = 'hidden';
+
+    // Construcción del Layout Super Clase (Overlay Full Screen)
+    // FIX: Se añadieron 'fixed inset-0 z-[5000] w-screen h-screen' para garantizar que cubra todo.
     const overlayHtml = `
-    <div id="superclass-overlay" class="super-class-overlay animate-fade-in flex flex-col bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white overflow-hidden transition-colors duration-300">
+    <div id="superclass-overlay" class="fixed inset-0 z-[5000] w-screen h-screen animate-fade-in flex flex-col bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white overflow-hidden transition-colors duration-300">
         <!-- HEADER -->
         <div class="h-12 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-[#020617] flex items-center justify-between px-4 shrink-0 transition-colors">
             <div class="flex items-center gap-4">
@@ -282,16 +293,16 @@ window.App.lms.renderSuperClass = async (commId, courseId) => {
         </div>
 
         <!-- MAIN LAYOUT (RESIZABLE FLEX) -->
-        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative" id="sc-main-container">
+        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative w-full h-full" id="sc-main-container">
             
             <!-- PANEL IZQUIERDO: VIDEO + NOTAS -->
-            <div id="sc-left-panel" class="flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-slate-800 bg-black transition-all duration-0 w-full lg:w-1/2 min-w-[300px]">
+            <div id="sc-left-panel" class="flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-slate-800 bg-black transition-all duration-0 w-full lg:w-1/2 min-w-[300px] h-1/2 lg:h-full">
                 <div id="sc-video-wrapper" class="w-full bg-black relative aspect-video shrink-0">
                     <div id="sc-youtube-player" class="absolute inset-0 w-full h-full"></div>
                 </div>
 
                 <!-- BLOC DE NOTAS -->
-                <div class="flex-1 bg-white dark:bg-[#0f172a] flex flex-col min-h-[200px] border-t border-gray-200 dark:border-slate-800 transition-colors">
+                <div class="flex-1 bg-white dark:bg-[#0f172a] flex flex-col min-h-[200px] border-t border-gray-200 dark:border-slate-800 transition-colors overflow-hidden">
                     <div class="h-10 bg-gray-50 dark:bg-[#1e293b] border-b border-gray-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0 transition-colors">
                         <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2"><i class="fas fa-sticky-note"></i> Mis Apuntes</span>
                         <div class="flex gap-2">
@@ -299,24 +310,24 @@ window.App.lms.renderSuperClass = async (commId, courseId) => {
                             <button onclick="App.lms.saveNotes()" class="text-slate-400 hover:text-green-500 text-xs"><i class="fas fa-save"></i></button>
                         </div>
                     </div>
-                    <textarea id="sc-notes-area" class="flex-1 bg-white dark:bg-[#0f172a] text-slate-800 dark:text-slate-300 p-4 text-sm outline-none resize-none font-mono leading-relaxed transition-colors" placeholder="Escribe tus apuntes aquí..."></textarea>
+                    <textarea id="sc-notes-area" class="flex-1 bg-white dark:bg-[#0f172a] text-slate-800 dark:text-slate-300 p-4 text-sm outline-none resize-none font-mono leading-relaxed transition-colors custom-scrollbar" placeholder="Escribe tus apuntes aquí..."></textarea>
                 </div>
             </div>
 
             <!-- GUTTER (BARRA DE REDIMENSIONAMIENTO) -->
-            <div id="sc-gutter" class="gutter hidden lg:block bg-gray-200 dark:bg-slate-800 w-[6px] hover:w-[8px] hover:bg-[#1890ff] cursor-col-resize z-50 transition-all"></div>
+            <div id="sc-gutter" class="gutter hidden lg:block bg-gray-200 dark:bg-slate-800 w-[6px] hover:w-[8px] hover:bg-[#1890ff] cursor-col-resize z-50 transition-all h-full"></div>
 
             <!-- PANEL DERECHO: CODE EDITOR -->
-            <div id="sc-right-panel" class="relative bg-white dark:bg-[#1e1e1e] flex-1 flex flex-col transition-colors min-w-[300px]">
+            <div id="sc-right-panel" class="relative bg-white dark:bg-[#1e1e1e] flex-1 flex flex-col transition-colors min-w-[300px] h-1/2 lg:h-full">
                 <div id="monaco-editor-container" class="w-full flex-1"></div>
                 
                 <!-- MOCK CONSOLE -->
-                <div class="h-32 bg-gray-100 dark:bg-[#000000] border-t border-gray-200 dark:border-slate-800 flex flex-col font-mono text-xs">
+                <div class="h-32 bg-gray-100 dark:bg-[#000000] border-t border-gray-200 dark:border-slate-800 flex flex-col font-mono text-xs shrink-0">
                     <div class="h-8 bg-gray-200 dark:bg-[#111] px-4 flex items-center justify-between text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider shrink-0">
                         <span><i class="fas fa-terminal mr-2"></i>Consola</span>
                         <button onclick="document.getElementById('sc-console-output').innerHTML=''" class="hover:text-red-500"><i class="fas fa-ban"></i></button>
                     </div>
-                    <div id="sc-console-output" class="flex-1 p-3 overflow-y-auto text-slate-600 dark:text-green-400 whitespace-pre-wrap"></div>
+                    <div id="sc-console-output" class="flex-1 p-3 overflow-y-auto text-slate-600 dark:text-green-400 whitespace-pre-wrap custom-scrollbar"></div>
                 </div>
 
                 <!-- LOADING INDICATOR -->
@@ -464,6 +475,9 @@ window.App.lms.exitSuperClass = (commId, courseId) => {
         overlay.classList.add('opacity-0');
         setTimeout(() => {
             overlay.remove();
+            // Restaurar scroll del body
+            document.body.style.overflow = '';
+            
             if (_editorInstance) { _editorInstance.dispose(); _editorInstance = null; }
             App.renderCommunity(commId, 'clases', courseId);
         }, 300);

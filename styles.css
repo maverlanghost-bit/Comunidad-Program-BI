@@ -1,4 +1,14 @@
 /* =============================================================================
+   styles.css (V49.2 - RESTORED FULL DESIGN & SHELL ARCHITECTURE FIX)
+   Fusión: Estilos Visuales Originales + Arquitectura Shell Layout (V49).
+   * CONTENIDO RESTAURADO:
+   - Variables completas, Animaciones Hero, Landing V2, Welcome Modal, Confetti.
+   * CORRECCIÓN TÉCNICA:
+   - Layout: Adaptado a Flexbox Shell (Sin márgenes manuales en main).
+   - Sidebar: Sincronizado con body.sidebar-is-pinned.
+   ============================================================================= */
+
+/* =============================================================================
    1. VARIABLES & SISTEMA DE TEMAS (DÍA / NOCHE - SLATE SCALE)
    ============================================================================= */
 :root {
@@ -73,7 +83,7 @@ html, body {
 }
 
 body.app-mode {
-    overflow: hidden;
+    overflow: hidden; /* Scroll delegado a #main-scroll-wrapper en core.js */
 }
 
 h1, h2, h3, h4, h5, h6, .font-heading {
@@ -82,7 +92,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 /* =============================================================================
-   3. NEW DISCOVERY HERO & ANIMATIONS (PROGRAMBI V3.0)
+   3. HERO & ANIMATIONS (RESTAURADO)
    ============================================================================= */
 .hero-tech-bg {
     background-color: var(--bg-app);
@@ -136,8 +146,25 @@ body.dark-mode .glass-panel {
 }
 
 /* =============================================================================
-   4. SIDEBAR (LEGACY + IMPROVEMENTS)
+   4. SIDEBAR & SHELL LAYOUT (MODIFICADO PARA ARQUITECTURA V49)
    ============================================================================= */
+
+/* A. El "Shell" (#shell-sidebar): El contenedor físico en el Grid/Flex */
+#shell-sidebar {
+    width: var(--sidebar-collapsed);
+    transition: width 0.3s var(--ease-out-quart);
+    will-change: width;
+    /* Se asegura que el fondo sea continuo */
+    background: var(--bg-surface); 
+    border-right: 1px solid var(--border-light);
+}
+
+/* Expansión Dinámica del Shell (Empuja el contenido) */
+body.sidebar-is-pinned #shell-sidebar {
+    width: var(--sidebar-expanded) !important;
+}
+
+/* B. El Sidebar Visual (#sidebar): Fijo sobre el Shell */
 #sidebar {
     position: fixed;
     top: 0;
@@ -148,20 +175,32 @@ body.dark-mode .glass-panel {
     border-right: 1px solid var(--border-light);
     z-index: 50;
     transition: width 0.3s var(--ease-out-quart), background-color 0.3s ease;
-    overflow: hidden;
+    overflow: visible; /* Permitir tooltips */
     display: flex;
     flex-direction: column;
 }
 
-#sidebar:hover, #sidebar.is-pinned {
+/* Estados de expansión del Sidebar Visual */
+#sidebar:hover, 
+#sidebar.is-pinned,
+body.sidebar-is-pinned #sidebar {
     width: var(--sidebar-expanded);
     box-shadow: var(--shadow-card);
 }
 
+/* Elementos internos del Sidebar */
 .logo-collapsed, .logo-expanded { transition: opacity 0.2s ease; }
 .logo-expanded { display: none; opacity: 0; }
-#sidebar:hover .logo-collapsed, #sidebar.is-pinned .logo-collapsed { display: none; opacity: 0; }
-#sidebar:hover .logo-expanded, #sidebar.is-pinned .logo-expanded { display: block; opacity: 1; }
+
+/* Mostrar logo expandido en hover o pin */
+#sidebar:hover .logo-collapsed, 
+body.sidebar-is-pinned #sidebar .logo-collapsed { 
+    display: none; opacity: 0; 
+}
+#sidebar:hover .logo-expanded, 
+body.sidebar-is-pinned #sidebar .logo-expanded { 
+    display: block; opacity: 1; 
+}
 
 .sidebar-text {
     opacity: 0;
@@ -170,32 +209,45 @@ body.dark-mode .glass-panel {
     white-space: nowrap;
     color: var(--text-primary);
 }
-#sidebar:hover .sidebar-text, #sidebar.is-pinned .sidebar-text {
+
+#sidebar:hover .sidebar-text, 
+body.sidebar-is-pinned #sidebar .sidebar-text {
     opacity: 1;
     transform: translateX(0);
 }
 
+/* Mobile Fix */
+@media (max-width: 1024px) {
+    #shell-sidebar {
+        width: 0 !important; /* Desaparece físicamente */
+        display: none;
+    }
+    #sidebar {
+        transform: translateX(-100%); /* Oculto por defecto */
+        width: var(--sidebar-expanded); /* Siempre ancho completo en móvil al abrirse */
+    }
+    body.mobile-menu-open #sidebar {
+        transform: translateX(0);
+    }
+}
+
 /* =============================================================================
-   5. LAYOUT PRINCIPAL (APP MODE)
+   5. LAYOUT PRINCIPAL (CORREGIDO PARA FLEXBOX V49)
    ============================================================================= */
 main.app-layout {
+    /* CORRECCIÓN CRÍTICA: Eliminamos margin-left */
+    /* El posicionamiento ahora lo maneja el contenedor Flex en core.js */
+    margin-left: 0 !important; 
+    width: 100% !important;
     height: 100%;
-    margin-left: var(--sidebar-collapsed);
-    width: calc(100% - var(--sidebar-collapsed));
-    transition: margin-left 0.3s var(--ease-out-quart), width 0.3s var(--ease-out-quart);
     position: relative;
     display: flex;
     flex-direction: column;
     background-color: var(--bg-app);
 }
 
-body.sidebar-is-pinned main.app-layout {
-    margin-left: var(--sidebar-expanded);
-    width: calc(100% - var(--sidebar-expanded));
-}
-
 /* =============================================================================
-   6. COMPONENTES DE UI (CARDS, BUTTONS)
+   6. COMPONENTES DE UI (RESTAURADOS)
    ============================================================================= */
 .card-hover-effect {
     transition: all 0.3s var(--ease-out-quart);
@@ -251,14 +303,14 @@ body.dark-mode .text-gray-400, body.dark-mode .text-slate-400 { color: var(--tex
 body.dark-mode .bg-grid-slate-100 { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(30 41 59 / 0.5)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e"); }
 
 /* =============================================================================
-   8. LANDING PAGE V2 (SKOOL + PREMIUM HYBRID) - NEW
+   8. LANDING PAGE V2 (RESTAURADO)
    ============================================================================= */
 
 /* Contenedor Lateral Pegajoso */
 .sticky-sidebar-container {
     position: -webkit-sticky;
     position: sticky;
-    top: calc(var(--header-height) + 2rem); /* Altura del header + espacio */
+    top: calc(var(--header-height) + 2rem);
     height: fit-content;
     z-index: 40;
 }
@@ -266,7 +318,7 @@ body.dark-mode .bg-grid-slate-100 { background-image: url("data:image/svg+xml,%3
 /* Efecto Glow para el Video/Imagen Principal */
 .video-glow-container {
     position: relative;
-    border-radius: 1.5rem; /* rounded-3xl */
+    border-radius: 1.5rem;
     overflow: hidden;
     box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.3);
     border: 1px solid var(--border-light);
@@ -317,7 +369,7 @@ body.dark-mode .nav-pill.active {
     border-color: var(--border-light);
 }
 
-/* Power Card (Tarjeta de Conversión Lateral) */
+/* Power Card */
 .power-card {
     background: var(--bg-surface);
     border: 1px solid var(--border-light);
@@ -329,7 +381,7 @@ body.dark-mode .nav-pill.active {
     border-color: var(--accent-primary);
 }
 
-/* Lista de Beneficios (Checks) */
+/* Lista de Beneficios */
 .check-list-item {
     display: flex;
     align-items: flex-start;
@@ -341,19 +393,17 @@ body.dark-mode .nav-pill.active {
 }
 
 .check-list-item i {
-    color: #10b981; /* Green 500 */
+    color: #10b981;
     margin-top: 0.25rem;
     flex-shrink: 0;
 }
 
 /* =============================================================================
-   9. TOGGLE SWITCH & WELCOME MODAL (V57.0 - SUPER PLAN FEATURES)
+   9. TOGGLE SWITCH & WELCOME MODAL (RESTAURADO)
    ============================================================================= */
 
-/* Toggle Switch Personalizado (iOS Style) */
-.toggle-checkbox {
-    display: none;
-}
+/* Toggle Switch Personalizado */
+.toggle-checkbox { display: none; }
 
 .toggle-label {
     position: relative;
@@ -366,7 +416,7 @@ body.dark-mode .nav-pill.active {
 .toggle-rail {
     width: 44px;
     height: 24px;
-    background-color: var(--border-light); /* Default OFF */
+    background-color: var(--border-light);
     border-radius: 9999px;
     transition: background-color 0.3s ease;
     position: relative;
@@ -389,9 +439,8 @@ body.dark-mode .toggle-rail {
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
-/* Estado Activado */
 .toggle-checkbox:checked + .toggle-label .toggle-rail {
-    background-color: #10b981; /* Green 500 - Success */
+    background-color: #10b981;
     border-color: #10b981;
 }
 
@@ -415,12 +464,11 @@ body.dark-mode .toggle-rail {
     100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* Animación de entrada para los elementos internos */
 .animate-delay-100 { animation-delay: 100ms; }
 .animate-delay-200 { animation-delay: 200ms; }
 .animate-delay-300 { animation-delay: 300ms; }
 
-/* Confetti CSS Simple */
+/* Confetti CSS */
 .confetti-piece {
     position: absolute;
     width: 8px;

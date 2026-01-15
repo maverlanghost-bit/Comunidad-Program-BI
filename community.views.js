@@ -1,10 +1,11 @@
 /**
- * community.views.js (V45.0 - TRIAL & ACCESS CONTROL)
+ * community.views.js (V51.0 - CHAT REMOVAL & CLEANUP)
  * Motor de Vistas de Comunidad Interna.
- * * MEJORAS V45.0:
- * - ACCESS GUARD: Redirección automática a Landing Page si el usuario no es miembro.
- * - TRIAL UX: Banner de "7 días restantes" con botón de actualización de plan.
- * - CORE: Mantiene toda la funcionalidad de Feed, Chat, Live y Admin intacta.
+ * * CAMBIOS V51.0:
+ * - REMOVE: Eliminada la pestaña 'Chat' del header de comunidad.
+ * - REMOVE: Eliminada la lógica de renderizado de chat interno (case 'chat').
+ * - REMOVE: Borrada la función obsoleta '_renderChatTab' y sus helpers.
+ * - CLEANUP: Código purgado y optimizado para Feed, Aula y Live.
  */
 
 window.App = window.App || {};
@@ -25,6 +26,7 @@ if (!window.YT) {
 // Estado Local de la Vista
 window.App.currentFeed = []; 
 window.liveInterval = null; 
+window.trialInterval = null;
 window.App.communityState = {
     isEditing: false,
     editingPostId: null
@@ -41,7 +43,24 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
     // Validación de Sesión
     if (!user) { window.location.hash = '#comunidades'; return; }
 
-    // 1. Cargar Datos (Estrategia: Cache-First + Network Fallback)
+    // ------------------------------------------------------------------------
+    // LIMPIEZA DE ESTADO GLOBAL (SAFETY NET)
+    // ------------------------------------------------------------------------
+    const scOverlay = document.getElementById('superclass-overlay');
+    if (scOverlay) {
+        scOverlay.remove();
+        document.body.style.overflow = '';
+        if (window.App.lms && window.App.lms._editorInstance) {
+            window.App.lms._editorInstance.dispose();
+            window.App.lms._editorInstance = null;
+        }
+    }
+
+    if (window.liveInterval) { clearInterval(window.liveInterval); window.liveInterval = null; }
+    if (window.trialInterval) { clearInterval(window.trialInterval); window.trialInterval = null; }
+    // ------------------------------------------------------------------------
+
+    // 1. Cargar Datos
     let community = App.state.cache.communities[cid];
     if (!community) {
         try {
@@ -60,117 +79,79 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
     }
 
     // ------------------------------------------------------------------------
-    // [NUEVO] ACCESS GUARD (Guardia de Tráfico)
-    // Si el usuario NO es miembro y NO es admin, redirigir a la Landing de Ventas.
+    // ACCESS GUARD
     // ------------------------------------------------------------------------
     const isMember = (user.joinedCommunities || []).includes(cid);
     const isAdmin = user.role === 'admin';
 
     if (!isMember && !isAdmin) {
-        // Redirección forzada a la Landing Page Pública para venta/planes
-        console.log(`🔒 Acceso denegado a ${cid}. Redirigiendo a Landing de Ventas.`);
-        window.location.hash = `#comunidades/${cid}`; 
+        window.location.hash = `#comunidades/${cid}/info`; 
         return;
     }
-    // ------------------------------------------------------------------------
 
-    // 2. Renderizar Estructura Base (Solo si cambia el contexto o es render inicial)
-    const root = document.getElementById('community-root');
-    const currentCid = root ? root.dataset.cid : null;
-    const isNewRender = currentCid !== cid;
-
-    // Renderizar Sidebar Global (Pasamos el ID de la comunidad para que se marque activo)
-    const sidebarHTML = App.sidebar && App.sidebar.render ? App.sidebar.render(cid) : '';
-
-    if (isNewRender) {
-        // LAYOUT PRINCIPAL
-        await App.render(`
-            ${sidebarHTML}
+    // 2. Renderizar Estructura Base
+    const contentHTML = `
+        <div id="community-root" data-cid="${cid}" class="flex flex-col min-h-full bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300 relative">
             
-            <main class="app-layout min-h-screen bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300 flex flex-col relative" id="community-root" data-cid="${cid}">
-                
-                <!-- Header Sticky -->
-                <div id="comm-header-wrapper" class="sticky top-0 z-40 w-full bg-white dark:bg-[#0f172a] border-b border-gray-200 dark:border-slate-800 transition-colors shadow-sm">
-                    ${_renderCommunityHeader(community, activeTab, user)}
-                </div>
-                
-                <!-- Contenido Dinámico -->
-                <div id="community-content" class="flex-1 w-full animate-fade-in relative z-0">
-                    <div class="p-20 flex justify-center"><i class="fas fa-circle-notch fa-spin text-3xl text-[#1890ff]"></i></div>
-                </div>
-
-            </main>
+            <!-- Header Sticky (Contextual de la Comunidad) -->
+            <div id="comm-header-wrapper" class="sticky top-0 z-40 w-full bg-white dark:bg-[#0f172a] border-b border-gray-200 dark:border-slate-800 transition-colors shadow-sm">
+                ${_renderCommunityHeader(community, activeTab, user)}
+            </div>
             
-            <!-- Contenedor de Modales (Inyección Lazy) -->
+            <!-- Contenido Dinámico -->
+            <div id="community-content" class="flex-1 w-full animate-fade-in relative z-0 flex flex-col">
+                <div class="p-20 flex justify-center"><i class="fas fa-circle-notch fa-spin text-3xl text-[#1890ff]"></i></div>
+            </div>
+
+            <!-- Contenedor de Modales -->
             <div id="comm-modals-container"></div>
-        `);
-        
-        // Inyectar TODOS los modales (Post, Live, Channels, Edit Community)
-        _injectModals(community, user);
-    } else {
-        // Actualización ligera: Solo tabs del header (Mantiene estado de scroll si es posible)
-        const headerWrapper = document.getElementById('comm-header-wrapper');
-        if (headerWrapper) {
-            headerWrapper.innerHTML = _renderCommunityHeader(community, activeTab, user);
-        }
-    }
+        </div>
+    `;
 
-    // 3. Cargar Contenido Específico (Routing Interno por Tabs)
+    await App.render(contentHTML);
+    _injectModals(community, user);
+
+    // 3. Cargar Contenido Específico (Routing Interno)
     const container = document.getElementById('community-content');
-    
-    // Limpieza de intervalos previos (Live Timer)
-    if (window.liveInterval) { clearInterval(window.liveInterval); window.liveInterval = null; }
-
-    // Reset scroll si cambiamos de tab (UX)
-    if(container && isNewRender) container.scrollTop = 0;
+    if(container) container.scrollTop = 0;
 
     switch (activeTab) {
         case 'inicio':
-        case 'comunidad': // Alias legacy
-            container.className = "flex-1 w-full max-w-[1600px] mx-auto animate-fade-in relative z-0 p-4 md:p-8 pb-32";
+        case 'comunidad':
+            // Feed
+            container.className = "flex-1 w-full max-w-[1600px] mx-auto animate-fade-in relative z-0 p-4 md:p-8 pb-32 block";
             await _renderFeedTab(container, community, user);
             break;
             
         case 'clases':
-            // Layout especial para Aula (Full Width o Container según vista)
-            container.className = "flex-1 w-full h-full animate-fade-in relative z-0 overflow-hidden";
+            // Aula (LMS)
+            container.className = "flex-1 w-full flex flex-col animate-fade-in relative z-0 bg-white dark:bg-[#0f172a] min-h-[calc(100vh-140px)]";
+            container.innerHTML = ''; 
+            
             if (App.lms) {
                 if (extraParam) {
-                    // Vista Player (Video)
                     App.lms.renderPlayer(container, community, extraParam, user, user.role === 'admin');
                 } else {
-                    // Vista Catálogo
-                    App.lms.renderCatalog(container, community, user, user.role === 'admin');
+                    const catalogWrapper = document.createElement('div');
+                    catalogWrapper.className = "w-full h-full"; 
+                    container.appendChild(catalogWrapper);
+                    App.lms.renderCatalog(catalogWrapper, community, user, user.role === 'admin');
                 }
             } else {
-                container.innerHTML = `<div class="p-20 text-center text-slate-400">Módulo de Aula no cargado.</div>`;
+                container.innerHTML = `<div class="p-20 text-center"><div class="text-6xl mb-4">🎓</div><h3 class="text-xl font-bold text-slate-700 dark:text-slate-200">Módulo de Aula no cargado</h3></div>`;
             }
             break;
             
         case 'live':
-            container.className = "flex-1 w-full max-w-[1600px] mx-auto animate-fade-in relative z-0 p-4 md:p-8";
+            container.className = "flex-1 w-full max-w-[1600px] mx-auto animate-fade-in relative z-0 p-4 md:p-8 block";
             await _renderLiveTab(container, community, user);
             break;
             
-        case 'chat':
-            // Layout Full Height para Chat (Sin scroll global del body)
-            container.className = "flex-1 w-full h-[calc(100vh-140px)] md:h-[calc(100vh-72px-64px)] animate-fade-in relative z-0 flex flex-col bg-white dark:bg-[#0f172a]";
-            await _renderChatTab(container, community, user);
-            break;
-            
-        case 'miembros':
-            container.className = "flex-1 w-full max-w-[1600px] mx-auto animate-fade-in relative z-0 p-8";
-            container.innerHTML = `
-                <div class="bg-white dark:bg-slate-900 rounded-3xl p-16 text-center border-2 border-dashed border-gray-200 dark:border-slate-800">
-                    <div class="w-20 h-20 bg-blue-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl text-[#1890ff]">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Directorio de Miembros</h3>
-                    <p class="text-slate-500 dark:text-slate-400 max-w-md mx-auto">Próximamente podrás ver y conectar con los ${community.membersCount || 0} estudiantes de esta comunidad.</p>
-                </div>`;
-            break;
+        // [UPDATE V51] Caso 'chat' eliminado. Si alguien llega aquí por URL antigua, fallback a default.
             
         default:
+            // Fallback al feed si la pestaña no existe
+            container.className = "flex-1 w-full max-w-[1600px] mx-auto animate-fade-in relative z-0 p-4 md:p-8 pb-32 block";
             await _renderFeedTab(container, community, user);
     }
 };
@@ -183,7 +164,6 @@ function _renderCommunityHeader(c, activeTab, user) {
     const isMember = (user.joinedCommunities || []).includes(c.id);
     const isAdmin = user.role === 'admin';
 
-    // Clases de utilidad para Tabs
     const tabInactive = "text-slate-500 dark:text-slate-400 hover:text-[#1890ff] hover:bg-gray-50 dark:hover:bg-slate-800/50 font-bold border-b-2 border-transparent transition-all";
     const tabActive = "text-[#1890ff] font-bold border-b-2 border-[#1890ff] bg-blue-50/50 dark:bg-blue-900/10";
 
@@ -192,102 +172,69 @@ function _renderCommunityHeader(c, activeTab, user) {
         return activeTab === tabName ? tabActive : tabInactive;
     };
 
-    // ------------------------------------------------------------------------
-    // [NUEVO] LOGICA DEL BANNER DE TRIAL
-    // Simulamos que el usuario está en periodo de prueba
-    // ------------------------------------------------------------------------
-    const isTrial = true; // Flag simulado (debería venir del backend: user.memberships[cid].isTrial)
-    const daysLeft = 7;   // Días restantes simulados
+    // BANNER TRIAL
+    const isTrial = user.trialActive && user.trialCommunities?.includes(c.id);
+    let trialBanner = '';
+    if (isTrial && user.trialStart && user.trialEnd) {
+        const end = new Date(user.trialEnd).getTime();
+        if (Date.now() < end) {
+            trialBanner = `
+                <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white px-4 py-2 text-xs font-bold flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6 shadow-inner relative z-50">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-stopwatch animate-pulse"></i>
+                        <span class="tracking-wide">TRIAL ACTIVO: <span id="trial-timer" class="bg-white/20 px-1.5 py-0.5 rounded text-white">Calculando...</span></span>
+                    </div>
+                    <button onclick="window.location.hash='#comunidades/${c.id}/planes'" class="bg-white text-indigo-700 px-3 py-0.5 rounded-full text-[10px] font-black hover:scale-105 transition-transform">ACTUALIZAR</button>
+                </div>`;
+            setTimeout(() => _initTrialCountdown(user.trialEnd), 0);
+        }
+    }
 
-    const trialBanner = isTrial ? `
-        <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white px-4 py-2 text-xs font-bold flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6 shadow-inner relative z-50">
-            <div class="flex items-center gap-2">
-                <i class="fas fa-stopwatch animate-pulse"></i>
-                <span class="tracking-wide">TU PERIODO DE PRUEBA TERMINA EN <span class="bg-white/20 px-1.5 py-0.5 rounded text-white">${daysLeft} DÍAS</span></span>
-            </div>
-            <div class="flex items-center gap-3">
-                <span class="hidden md:inline opacity-80 font-normal">No pierdas tu progreso.</span>
-                <button onclick="window.location.href='#comunidades/${c.id}'" class="bg-white text-indigo-700 px-4 py-1 rounded-full hover:bg-indigo-50 transition-all shadow-sm uppercase tracking-wider text-[10px] transform hover:scale-105 font-black border border-indigo-100 flex items-center gap-1">
-                    <i class="fas fa-star text-yellow-500"></i> Actualizar Plan
-                </button>
-            </div>
-        </div>
-    ` : '';
-    // ------------------------------------------------------------------------
-
+    // [UPDATE V51] Pestaña 'Chat' eliminada del menú
     return `
         <div class="w-full bg-white dark:bg-[#0f172a] shadow-sm relative z-50 flex flex-col">
-            
-            ${trialBanner} <!-- Inserción del Banner Superior -->
-
+            ${trialBanner}
             <div class="max-w-[1600px] w-full mx-auto px-4 lg:px-8">
-                <!-- Top Bar: Info + Acciones -->
                 <div class="h-20 flex items-center justify-between">
-                    
-                    <!-- Info Izquierda -->
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-4 flex-wrap md:flex-nowrap overflow-hidden">
                         <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1890ff] to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 shrink-0">
                             <i class="fas ${c.icon || 'fa-users'} text-xl"></i>
                         </div>
                         <div class="min-w-0">
                             <h1 class="font-heading font-black text-xl text-slate-900 dark:text-white leading-tight truncate flex items-center gap-2">
                                 ${c.name}
-                                ${c.isPrivate ? '<i class="fas fa-lock text-xs text-slate-400" title="Privada"></i>' : ''}
+                                ${c.isPrivate ? '<i class="fas fa-lock text-xs text-slate-400"></i>' : ''}
                             </h1>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wide truncate max-w-[300px]">
-                                ${c.description || 'Comunidad de aprendizaje'}
-                            </p>
+                        </div>
+                        
+                        <!-- Tabs Desktop -->
+                        <div class="flex items-center gap-1 overflow-x-auto custom-scrollbar ml-4 hidden md:flex">
+                            <a href="#comunidades/${c.id}/inicio" class="px-4 py-2 text-xs flex items-center gap-1 rounded-full whitespace-nowrap ${getTabClass('inicio')}"><i class="fas fa-stream text-xs"></i> Muro</a>
+                            <a href="#comunidades/${c.id}/clases" class="px-4 py-2 text-xs flex items-center gap-1 rounded-full whitespace-nowrap ${getTabClass('clases')}"><i class="fas fa-graduation-cap text-xs"></i> Aula</a>
+                            <a href="#comunidades/${c.id}/live" class="px-4 py-2 text-xs flex items-center gap-1 rounded-full whitespace-nowrap ${getTabClass('live')}"><i class="fas fa-video text-xs ${activeTab === 'live' ? 'text-red-500 animate-pulse' : ''}"></i> Live</a>
                         </div>
                     </div>
 
-                    <!-- Acciones Derecha -->
-                    <div class="flex items-center gap-3">
+                    <!-- Actions -->
+                    <div class="flex items-center gap-3 shrink-0">
                         ${!isMember ? 
-                            `<button onclick="App.api.joinCommunity('${c.id}').then(()=>App.renderCommunity('${c.id}'))" class="bg-[#1890ff] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/30 animate-pulse">Unirse</button>` : 
-                            `<div class="hidden md:flex items-center gap-2 text-[10px] font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full border border-green-100 dark:border-green-900/30">
-                                <i class="fas fa-check-circle"></i> Miembro
+                            `<button onclick="App.api.joinCommunity('${c.id}').then(()=>App.renderCommunity('${c.id}'))" class="bg-[#1890ff] text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/30">Unirse</button>` : 
+                            `<div class="relative" id="community-settings-wrapper">
+                                <button onclick="App.community.toggleSettings()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-[#1890ff] transition-colors"><i class="fas fa-cog"></i></button>
+                                <div id="community-settings-menu" class="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 hidden animate-slide-up overflow-hidden z-50">
+                                    ${isAdmin ? `<button onclick="App.community.openEditCommunityModal()" class="w-full text-left px-4 py-3 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors border-b border-gray-50 dark:border-slate-800"><i class="fas fa-edit w-4"></i> Editar Comunidad</button>` : ''}
+                                    <button onclick="App.community.leave('${c.id}')" class="w-full text-left px-4 py-3 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"><i class="fas fa-sign-out-alt w-4"></i> Abandonar</button>
+                                </div>
                             </div>`
                         }
-                        
-                        <!-- BOTÓN CONFIGURACIÓN (Tuerca) -->
-                        <div class="relative" id="community-settings-wrapper">
-                            <button onclick="App.community.toggleSettings()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-[#1890ff] hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors">
-                                <i class="fas fa-cog"></i>
-                            </button>
-                            
-                            <!-- Dropdown Menu -->
-                            <div id="community-settings-menu" class="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 hidden animate-slide-up overflow-hidden z-50">
-                                ${isAdmin ? `
-                                <button onclick="App.community.openEditCommunityModal()" class="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors border-b border-gray-50 dark:border-slate-800">
-                                    <i class="fas fa-edit w-5 text-center text-slate-400"></i> Editar Comunidad
-                                </button>` : ''}
-                                
-                                <!-- Opción Abandonar -->
-                                <button onclick="App.community.leave('${c.id}')" class="w-full text-left px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors">
-                                    <i class="fas fa-sign-out-alt w-5 text-center"></i> Abandonar Comunidad
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
-                <!-- Navegación Tabs -->
-                <div class="flex items-center gap-1 overflow-x-auto custom-scrollbar -mb-px">
-                    <a href="#comunidades/${c.id}/inicio" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('inicio')}">
-                        <i class="fas fa-stream"></i> Muro
-                    </a>
-                    <a href="#comunidades/${c.id}/clases" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('clases')}">
-                        <i class="fas fa-graduation-cap"></i> Aula
-                    </a>
-                    <a href="#comunidades/${c.id}/chat" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('chat')}">
-                        <i class="fas fa-comments"></i> Chat
-                    </a>
-                    <a href="#comunidades/${c.id}/live" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('live')}">
-                        <i class="fas fa-video ${activeTab === 'live' ? 'text-red-500 animate-pulse' : ''}"></i> En Vivo
-                    </a>
-                    <a href="#comunidades/${c.id}/miembros" class="px-5 py-3 text-sm flex items-center gap-2 rounded-t-xl whitespace-nowrap ${getTabClass('miembros')}">
-                        <i class="fas fa-users"></i> Miembros
-                    </a>
+                <!-- Tabs Mobile -->
+                <div class="flex md:hidden items-center gap-1 overflow-x-auto custom-scrollbar -mb-px px-1 pb-2">
+                    <a href="#comunidades/${c.id}/inicio" class="px-4 py-2 text-xs flex items-center gap-1 rounded-t-xl whitespace-nowrap ${getTabClass('inicio')}"><i class="fas fa-stream text-xs"></i> Muro</a>
+                    <a href="#comunidades/${c.id}/clases" class="px-4 py-2 text-xs flex items-center gap-1 rounded-t-xl whitespace-nowrap ${getTabClass('clases')}"><i class="fas fa-graduation-cap text-xs"></i> Aula</a>
+                    <a href="#comunidades/${c.id}/live" class="px-4 py-2 text-xs flex items-center gap-1 rounded-t-xl whitespace-nowrap ${getTabClass('live')}"><i class="fas fa-video text-xs ${activeTab === 'live' ? 'text-red-500 animate-pulse' : ''}"></i> Live</a>
                 </div>
             </div>
         </div>
@@ -295,14 +242,12 @@ function _renderCommunityHeader(c, activeTab, user) {
 }
 
 // ============================================================================
-// 3. LÓGICA DE ACTIONS (SETTINGS & LEAVE)
+// 3. LOGICA DE ACCIONES Y MODALES
 // ============================================================================
 
 App.community.toggleSettings = () => {
     const menu = document.getElementById('community-settings-menu');
     if (menu) menu.classList.toggle('hidden');
-    
-    // Auto-cierre al hacer click fuera
     const closeFn = (e) => {
         if (!e.target.closest('#community-settings-wrapper')) {
             menu?.classList.add('hidden');
@@ -313,124 +258,68 @@ App.community.toggleSettings = () => {
 };
 
 App.community.leave = async (cid) => {
-    if (!confirm("¿Estás seguro de que quieres abandonar esta comunidad? Perderás tu acceso a los cursos y el progreso.")) return;
-
+    if (!confirm("¿Estás seguro de que quieres abandonar esta comunidad?")) return;
     try {
         await App.api.leaveCommunity(cid);
         App.ui.toast("Has abandonado la comunidad.", "success");
         window.location.hash = '#feed';
-    } catch (e) {
-        console.error(e);
-        App.ui.toast("Error al intentar salir. Inténtalo de nuevo.", "error");
-    }
+    } catch (e) { App.ui.toast("Error al intentar salir.", "error"); }
 };
 
 // ============================================================================
-// 4. TAB: FEED SOCIAL (MURO)
+// 4. TABS: FEED, LIVE
 // ============================================================================
 
 async function _renderFeedTab(container, community, user) {
-    const isMember = (user.joinedCommunities || []).includes(community.id);
-
-    // 1. Estructura Inicial
+    const isAdmin = user.role === 'admin';
     container.innerHTML = `
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
-        
-        <!-- Columna Principal (Feed) -->
         <div class="lg:col-span-8 space-y-6">
-            ${isMember ? `
-            <!-- Widget Crear Post -->
-            <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex items-center gap-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-900 transition-all group" onclick="App.community.openCreatePostModal()">
-                <img src="${user.avatar}" class="w-12 h-12 rounded-full object-cover border-2 border-gray-100 dark:border-slate-700 bg-gray-100">
-                <div class="flex-1 bg-gray-50 dark:bg-slate-800 rounded-2xl px-5 py-3.5 flex items-center justify-between group-hover:bg-white dark:group-hover:bg-slate-700 transition-colors border border-transparent group-hover:border-gray-100 dark:group-hover:border-slate-600">
-                    <span class="text-slate-400 dark:text-slate-500 text-sm font-medium">Comparte tus ideas con la comunidad...</span>
-                    <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center text-slate-500 dark:text-slate-300">
-                        <i class="fas fa-plus"></i>
-                    </div>
+            ${isAdmin ? `
+            <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex items-center gap-4 cursor-pointer hover:border-blue-300 transition-all group" onclick="App.community.openCreatePostModal()">
+                <img src="${user.avatar}" class="w-12 h-12 rounded-full object-cover border-2 border-gray-100 dark:border-slate-700">
+                <div class="flex-1 bg-gray-50 dark:bg-slate-800 rounded-2xl px-5 py-3.5 flex items-center justify-between group-hover:bg-white dark:group-hover:bg-slate-700 transition-colors">
+                    <span class="text-slate-400 text-sm font-medium">Comparte tus ideas...</span>
+                    <i class="fas fa-plus text-slate-400"></i>
                 </div>
             </div>` : ''}
 
-            <!-- Filtros Rápidos -->
-            <div class="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                <button class="px-4 py-2 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold whitespace-nowrap shadow-lg">Todo</button>
-                <button class="px-4 py-2 rounded-full bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 text-xs font-bold whitespace-nowrap hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Anuncios</button>
-                <button class="px-4 py-2 rounded-full bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 text-xs font-bold whitespace-nowrap hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Preguntas</button>
-            </div>
-
-            <!-- Contenedor Posts -->
             <div id="feed-posts-container" class="space-y-6 min-h-[300px]">
                 ${[1, 2].map(() => App.ui.skeleton()).join('')}
             </div>
         </div>
 
-        <!-- Columna Sidebar (Info & Stats) -->
         <div class="hidden lg:block lg:col-span-4 space-y-6 sticky top-24">
-            
-            <!-- Widget Info -->
             <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-gray-200 dark:border-slate-800 shadow-sm">
-                <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-sm uppercase tracking-wide border-b border-gray-100 dark:border-slate-800 pb-3 flex items-center gap-2">
-                    <i class="fas fa-info-circle text-[#1890ff]"></i> Sobre nosotros
-                </h3>
-                <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6 font-medium">
-                    ${community.description || 'Sin descripción disponible.'}
-                </p>
-                
+                <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-sm uppercase tracking-wide flex items-center gap-2"><i class="fas fa-info-circle text-[#1890ff]"></i> Info</h3>
+                <p class="text-sm text-slate-500 mb-6 font-medium">${community.description || 'Sin descripción.'}</p>
                 <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 text-center border border-gray-100 dark:border-slate-700">
+                    <div class="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 text-center">
                         <div class="text-xl font-black text-slate-900 dark:text-white">${App.ui.formatNumber(community.membersCount || 0)}</div>
-                        <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1">Miembros</div>
+                        <div class="text-[10px] text-slate-400 uppercase font-bold mt-1">Miembros</div>
                     </div>
-                    <div class="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 text-center border border-gray-100 dark:border-slate-700">
+                    <div class="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 text-center">
                         <div class="text-xl font-black text-slate-900 dark:text-white">${(community.courses || []).length}</div>
-                        <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mt-1">Cursos</div>
+                        <div class="text-[10px] text-slate-400 uppercase font-bold mt-1">Cursos</div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Widget Leaderboard -->
-            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-gray-200 dark:border-slate-800 shadow-sm">
-                 <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-sm flex items-center gap-2 uppercase tracking-wide">
-                    <i class="fas fa-trophy text-yellow-500"></i> Top Estudiantes
-                 </h3>
-                 <div class="space-y-4">
-                    ${[1, 2, 3].map(i => `
-                    <div class="flex items-center gap-3">
-                        <div class="w-6 text-center font-black ${i===1?'text-[#1890ff] text-lg':'text-slate-400'}">#${i}</div>
-                        <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 border border-white dark:border-slate-600"></div>
-                        <div class="flex-1">
-                            <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-blue-500" style="width: ${100 - (i*20)}%"></div>
-                            </div>
-                        </div>
-                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400">${1000 - (i*50)} XP</span>
-                    </div>`).join('')}
-                 </div>
             </div>
         </div>
     </div>`;
 
-    // 2. Fetch Posts
     try {
         const allPosts = await App.api.getPosts(community.id);
-        const feedPosts = allPosts.filter(p => !p.channelId || p.channelId === 'general' || p.channelId === 'feed');
+        const feedPosts = allPosts.filter(p => !p.channelId || p.channelId === 'general');
         window.App.currentFeed = feedPosts;
-
-        const containerEl = document.getElementById('feed-posts-container');
-        if (containerEl) {
-            if (feedPosts.length === 0) {
-                containerEl.innerHTML = `
-                <div class="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed border-gray-200 dark:border-slate-800">
-                    <div class="w-20 h-20 bg-blue-50 dark:bg-slate-800 text-[#1890ff] rounded-full flex items-center justify-center mx-auto mb-6 text-3xl"><i class="fas fa-feather-alt"></i></div>
-                    <h3 class="font-bold text-xl text-slate-900 dark:text-white mb-2">Aún no hay publicaciones</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Sé el primero en iniciar una conversación.</p>
-                </div>`;
-            } else {
-                containerEl.innerHTML = feedPosts.map(p => _renderThreadCard(p, user, community)).join('');
-            }
+        const postEl = document.getElementById('feed-posts-container');
+        if (postEl) {
+            postEl.innerHTML = feedPosts.length === 0 
+                ? `<div class="text-center py-10 opacity-60"><i class="fas fa-feather text-4xl mb-2 text-slate-300"></i><p class="text-sm text-slate-500">No hay posts aún.</p></div>`
+                : feedPosts.map(p => _renderThreadCard(p, user, community)).join('');
         }
     } catch (e) {
-        const containerEl = document.getElementById('feed-posts-container');
-        if(containerEl) containerEl.innerHTML = `<div class="text-red-500 text-center p-4">Error al cargar el feed.</div>`;
+        const postEl = document.getElementById('feed-posts-container');
+        if(postEl) postEl.innerHTML = `<div class="text-red-500 text-center text-sm">Error cargando feed.</div>`;
     }
 }
 
@@ -520,136 +409,6 @@ function _renderThreadCard(post, user, community) {
     </div>`;
 }
 
-// ============================================================================
-// 5. TAB: CHAT REALTIME (CANALES)
-// ============================================================================
-
-async function _renderChatTab(container, community, user) {
-    const channels = community.channels || [{ id: 'general', name: 'General', type: 'text', category: 'Comunidad' }];
-    const activeChId = window.tempActiveChannel || channels[0].id;
-    const activeCh = channels.find(c => c.id === activeChId) || channels[0];
-    window.tempActiveChannel = activeChId;
-    const isAdmin = user.role === 'admin';
-
-    const grouped = channels.reduce((acc, ch) => {
-        const cat = ch.category || 'General';
-        if(!acc[cat]) acc[cat] = [];
-        acc[cat].push(ch);
-        return acc;
-    }, {});
-
-    container.innerHTML = `
-    <div class="flex h-full w-full overflow-hidden">
-        
-        <!-- Sidebar Canales -->
-        <div class="w-72 bg-gray-50 dark:bg-slate-900/50 border-r border-gray-200 dark:border-slate-800 flex flex-col shrink-0 hidden md:flex">
-            <div class="h-16 flex items-center justify-between px-5 border-b border-gray-200 dark:border-slate-800 shrink-0">
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Canales</span>
-                ${isAdmin ? `<button onclick="App.community.openChannelModal()" class="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#1890ff] transition-all"><i class="fas fa-plus text-xs"></i></button>` : ''}
-            </div>
-            
-            <div class="flex-1 overflow-y-auto p-3 space-y-6 custom-scrollbar">
-                ${Object.entries(grouped).map(([cat, chs]) => `
-                    <div class="space-y-1">
-                        <div class="px-3 mb-2 flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest opacity-80">
-                            <i class="fas fa-chevron-down text-[8px]"></i> ${cat}
-                        </div>
-                        ${chs.map(ch => {
-                            const isActive = ch.id === activeCh.id;
-                            const activeClass = isActive 
-                                ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10" 
-                                : "text-slate-500 dark:text-slate-400 hover:bg-gray-200/50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white";
-                            const icon = ch.type === 'announcement' ? 'fa-bullhorn' : 'fa-hashtag';
-                            return `
-                            <button onclick="window.tempActiveChannel='${ch.id}'; App.renderCommunity('${community.id}', 'chat')" 
-                                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all group ${activeClass}">
-                                <div class="flex items-center gap-2.5 truncate">
-                                    <i class="fas ${icon} text-xs opacity-60 w-4 text-center"></i> 
-                                    <span class="truncate font-bold text-xs">${ch.name}</span>
-                                </div>
-                                ${isAdmin && ch.id !== 'general' ? `<i onclick="event.stopPropagation(); App.community.deleteChannel('${community.id}', '${ch.id}')" class="fas fa-times text-[10px] opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-opacity p-1"></i>` : ''}
-                            </button>`;
-                        }).join('')}
-                    </div>`).join('')}
-            </div>
-        </div>
-        
-        <!-- Área Principal -->
-        <div class="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900 relative">
-            <div class="h-16 border-b border-gray-200 dark:border-slate-800 flex items-center px-6 shrink-0 justify-between bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-10 sticky top-0">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
-                        <i class="fas ${activeCh.type === 'announcement' ? 'fa-bullhorn' : 'fa-hashtag'}"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-900 dark:text-white text-sm leading-tight">${activeCh.name}</h3>
-                        <span class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">${activeCh.type === 'announcement' ? 'Canal de anuncios oficial' : 'Chat general de la comunidad'}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar flex flex-col" id="chat-scroller">
-                <div class="mt-auto text-center py-10 opacity-50">
-                    <div class="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400 text-2xl"><i class="fas fa-hashtag"></i></div>
-                    <h4 class="font-bold text-slate-900 dark:text-white">Bienvenido a #${activeCh.name}</h4>
-                    <p class="text-xs text-slate-500">Este es el comienzo del canal.</p>
-                </div>
-                <div id="chat-messages-container" class="space-y-2 pb-4"></div>
-            </div>
-
-            <div class="p-4 bg-white dark:bg-slate-900 shrink-0 border-t border-gray-200 dark:border-slate-800">
-                ${(isAdmin || activeCh.type !== 'announcement') ? `
-                <form onsubmit="App.community.handleSendMessage(event, '${community.id}', '${activeCh.id}')" class="bg-gray-100 dark:bg-slate-800 rounded-2xl p-2 flex gap-2 items-end border border-transparent focus-within:border-[#1890ff] focus-within:ring-4 focus-within:ring-blue-500/10 transition-all">
-                    <button type="button" class="p-3 text-slate-400 hover:text-[#1890ff] transition-colors"><i class="fas fa-plus-circle"></i></button>
-                    <textarea id="chat-input" rows="1" class="flex-1 bg-transparent border-none outline-none text-sm p-3 text-slate-900 dark:text-white placeholder:text-slate-500 resize-none max-h-32 custom-scrollbar font-medium" placeholder="Enviar mensaje a #${activeCh.name}" onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); this.form.dispatchEvent(new Event('submit')); }"></textarea>
-                    <button type="submit" class="p-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl hover:scale-105 transition-transform shadow-md flex items-center justify-center"><i class="fas fa-paper-plane text-xs"></i></button>
-                </form>
-                <div class="text-[10px] text-slate-400 mt-2 text-center font-medium"><strong>Enter</strong> para enviar, <strong>Shift+Enter</strong> para nueva línea.</div>` 
-                : 
-                `<div class="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-2xl text-center text-xs font-bold text-slate-400 uppercase border-2 border-dashed border-gray-200 dark:border-slate-700 flex items-center justify-center gap-2"><i class="fas fa-lock"></i> Solo lectura</div>`}
-            </div>
-        </div>
-    </div>`;
-
-    _loadChatMessages(community.id, activeCh.id, user);
-}
-
-async function _loadChatMessages(cid, chid, user) {
-    const container = document.getElementById('chat-messages-container');
-    if(!container) return;
-
-    try {
-        const allPosts = await App.api.getPosts(cid);
-        const messages = allPosts
-            .filter(p => p.channelId === chid)
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-
-        container.innerHTML = messages.map(m => {
-            const isMe = m.authorId === user.uid;
-            return `
-            <div class="group flex gap-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 -mx-4 px-4 py-2 rounded-xl transition-colors relative">
-                <img src="${m.author.avatar}" class="w-10 h-10 rounded-full bg-gray-200 object-cover mt-1 border border-gray-200 dark:border-slate-700">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-baseline gap-2 mb-0.5">
-                        <span class="font-bold text-sm text-slate-900 dark:text-white hover:underline cursor-pointer">${m.author.name}</span>
-                        <span class="text-[10px] text-slate-400 font-medium">${App.ui.formatDate(m.createdAt)}</span>
-                        ${m.author.role === 'admin' ? '<span class="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Admin</span>' : ''}
-                    </div>
-                    <div class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap break-words font-medium">${m.content}</div>
-                </div>
-                ${(user.role === 'admin' || isMe) ? `<button onclick="App.community.deleteMessage('${cid}', '${m.id}')" class="absolute right-4 top-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 bg-white dark:bg-slate-800 p-2 rounded-lg shadow-sm border border-gray-100 dark:border-slate-700 transition-all"><i class="fas fa-trash text-xs"></i></button>` : ''}
-            </div>`;
-        }).join('');
-
-        const scroller = document.getElementById('chat-scroller');
-        if(scroller) scroller.scrollTop = scroller.scrollHeight;
-    } catch (e) { console.error(e); }
-}
-
-// ============================================================================
-// 6. TAB: LIVE CENTER
-// ============================================================================
-
 async function _renderLiveTab(container, community, user) {
     const liveConfig = community.liveConfig || { active: false };
     const isAdmin = user.role === 'admin';
@@ -705,13 +464,13 @@ function _renderEmptyLiveHero(isAdmin) {
 }
 
 // ============================================================================
-// 7. MODALES Y DIÁLOGOS (INYECCIÓN COMPLETA)
+// 5. INYECCION MODALES Y HANDLERS
 // ============================================================================
 
 function _injectModals(community, user) {
     const container = document.getElementById('comm-modals-container');
     if(!container) return;
-
+    
     let modalsHtml = `
     <!-- A. Modal Crear Post -->
     <div id="create-post-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
@@ -741,16 +500,9 @@ function _injectModals(community, user) {
             </div>
         </div>`;
 
-        // C. Modal Channel
-        modalsHtml += `
-        <div id="channel-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-            <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden">
-                <div class="p-5 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-800"><h3 class="font-bold text-slate-900 dark:text-white">Nuevo Canal</h3><button onclick="App.community.closeChannelModal()"><i class="fas fa-times text-slate-400"></i></button></div>
-                <div class="p-6 space-y-4"><input type="hidden" id="channel-cid" value="${community.id}"><div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">Nombre</label><input type="text" id="channel-name" class="w-full p-2.5 border border-gray-200 dark:border-slate-700 rounded-xl dark:bg-slate-800 dark:text-white outline-none focus:border-[#1890ff] text-sm"></div><div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">Categoría</label><select id="channel-category" class="w-full p-2.5 border border-gray-200 dark:border-slate-700 rounded-xl dark:bg-slate-800 dark:text-white outline-none focus:border-[#1890ff] text-sm"><option value="General">General</option><option value="Temas">Temas</option></select></div><div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">Tipo</label><select id="channel-type" class="w-full p-2.5 border border-gray-200 dark:border-slate-700 rounded-xl dark:bg-slate-800 dark:text-white outline-none focus:border-[#1890ff] text-sm"><option value="text">Chat</option><option value="announcement">Anuncios</option></select></div><button onclick="App.community.saveChannel()" class="w-full bg-[#1890ff] text-white py-3 rounded-xl font-bold shadow-lg hover:bg-blue-600 transition-colors text-sm">Crear Canal</button></div>
-            </div>
-        </div>`;
+        // [REMOVE] Modal Channel eliminado ya que el chat es global
 
-        // D. Modal Editar Comunidad (NUEVO V38)
+        // D. Modal Editar Comunidad
         modalsHtml += `
         <div id="edit-community-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
             <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
@@ -840,7 +592,7 @@ App.community.submitPost = async () => {
             App.ui.toast("Publicado con éxito", "success");
         }
         App.community.closeCreatePostModal(); App.renderCommunity(cid, 'inicio'); 
-    } catch(e) { console.error(e); App.ui.toast("Error al procesar", "error"); } finally { btn.disabled = false; }
+    } catch(e) { console.error(e); App.ui.toast("Error al procesar", "error"); } finally { btn.disabled = false; btn.innerHTML = window.App.communityState.isEditing ? 'Guardar Cambios' : 'Publicar Ahora'; }
 };
 
 App.community.deletePost = async (pid, cid) => {
@@ -859,7 +611,7 @@ App.community.handleLike = async (postId) => {
     if(isLiked) { post.likes--; post.likedBy = post.likedBy.filter(id => id !== uid); } else { post.likes++; if(!post.likedBy) post.likedBy = []; post.likedBy.push(uid); }
     
     const countEl = document.getElementById(`likes-count-${postId}`); if(countEl) countEl.innerText = post.likes;
-    const btn = countEl?.parentElement; if(btn) { btn.classList.toggle('text-red-500'); btn.classList.toggle('text-slate-500'); }
+    const btn = countEl?.parentElement; if(btn) { btn.classList.toggle('text-red-500', !isLiked); btn.classList.toggle('text-slate-500', isLiked); }
     try { await window.F.updateDoc(window.F.doc(window.F.db, "posts", postId), { likes: post.likes, likedBy: post.likedBy }); } catch(e) { console.error(e); }
 };
 
@@ -879,8 +631,7 @@ App.community.addComment = async (pid) => {
 
 App.community.openLiveConfigModal = () => document.getElementById('live-modal').classList.remove('hidden');
 App.community.closeLiveModal = () => document.getElementById('live-modal').classList.add('hidden');
-App.community.openChannelModal = () => document.getElementById('channel-modal').classList.remove('hidden');
-App.community.closeChannelModal = () => document.getElementById('channel-modal').classList.add('hidden');
+// [REMOVE] App.community.openChannelModal ya no es necesario
 App.community.openEditCommunityModal = () => { document.getElementById('edit-community-modal').classList.remove('hidden'); App.community.toggleSettings(); };
 App.community.closeEditCommunityModal = () => document.getElementById('edit-community-modal').classList.add('hidden');
 
@@ -899,28 +650,7 @@ App.community.saveLiveConfig = async () => {
     } catch(e) { App.ui.toast("Error al guardar", "error"); }
 };
 
-App.community.saveChannel = async () => {
-    const cid = document.getElementById('channel-cid').value; const name = document.getElementById('channel-name').value.trim();
-    if(!name) return App.ui.toast("Nombre requerido", "warning");
-    try {
-        const newChannel = { id: name.toLowerCase().replace(/\s+/g, '-'), name, type: document.getElementById('channel-type').value, category: document.getElementById('channel-category').value };
-        await window.F.updateDoc(window.F.doc(window.F.db, "communities", cid), { channels: window.F.arrayUnion(newChannel) });
-        App.ui.toast("Canal creado", "success"); App.community.closeChannelModal(); App.renderCommunity(cid, 'chat');
-    } catch(e) { App.ui.toast("Error al crear canal", "error"); }
-};
-
-App.community.deleteChannel = async (cid, chId) => {
-    if(!confirm("¿Eliminar este canal?")) return;
-    try {
-        const ref = window.F.doc(window.F.db, "communities", cid);
-        await window.F.runTransaction(window.F.db, async (transaction) => {
-            const doc = await transaction.get(ref); if (!doc.exists()) throw "La comunidad no existe";
-            const channels = doc.data().channels || []; const newChannels = channels.filter(c => c.id !== chId);
-            transaction.update(ref, { channels: newChannels });
-        });
-        App.ui.toast("Canal eliminado", "success"); const currentHash = window.location.hash; if(currentHash.includes('/chat')) App.renderCommunity(cid, 'chat');
-    } catch(e) { console.error(e); App.ui.toast("Error al eliminar canal", "error"); }
-};
+// [REMOVE] App.community.saveChannel eliminado (chat es global)
 
 App.community.saveCommunityConfig = async () => {
     const cid = document.getElementById('ec-id').value;
@@ -938,25 +668,37 @@ App.community.saveCommunityConfig = async () => {
     } catch (e) { console.error(e); App.ui.toast("Error al guardar", "error"); }
 };
 
-App.community.handleSendMessage = async (e, cid, chid) => {
-    e.preventDefault(); const input = document.getElementById('chat-input'); const txt = input.value.trim(); if(!txt) return; input.value = '';
-    try { await App.api.createPost({ communityId: cid, channelId: chid, content: txt, authorId: App.state.currentUser.uid, author: App.state.currentUser }); _loadChatMessages(cid, chid, App.state.currentUser); } catch(e) { App.ui.toast("Error enviando mensaje", "error"); }
-};
-
-App.community.deleteMessage = async (cid, pid) => {
-    if(!confirm("¿Borrar mensaje?")) return;
-    try { await window.F.deleteDoc(window.F.doc(window.F.db, "posts", pid)); const chid = window.tempActiveChannel || 'general'; _loadChatMessages(cid, chid, App.state.currentUser); } catch(e) { App.ui.toast("Error al borrar", "error"); }
-};
-
 function _initLiveCountdown(dateIso) {
     const el = document.getElementById('live-timer'); if(!el || !dateIso) return;
     const target = new Date(dateIso).getTime(); if(window.liveInterval) clearInterval(window.liveInterval);
     const update = () => {
         const now = new Date().getTime(); const diff = target - now;
-        if(diff <= 0) { el.innerHTML = '<div class="col-span-4 text-center text-3xl font-bold animate-pulse text-red-500 bg-white/10 p-4 rounded-xl">¡EN VIVO AHORA!</div>'; return; }
+        if(diff <= 0) { el.innerHTML = '<div class="col-span-4 text-center text-3xl font-bold animate-pulse text-red-500 bg-white/10 p-4 rounded-xl">¡EN VIVO AHORA!</div>'; clearInterval(window.liveInterval); return; }
         const d = Math.floor(diff / (1000 * 60 * 60 * 24)); const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)); const s = Math.floor((diff % (1000 * 60)) / 1000);
         const box = (val, label) => `<div class="bg-white/10 backdrop-blur border border-white/20 rounded-2xl p-4 flex flex-col items-center justify-center"><div class="text-3xl md:text-4xl font-mono font-bold text-white">${val < 10 ? '0'+val : val}</div><div class="text-[10px] uppercase tracking-widest text-slate-300 mt-1">${label}</div></div>`;
         el.innerHTML = box(d, 'Días') + box(h, 'Horas') + box(m, 'Min') + box(s, 'Seg');
     };
     update(); window.liveInterval = setInterval(update, 1000);
+}
+
+function _initTrialCountdown(endIso) {
+    const target = new Date(endIso).getTime();
+    if (window.trialInterval) clearInterval(window.trialInterval);
+    const update = () => {
+        const now = Date.now();
+        const diff = target - now;
+        if (diff <= 0) {
+            const banner = document.querySelector('.animate-gradient'); if (banner) banner.remove();
+            clearInterval(window.trialInterval);
+            return;
+        }
+        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((diff % (1000 * 60)) / 1000);
+        const timerSpan = document.getElementById('trial-timer');
+        if (timerSpan) timerSpan.innerText = `${d}d ${h}h ${m}m ${s}s`;
+    };
+    update();
+    window.trialInterval = setInterval(update, 1000);
 }

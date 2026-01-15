@@ -1,12 +1,10 @@
 /**
- * admin.views.js (V40.5 - FINAL PRODUCTION RELEASE)
+ * admin.views.js (V47.0 - PRO PLAN BUILDER)
  * Panel de Control Unificado.
- * * CARACTERÍSTICAS INCLUIDAS:
- * 1. LAYOUT ADAPTATIVO: El margen se ajusta dinámicamente según el estado de la Sidebar (Fija/Colapsada).
- * 2. CONSTRUCTOR DE VARIANTES: Interfaz visual para agregar opciones de precio una por una.
- * 3. SEGURIDAD: Verificación asíncrona de rol 'admin' en Firestore.
- * 4. MULTIMEDIA: Galería mixta (YouTube + Imágenes) reordenable.
- * 5. CRUD COMPLETO: Comunidades, Usuarios, Moderación y Planes.
+ * * CAMBIOS V47.0:
+ * - PLANES: Soporte completo para facturación dual (Mensual/Anual).
+ * - TRIALS: Configuración de días de prueba y flag "Sin Tarjeta".
+ * - DYNAMIC V2: Constructor de variantes con Links de Pago independientes por opción.
  */
 
 window.App = window.App || {};
@@ -15,7 +13,7 @@ window.App.admin = window.App.admin || {};
 // Almacenes temporales para la edición en curso
 window.App.admin.tempPlans = [];
 window.App.admin.tempGallery = [];
-window.App.admin.tempVariants = []; // Nuevo: para el constructor de variantes visual
+window.App.admin.tempVariants = [];
 
 // ==========================================
 // 1. RENDERIZADOR PRINCIPAL & SEGURIDAD
@@ -25,7 +23,7 @@ window.App.renderAdmin = async (activeTab = 'overview') => {
 
     // 1. Verificación rápida de sesión local
     if (!user) {
-        window.location.hash = '#comunidades';
+        window.location.hash = '#feed';
         return;
     }
 
@@ -37,7 +35,7 @@ window.App.renderAdmin = async (activeTab = 'overview') => {
         </div>
     `);
 
-    // 3. Verificación Estricta contra Firestore (Fuente de verdad)
+    // 3. Verificación Estricta contra Firestore
     let isVerifiedAdmin = false;
     try {
         const userDocRef = window.F.doc(window.F.db, "users", user.uid);
@@ -73,7 +71,6 @@ window.App.renderAdmin = async (activeTab = 'overview') => {
     }
 
     // 5. Configuración de Layout Dinámico
-    // Sincronizar estado visual con el sidebar component
     const isSidebarPinned = localStorage.getItem('sidebar_pinned') === 'true';
     if (isSidebarPinned) document.body.classList.add('sidebar-is-pinned');
     else document.body.classList.remove('sidebar-is-pinned');
@@ -81,21 +78,14 @@ window.App.renderAdmin = async (activeTab = 'overview') => {
     const sidebarHTML = App.sidebar && App.sidebar.render ? App.sidebar.render('admin') : '';
 
     await App.render(`
-        <!-- ESTILOS DINÁMICOS PARA EL CONTENIDO PRINCIPAL -->
         <style>
-            #admin-main { transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-            
-            /* Móvil */
-            @media (max-width: 767px) { 
-                #admin-main { margin-left: 0 !important; padding-bottom: 80px; } 
+            #admin-main { 
+                transition: margin-left 300ms ease-in-out;
+                will-change: margin-left;
             }
-
-            /* Escritorio */
+            @media (max-width: 767px) { #admin-main { margin-left: 0 !important; padding-bottom: 80px; } }
             @media (min-width: 768px) {
-                /* Por defecto: Sidebar colapsada (iconos) -> 72px */
                 #admin-main { margin-left: 72px; }
-                
-                /* Si la sidebar está fijada (clase en body) -> 260px */
                 body.sidebar-is-pinned #admin-main { margin-left: 260px; }
             }
         </style>
@@ -103,7 +93,6 @@ window.App.renderAdmin = async (activeTab = 'overview') => {
         ${sidebarHTML}
         
         <main id="admin-main" class="min-h-screen bg-[#F8FAFC] dark:bg-[#020617] transition-colors p-6 lg:p-8 relative flex flex-col">
-            
             <!-- HEADER -->
             <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
                 <div>
@@ -111,7 +100,7 @@ window.App.renderAdmin = async (activeTab = 'overview') => {
                         <span class="w-10 h-10 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center text-lg shadow-lg"><i class="fas fa-cogs"></i></span>
                         Panel de Control
                     </h1>
-                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1 ml-1">V40.5: Gestor Visual de Variantes y Layout Fluido</p>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1 ml-1">Administración Global del Sistema</p>
                 </div>
                 <div class="flex gap-3">
                     <button onclick="App.admin.openCommunityModal()" class="px-5 py-3 bg-[#1890ff] text-white rounded-xl font-bold text-sm hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20 flex items-center gap-2 active:scale-95 group">
@@ -175,8 +164,8 @@ async function _loadAdminOverview() {
             
             <div class="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-8 text-center shadow-sm">
                  <div class="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4 text-[#1890ff] text-3xl"><i class="fas fa-rocket"></i></div>
-                 <h3 class="text-xl font-bold text-slate-900 dark:text-white">Panel Actualizado V40.5</h3>
-                 <p class="text-slate-500 dark:text-slate-400 max-w-lg mx-auto mt-2">Ahora el layout se adapta perfectamente y puedes construir variantes de precios visualmente una por una.</p>
+                 <h3 class="text-xl font-bold text-slate-900 dark:text-white">Panel de Administración</h3>
+                 <p class="text-slate-500 dark:text-slate-400 max-w-lg mx-auto mt-2">Gestiona comunidades, usuarios y contenido desde un solo lugar.</p>
             </div>
         `;
     } catch (e) { console.error(e); }
@@ -332,10 +321,10 @@ async function _loadAdminContent() {
 }
 
 // ==========================================
-// 3. LÓGICA DE NEGOCIO (CORE)
+// 3. LÓGICA DE NEGOCIO (CORE PLANES V47)
 // ==========================================
 
-// --- A. GESTIÓN DE VARIANTES (CONSTRUCTOR VISUAL) ---
+// --- A. GESTIÓN DE VARIANTES (CONSTRUCTOR VISUAL V2) ---
 App.admin.addVariant = () => {
     const name = document.getElementById('var-name').value.trim();
     const price = parseFloat(document.getElementById('var-price').value);
@@ -345,10 +334,14 @@ App.admin.addVariant = () => {
         return App.ui.toast("Debes ingresar al menos Nombre y Precio", "warning");
     }
 
-    // Agregar al store temporal
-    App.admin.tempVariants.push({ name, price, link });
+    if (!link) {
+        return App.ui.toast("El link de pago es obligatorio para planes dinámicos", "warning");
+    }
+
+    // Agregar al store temporal (Ahora INCLUYE el paymentUrl)
+    App.admin.tempVariants.push({ name, price, paymentUrl: link });
     
-    // Limpiar inputs para la siguiente
+    // Limpiar inputs
     document.getElementById('var-name').value = '';
     document.getElementById('var-price').value = '';
     document.getElementById('var-link').value = '';
@@ -378,7 +371,7 @@ App.admin.renderVariantsList = () => {
                 <div class="flex items-center gap-2 text-slate-500">
                     <span class="text-green-600 font-mono font-bold">$${v.price}</span>
                     <span class="text-slate-300">|</span>
-                    ${v.link ? `<span class="truncate text-[10px] max-w-[150px] text-blue-500"><i class="fas fa-link"></i> ${v.link}</span>` : '<span class="text-[10px] opacity-50">Sin link</span>'}
+                    <span class="truncate text-[10px] max-w-[150px] text-blue-500"><i class="fas fa-link"></i> ${v.paymentUrl || 'Sin link'}</span>
                 </div>
             </div>
             <button onclick="App.admin.removeVariant(${idx})" class="text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-1.5 rounded transition-colors"><i class="fas fa-times"></i></button>
@@ -386,69 +379,87 @@ App.admin.renderVariantsList = () => {
     `).join('');
 };
 
-// --- B. GESTIÓN DE PLANES UNIFICADA ---
+// --- B. GESTIÓN DE PLANES UNIFICADA (PRO) ---
 App.admin.toggleDynamicPricingUI = (enabled) => {
     const dynamicSection = document.getElementById('plan-dynamic-settings');
-    const priceLabel = document.getElementById('label-plan-price');
-    const intervalInput = document.getElementById('plan-interval');
+    const staticSection = document.getElementById('plan-static-pricing');
     
     if (enabled) {
         dynamicSection.classList.remove('hidden');
-        priceLabel.innerText = "Precio Base (Solo Visual)";
-        intervalInput.disabled = true; // Se deshabilita porque el precio depende de la variante
+        staticSection.classList.add('opacity-50', 'pointer-events-none', 'grayscale');
     } else {
         dynamicSection.classList.add('hidden');
-        priceLabel.innerText = "Precio Fijo";
-        intervalInput.disabled = false;
+        staticSection.classList.remove('opacity-50', 'pointer-events-none', 'grayscale');
     }
 };
 
 App.admin.addPlanUnified = () => {
     const name = document.getElementById('plan-name').value.trim();
-    const basePrice = parseFloat(document.getElementById('plan-price').value) || 0;
     const isDynamic = document.getElementById('plan-is-dynamic').checked;
-    const interval = document.getElementById('plan-interval').value;
 
     if (!name) return App.ui.toast("Nombre del plan requerido", "warning");
 
     let planData = {
         id: 'plan_' + Date.now(),
         name,
-        price: basePrice, // Precio "Desde" o Precio Fijo
-        interval: interval,
         features: document.getElementById('plan-features').value.split(',').map(s => s.trim()).filter(Boolean),
-        paymentUrl: document.getElementById('plan-link').value.trim(), // Link default
-        isDynamic: isDynamic
+        isDynamic: isDynamic,
+        // Configuración de Trial (Global para el plan)
+        trialDays: parseInt(document.getElementById('plan-trial-days').value) || 0,
+        noCardRequired: document.getElementById('plan-no-card').checked
     };
 
-    // Si es Dinámico (Variantes por Dropdown)
     if (isDynamic) {
         if (App.admin.tempVariants.length === 0) {
             return App.ui.toast("Debes agregar al menos una variante en la lista", "error");
         }
-
-        const selectorLabel = document.getElementById('dyn-unit-name').value || 'Selecciona una opción';
         
         planData.dynamicPricing = {
-            selectorLabel: selectorLabel,
-            variants: [...App.admin.tempVariants] // Copiamos el array construido visualmente
+            selectorLabel: document.getElementById('dyn-unit-name').value || 'Selecciona una opción',
+            variants: [...App.admin.tempVariants]
         };
-        // Mostrar precio inicial visualmente
-        planData.priceDisplay = `Desde $${App.admin.tempVariants[0].price}`;
+        // Precio base visual (el menor de las variantes)
+        const minPrice = Math.min(...App.admin.tempVariants.map(v => v.price));
+        planData.priceMonthly = minPrice; // Fallback para compatibilidad
+        planData.priceDisplay = `Desde $${minPrice}`;
     } else {
-        planData.priceDisplay = basePrice === 0 ? 'Gratis' : `$${basePrice}`;
+        // Modo Estático Dual (Mensual + Anual)
+        const priceMonthly = parseFloat(document.getElementById('plan-price-monthly').value);
+        const urlMonthly = document.getElementById('plan-link-monthly').value.trim();
+        const priceAnnual = parseFloat(document.getElementById('plan-price-annual').value);
+        const urlAnnual = document.getElementById('plan-link-annual').value.trim();
+
+        if (isNaN(priceMonthly) && isNaN(priceAnnual)) {
+            return App.ui.toast("Debes definir al menos un precio (Mensual o Anual)", "warning");
+        }
+
+        planData.priceMonthly = isNaN(priceMonthly) ? null : priceMonthly;
+        planData.paymentUrlMonthly = urlMonthly;
+        planData.priceAnnual = isNaN(priceAnnual) ? null : priceAnnual;
+        planData.paymentUrlAnnual = urlAnnual;
+        
+        // Compatibilidad Legacy
+        planData.price = planData.priceMonthly || planData.priceAnnual;
+        planData.interval = planData.priceMonthly ? 'month' : 'year';
+        planData.paymentUrl = planData.paymentUrlMonthly || planData.paymentUrlAnnual;
     }
 
     App.admin.tempPlans.push(planData);
     
-    // Limpiar Formulario Plan
+    // Limpiar Formulario
     document.getElementById('plan-name').value = '';
-    document.getElementById('plan-price').value = '';
-    document.getElementById('plan-link').value = '';
     document.getElementById('plan-features').value = '';
     document.getElementById('plan-is-dynamic').checked = false;
+    document.getElementById('plan-trial-days').value = '';
+    document.getElementById('plan-no-card').checked = false;
     
-    // Limpiar Variantes UI
+    // Limpiar Sección Estática
+    document.getElementById('plan-price-monthly').value = '';
+    document.getElementById('plan-link-monthly').value = '';
+    document.getElementById('plan-price-annual').value = '';
+    document.getElementById('plan-link-annual').value = '';
+
+    // Limpiar Sección Dinámica
     document.getElementById('dyn-unit-name').value = '';
     App.admin.tempVariants = [];
     App.admin.renderVariantsList();
@@ -475,24 +486,28 @@ App.admin.renderPlansList = () => {
         let details = '';
         if (p.isDynamic && p.dynamicPricing) {
             const count = p.dynamicPricing.variants.length;
-            const examples = p.dynamicPricing.variants.slice(0, 2).map(v => v.name).join(', ');
-            details = `<div class="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-900/30 mt-2">
-                <i class="fas fa-list-ul mr-1"></i> <strong>Menú (${count}):</strong> ${examples}${count > 2 ? '...' : ''}
+            details = `<div class="text-xs text-blue-600 bg-blue-50 p-1.5 rounded mt-1 border border-blue-100 flex items-center gap-1">
+                <i class="fas fa-bolt"></i> Dinámico: ${count} variantes
             </div>`;
         } else {
-            details = `<div class="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1">Precio fijo: $${p.price} / ${p.interval}</div>`;
+            const monthly = p.priceMonthly ? `$${p.priceMonthly}/mes` : '';
+            const annual = p.priceAnnual ? `$${p.priceAnnual}/año` : '';
+            const sep = (monthly && annual) ? ' + ' : '';
+            details = `<div class="text-xs text-slate-500 font-mono mt-1">${monthly}${sep}${annual}</div>`;
+        }
+        
+        let trialLabel = '';
+        if (p.trialDays > 0) {
+            trialLabel = `<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold border border-green-200 ml-2">Trial ${p.trialDays}d</span>`;
         }
 
         return `
-        <div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-700 relative group hover:border-blue-300 transition-colors">
+        <div class="bg-white dark:bg-slate-900 p-3 rounded-xl border border-gray-200 dark:border-slate-700 relative group hover:border-blue-300 transition-colors">
             <div class="flex justify-between items-start">
-                <h5 class="font-bold text-slate-900 dark:text-white text-sm">${p.name}</h5>
+                <h5 class="font-bold text-slate-900 dark:text-white text-sm flex items-center">${p.name} ${trialLabel}</h5>
                 <button onclick="App.admin.removePlan(${idx})" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fas fa-trash text-xs"></i></button>
             </div>
             ${details}
-            <div class="text-[10px] text-slate-400 truncate border-t border-gray-100 dark:border-slate-800 pt-2 mt-2 flex items-center gap-1">
-                ${p.paymentUrl ? '<i class="fas fa-link text-green-500"></i> Link Default' : '<i class="fas fa-link text-gray-300"></i> Sin link default'}
-            </div>
         </div>`;
     }).join('');
 };
@@ -544,18 +559,21 @@ App.admin.editCommunity = async (id) => {
         
         // Cargar Galería
         App.admin.tempGallery = comm.gallery || [];
-        // Migración legacy si no hay galería
         if (App.admin.tempGallery.length === 0) {
             if (comm.image) App.admin.tempGallery.push({ type: 'image', url: comm.image });
             if (comm.videoUrl) App.admin.tempGallery.push({ type: 'video', url: comm.videoUrl });
         }
         App.admin.renderGalleryList();
 
-        // Cargar Planes
+        // Cargar Planes (Mapeo Inteligente)
         App.admin.tempPlans = comm.plans || [];
+        // Compatibilidad Legacy si es necesario
         if (App.admin.tempPlans.length === 0 && comm.priceMonthly) {
             App.admin.tempPlans.push({
-                id: 'legacy_'+Date.now(), name: 'Plan Estándar', price: comm.priceMonthly, interval: 'month'
+                id: 'legacy_'+Date.now(), name: 'Plan Estándar', 
+                priceMonthly: comm.priceMonthly, 
+                paymentUrlMonthly: comm.paymentUrl || '',
+                price: comm.priceMonthly, interval: 'month'
             });
         }
         App.admin.renderPlansList();
@@ -581,41 +599,44 @@ App.admin.saveCommunity = async () => {
     // 1. GENERACIÓN Y VALIDACIÓN DE SLUG
     if (!id) {
         id = name.toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, '') // Eliminar caracteres especiales
-            .replace(/\s+/g, '-')         // Espacios a guiones
-            .replace(/-+/g, '-');         // Guiones múltiples
-        
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-');
         if (id.length < 3) id += "-edu";
 
-        // Verificar duplicados
         try {
             const docRef = window.F.doc(window.F.db, "communities", id);
             const docSnap = await window.F.getDoc(docRef);
             if (docSnap.exists()) {
                 btn.disabled = false; btn.innerHTML = "Crear Comunidad";
-                return App.ui.toast(`El nombre "${name}" ya existe (ID: ${id}). Intenta con otro.`, "error");
+                return App.ui.toast(`El nombre "${name}" ya existe.`, "error");
             }
-        } catch(e) {
-            console.error("Error verificando duplicado", e);
-        }
+        } catch(e) { console.error(e); }
     }
 
     // 2. PREPARAR DATOS
+    // Calculamos precios mínimos para mostrar "Desde $X" en cards
+    const allPrices = [];
+    App.admin.tempPlans.forEach(p => {
+        if (p.isDynamic && p.dynamicPricing) {
+            p.dynamicPricing.variants.forEach(v => allPrices.push(v.price));
+        } else {
+            if (p.priceMonthly) allPrices.push(p.priceMonthly);
+        }
+    });
+    const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : 0;
+
     const data = {
         id: id,
         name: name,
         icon: document.getElementById('comm-icon').value.trim(),
         description: document.getElementById('comm-desc').value.trim(),
         category: document.getElementById('comm-category').value,
-        
-        // Galería
         gallery: App.admin.tempGallery,
-        // Fallback para UI Legacy
         image: App.admin.tempGallery.find(i => i.type === 'image')?.url || '',
         videoUrl: App.admin.tempGallery.find(i => i.type === 'video')?.url || '',
-        
-        // Planes
         plans: App.admin.tempPlans,
+        priceMonthly: minPrice, // Precio de referencia para filtrado
         isPublic: true, 
         updatedAt: new Date().toISOString()
     };
@@ -647,7 +668,6 @@ App.admin.deleteCommunity = async (id) => {
 };
 
 // --- D. GESTOR MULTIMEDIA ---
-
 App.admin.addMediaItem = () => {
     const url = document.getElementById('media-url').value.trim();
     const type = document.getElementById('media-type').value; 
@@ -835,89 +855,114 @@ function _renderCommunityModalUnified() {
                     </div>
 
                     <!-- Lista Visual de Items -->
-                    <div id="gallery-list" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <!-- Items inyectados por JS -->
-                    </div>
+                    <div id="gallery-list" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
                     <p class="text-[10px] text-slate-400 mt-2 font-medium">* Usa las flechas para ordenar. El primer elemento será la portada principal.</p>
                 </div>
 
                 <hr class="border-gray-100 dark:border-slate-800">
 
-                <!-- 3. MOTOR DE PLANES & VARIANTES -->
+                <!-- 3. MOTOR DE PLANES V2 PRO (UNIFICADO) -->
                 <div>
                     <h4 class="text-sm font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                         <i class="fas fa-tags text-green-500"></i> Planes de Venta
                     </h4>
 
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
-                        <!-- Lista de Planes Agregados -->
-                        <div class="md:col-span-4 space-y-3" id="plans-list">
-                            <!-- Renderizado JS -->
-                        </div>
+                        <!-- Left: Lista de Planes -->
+                        <div class="md:col-span-4 space-y-3" id="plans-list"></div>
 
-                        <!-- Editor de Planes -->
+                        <!-- Right: Editor de Planes -->
                         <div class="md:col-span-8 bg-gray-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-gray-200 dark:border-slate-700">
+                            <!-- Header Editor -->
                             <div class="flex justify-between items-center mb-4">
-                                <h5 class="text-xs font-bold text-slate-500 uppercase">Configurar Nuevo Plan</h5>
-                                <div class="flex items-center gap-2">
-                                    <label class="text-xs font-bold text-[#1890ff] cursor-pointer select-none" for="plan-is-dynamic">¿Habilitar Menú Desplegable?</label>
+                                <h5 class="text-xs font-bold text-slate-500 uppercase">Editor de Planes</h5>
+                                <div class="flex items-center gap-2 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-full border border-gray-200 dark:border-slate-700">
+                                    <label class="text-[10px] font-bold text-slate-500 cursor-pointer select-none uppercase" for="plan-is-dynamic">Modo Dinámico</label>
                                     <input type="checkbox" id="plan-is-dynamic" class="accent-[#1890ff] w-4 h-4 cursor-pointer" onchange="App.admin.toggleDynamicPricingUI(this.checked)">
                                 </div>
                             </div>
 
-                            <!-- Campos Comunes -->
-                            <div class="grid grid-cols-2 gap-3 mb-3">
-                                <input type="text" id="plan-name" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="Nombre (ej: Pack Asesoría)">
-                                
-                                <div class="flex gap-2">
-                                    <div class="flex-1">
-                                        <label class="text-[9px] text-slate-400 uppercase font-bold pl-1 mb-0.5 block" id="label-plan-price">Precio Fijo</label>
-                                        <input type="number" id="plan-price" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="$$">
+                            <!-- Campos Base -->
+                            <div class="mb-4">
+                                <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Nombre del Plan</label>
+                                <input type="text" id="plan-name" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white font-bold" placeholder="Ej: Plan Experto">
+                            </div>
+
+                            <!-- SECCIÓN ESTÁTICA (Mensual/Anual) -->
+                            <div id="plan-static-pricing" class="space-y-3 transition-all">
+                                <div class="grid grid-cols-12 gap-3 items-center">
+                                    <div class="col-span-4">
+                                        <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Precio Mensual</label>
+                                        <div class="relative">
+                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                                            <input type="number" id="plan-price-monthly" class="w-full pl-6 p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="0">
+                                        </div>
                                     </div>
-                                    <div class="w-1/3 pt-4">
-                                        <select id="plan-interval" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white cursor-pointer">
-                                            <option value="month">Mensual</option>
-                                            <option value="year">Anual</option>
-                                            <option value="forever">Vida</option>
-                                        </select>
+                                    <div class="col-span-8">
+                                        <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Link de Pago Mensual</label>
+                                        <input type="text" id="plan-link-monthly" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="https://...">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-12 gap-3 items-center">
+                                    <div class="col-span-4">
+                                        <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Precio Anual (Opcional)</label>
+                                        <div class="relative">
+                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                                            <input type="number" id="plan-price-annual" class="w-full pl-6 p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="0">
+                                        </div>
+                                    </div>
+                                    <div class="col-span-8">
+                                        <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Link de Pago Anual</label>
+                                        <input type="text" id="plan-link-annual" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="https://...">
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- CONSTRUCTOR DE VARIANTES (VISUAL) -->
-                            <div id="plan-dynamic-settings" class="hidden bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg border border-blue-100 dark:border-blue-900/30 mb-3 animate-fade-in">
-                                <p class="text-[10px] text-blue-600 dark:text-blue-400 font-bold mb-3 uppercase flex items-center gap-1"><i class="fas fa-list"></i> Constructor de Opciones</p>
+                            <!-- SECCIÓN DINÁMICA (Asesorías/Cantidad) -->
+                            <div id="plan-dynamic-settings" class="hidden bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 mb-4 animate-fade-in relative overflow-hidden">
+                                <div class="absolute top-0 right-0 bg-blue-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl">PRO V2</div>
+                                <p class="text-[10px] text-blue-600 dark:text-blue-400 font-bold mb-3 uppercase flex items-center gap-1"><i class="fas fa-cubes"></i> Constructor de Variantes</p>
                                 
-                                <input type="text" id="dyn-unit-name" class="w-full mb-3 p-2.5 rounded border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-xs outline-none dark:text-white placeholder:text-slate-400" placeholder="Título del Menú (Ej: Elige Duración)">
+                                <input type="text" id="dyn-unit-name" class="w-full mb-3 p-2.5 rounded border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-xs outline-none dark:text-white placeholder:text-slate-400" placeholder="Título del Selector (Ej: Elige Horas de Asesoría)">
                                 
-                                <div class="flex gap-2 items-end mb-2">
-                                    <div class="flex-1">
-                                        <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Nombre Opción</label>
+                                <div class="grid grid-cols-12 gap-2 items-end mb-2">
+                                    <div class="col-span-5">
+                                        <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Opción</label>
                                         <input type="text" id="var-name" placeholder="Ej: 5 Horas" class="w-full p-2 rounded border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-xs outline-none dark:text-white">
                                     </div>
-                                    <div class="w-24">
+                                    <div class="col-span-3">
                                         <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Precio</label>
                                         <input type="number" id="var-price" placeholder="$$" class="w-full p-2 rounded border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-xs outline-none dark:text-white">
                                     </div>
+                                    <div class="col-span-4">
+                                        <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Link Pago Único</label>
+                                        <input type="text" id="var-link" placeholder="Link Específico" class="w-full p-2 rounded border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-xs outline-none dark:text-white">
+                                    </div>
                                 </div>
-                                <div class="flex gap-2 mb-3">
-                                    <input type="text" id="var-link" placeholder="Link de Pago Específico (Stripe...)" class="flex-1 p-2 rounded border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-xs outline-none dark:text-white">
-                                    <button onclick="App.admin.addVariant()" class="bg-blue-600 text-white px-4 py-2 rounded text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm">Agregar</button>
-                                </div>
+                                <button onclick="App.admin.addVariant()" class="w-full bg-blue-600 text-white py-2 rounded text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm mb-3">Agregar Variante</button>
 
                                 <!-- LISTA VISUAL DE VARIANTES -->
-                                <div class="max-h-32 overflow-y-auto custom-scrollbar border-t border-blue-200 dark:border-blue-800 pt-2 mt-2" id="variants-list-visual">
-                                    <!-- Items inyectados por JS -->
-                                </div>
+                                <div class="max-h-32 overflow-y-auto custom-scrollbar border-t border-blue-200 dark:border-blue-800 pt-2" id="variants-list-visual"></div>
                             </div>
 
-                            <!-- Footer Plan -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                                <input type="text" id="plan-link" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="Link Pago Default (Opcional)">
-                                <input type="text" id="plan-features" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="Características (sep por comas)">
+                            <!-- Configuración Extra (Trials) -->
+                            <div class="grid grid-cols-2 gap-4 mt-4 mb-4">
+                                <div>
+                                    <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Días de Prueba (Trial)</label>
+                                    <input type="number" id="plan-trial-days" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="0">
+                                </div>
+                                <div class="flex items-center gap-2 h-full pt-6">
+                                    <input type="checkbox" id="plan-no-card" class="accent-green-500 w-4 h-4 cursor-pointer">
+                                    <label for="plan-no-card" class="text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer select-none">Sin Tarjeta Requerida</label>
+                                </div>
                             </div>
                             
-                            <button onclick="App.admin.addPlanUnified()" class="w-full py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity shadow-sm">Agregar Plan a la Lista</button>
+                            <div class="mb-4">
+                                <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Características</label>
+                                <input type="text" id="plan-features" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="Soporte 24/7, Acceso total (separar por comas)">
+                            </div>
+                            
+                            <button onclick="App.admin.addPlanUnified()" class="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-sm font-bold hover:opacity-90 transition-opacity shadow-lg">Guardar Plan en la Lista</button>
                         </div>
                     </div>
                 </div>
