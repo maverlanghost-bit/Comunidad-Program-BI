@@ -121,13 +121,15 @@
                 console.log("✅ Firebase Inicializado con éxito");
 
                 // 3. Cargar Scripts de la App Dinámicamente (ORDEN CRÍTICO V25.0)
-                // Se agrega 'public.views.js' para el Discovery Mode y Ventas
+                // CORRECCIÓN: Agregados ai.service.js y ai.views.js, eliminado mockData.js
                 const scripts = [
                     'utils.js',             // Utilidades base
                     'core.js',              // Motor central y Router
                     'components.sidebar.js',// Sidebar global
+                    'ai.service.js',        // Motor IA (Nueva integración)
+                    'ai.views.js',          // Vistas IA (Nueva integración)
                     'auth.views.js',        // Login/Registro
-                    'public.views.js',      // ** NUEVO: Discovery & Landing **
+                    'public.views.js',      // Discovery & Landing
                     'dashboard.views.js',   // Dashboard usuario
                     'community.lms.js',     // Motor educativo
                     'community.views.js',   // Vistas de comunidad
