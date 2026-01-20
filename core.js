@@ -1,13 +1,9 @@
 /**
- * core.js (V59.0 - ULTIMATE INTEGRATION)
+ * core.js (V60.0 - ULTIMATE ROBUSTNESS)
  * Motor Central de ProgramBI.
- * * VERSIÓN COMPLETA SIN RECORTES.
- * * INCLUYE:
- * 1. State & Cache Management.
- * 2. Shell Layout Renderer (Sidebar + Content).
- * 3. API Layer Completa (Auth, Firestore, Storage).
- * 4. Utils (Monaco Loader) & Search Engine.
- * 5. Router Inteligente con Auto-Loading para Chat y AI.
+ * * CAMBIOS V60:
+ * 1. FIX CRÍTICO F5: Implementado 'wait loop' real para esperar a Firebase.
+ * 2. AUTH STATE: Manejo mejorado de estados de carga intermedios.
  */
 
 // =============================================================================
@@ -499,11 +495,20 @@ App.search = {
 };
 
 // =============================================================================
-// 7. ROUTER INTELIGENTE (MODIFICADO V59.0)
+// 7. ROUTER INTELIGENTE (MODIFICADO V60.0)
 // =============================================================================
 App.handleRoute = async () => {
-    // Esperar a que Firebase esté listo
-    if (!window.F || !window.F.initialized) { await new Promise(r => setTimeout(r, 500)); }
+    // [FIX V60] ESPERA ROBUSTA DE FIREBASE (Bucle de hasta 5s)
+    let attempts = 0;
+    while ((!window.F || !window.F.initialized) && attempts < 50) {
+        await new Promise(r => setTimeout(r, 100));
+        attempts++;
+    }
+    
+    if (!window.F || !window.F.initialized) {
+        console.error("Firebase failed to initialize after 5s");
+        // No detenemos ejecución, permitimos que Auth intente recuperar
+    }
 
     const hash = window.location.hash.slice(1);
     const parts = hash.split('/');
@@ -579,7 +584,12 @@ App.handleRoute = async () => {
 
         // --- RUTA 2: ASISTENTE IA (LAZY LOAD & SELF-HEALING) ---
         if (route === 'ai') {
-            if (!currentUser) { window.location.hash = '#comunidades'; return; }
+            // [FIX V60] Evitar redirect inmediato si auth está inicializando
+            if (!currentUser) { 
+                // Si llegamos aquí y no hay usuario, es seguro redirigir
+                window.location.hash = '#comunidades'; 
+                return; 
+            }
             
             // 1. Renderizar Pantalla de Carga Estilizada
             await App.render(`

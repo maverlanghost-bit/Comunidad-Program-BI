@@ -1,196 +1,389 @@
 /**
- * ai.views.js (V3.0 - LUXURY UI)
- * Interfaz de Usuario para Asistente IA de Primer Nivel.
- * * CAMBIOS VISUALES:
- * - DISEÑO CENTRADO: Estilo Claude/Perplexity (columna central limpia).
- * - ESTÉTICA PREMIUM: Sombras suaves, glassmorphism, avatares con gradiente.
- * - MARKDOWN PRO: Bloques de código con tema oscuro y barra de herramientas.
- * - INPUT FLOTANTE: Caja de texto moderna y estilizada.
+ * ai.views.js (V17.0 - NO URL CHANGE & ROBUST DELETE)
+ * Solución Definitiva: Sin URLs únicas por chat y borrado reforzado.
+ * * CAMBIOS V17:
+ * 1. NO URL: Se eliminó history.replaceState() al crear chat. Siempre es #ai.
+ * 2. DELETE FIX: Limpieza agresiva de caché y DOM al borrar.
+ * 3. SYNC: Mantiene la espera de dependencias V16.
  */
 
 window.App = window.App || {};
 window.App.ai = window.App.ai || {};
 
+// ============================================================================
+// 0. ESTADO & CONFIGURACIÓN
+// ============================================================================
+
 window.App.ai.state = {
     currentConversationId: null,
     isGenerating: false,
-    userScrolledUp: false
+    userScrolledUp: false,
+    modelName: 'Grok 4.1', 
+    pendingFiles: [],
+    modes: { tutor: false, canvas: false },
+    isMenuOpen: false,
+    chatToDelete: null
 };
 
-// Cargar Marked.js + Highlight.js (para coloreado de sintaxis real si se desea)
-(function loadDependencies() {
-    if (!window.marked) {
-        const s = document.createElement('script');
-        s.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
-        s.onload = () => {
-            const renderer = new marked.Renderer();
-            
-            // Custom Code Block Renderer
-            renderer.code = function(code, language) {
-                const validLang = !!(language && language.length > 0);
-                const langLabel = validLang ? language : 'texto';
-                return `
-                <div class="code-block group my-6 rounded-xl overflow-hidden bg-[#1e1e1e] border border-white/10 shadow-2xl relative font-sans">
-                    <div class="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5 backdrop-blur-sm">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <i class="fas fa-code text-purple-400"></i> ${langLabel}
+// Modelos (Visual)
+const AI_MODELS = [
+    { name: 'Grok 4.1', disabled: false },
+    { name: 'Claude 3.5 Sonnet', disabled: true },
+    { name: 'Chat GPT 5.2', disabled: true },
+    { name: 'Gemini 3 Flash', disabled: true },
+    { name: 'Gemini 3 Pro', disabled: true }
+];
+
+// GESTOR DE DEPENDENCIAS (Marked.js)
+const _dependenciesPromise = new Promise((resolve) => {
+    if (window.marked) { resolve(); return; }
+    const script = document.createElement('script');
+    script.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
+    script.onload = () => {
+        const renderer = new marked.Renderer();
+        renderer.code = function(code, language) {
+            return `
+            <div class="my-5 rounded-xl overflow-hidden bg-[#0d1117] border border-white/10 shadow-lg font-mono text-sm relative group/code w-full ring-1 ring-white/5">
+                <div class="flex items-center justify-between px-4 py-2.5 bg-white/5 border-b border-white/5 backdrop-blur-md">
+                    <div class="flex items-center gap-2">
+                        <div class="flex gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500/20 border border-rose-500/50"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500/20 border border-amber-500/50"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/50"></span>
+                        </div>
+                        <span class="ml-3 text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
+                            ${language || 'TEXT'}
                         </span>
-                        <button onclick="App.ai.copyToClipboard(this)" class="text-[10px] font-bold text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors bg-white/5 hover:bg-white/10 px-2 py-1 rounded-md">
-                            <i class="far fa-copy"></i> Copiar
-                        </button>
-                        <div class="hidden code-content">${encodeURIComponent(code)}</div>
                     </div>
-                    <div class="p-4 overflow-x-auto custom-scrollbar">
-                        <code class="text-sm font-mono text-slate-300 leading-relaxed">${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>
-                    </div>
-                </div>`;
-            };
-
-            // Custom Link Renderer (Open in new tab)
-            renderer.link = function(href, title, text) {
-                return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline underline-offset-2 decoration-blue-400/30 transition-colors font-medium">${text}</a>`;
-            };
-
-            marked.use({ renderer });
+                    <button onclick="App.ai.copyCode(this)" class="text-[10px] font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-md border border-white/5 cursor-pointer">
+                        <i class="far fa-copy"></i> <span class="hidden sm:inline">Copiar</span>
+                    </button>
+                    <div class="hidden code-content">${encodeURIComponent(code)}</div>
+                </div>
+                <div class="p-5 overflow-x-auto text-slate-300 leading-relaxed custom-scrollbar bg-[#0d1117] selection:bg-indigo-500/30">
+                    <code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>
+                </div>
+            </div>`;
         };
-        document.head.appendChild(s);
-    }
-})();
+        marked.use({ renderer });
+        resolve();
+    };
+    script.onerror = () => { console.warn("Marked failed to load."); resolve(); };
+    document.head.appendChild(script);
+});
 
 // ============================================================================
-// 1. RENDERIZADOR PRINCIPAL (LAYOUT)
+// 1. RENDERIZADO DEL SHELL
 // ============================================================================
+
+// [HELPER CRÍTICO] Espera a que Firebase Y EL SERVICIO estén listos
+const _waitForDependencies = async () => {
+    let attempts = 0;
+    while (attempts < 50) { // 5 segundos máx
+        const isReady = window.F && window.F.auth && window.F.auth.currentUser && window.App && window.App.aiService;
+        
+        if (isReady) {
+            return window.F.auth.currentUser;
+        }
+        await new Promise(r => setTimeout(r, 100));
+        attempts++;
+    }
+    return window.F?.auth?.currentUser || null;
+};
 
 window.App.ai.render = async (container, conversationId = null) => {
-    const user = App.state.currentUser;
-    window.App.ai.state.currentConversationId = conversationId;
-
-    container.innerHTML = `
-    <div class="flex flex-col h-full bg-[#f8f9fa] dark:bg-[#0b0f19] relative font-sans transition-colors duration-500">
-        
-        <!-- TOP BAR (Minimalista) -->
-        <div class="h-16 flex items-center justify-between px-6 shrink-0 z-20 bg-transparent">
-            <div class="flex items-center gap-2 md:hidden">
-                <span class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> ProgramBI AI
-                </span>
-            </div>
-            <div class="hidden md:flex items-center gap-2 mx-auto px-4 py-1.5 bg-white/50 dark:bg-slate-800/50 backdrop-blur-md rounded-full border border-gray-200/50 dark:border-white/5 shadow-sm">
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Modelo:</span>
-                <span class="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-500">Grok 4.1 Fast</span>
-            </div>
-        </div>
-
-        <!-- ÁREA DE SCROLL (Contenido) -->
-        <div id="ai-chat-scroller" class="flex-1 overflow-y-auto custom-scrollbar scroll-smooth relative">
-            <!-- Espaciador superior -->
-            <div class="h-4"></div>
-            
-            <div id="ai-messages-container" class="max-w-3xl mx-auto w-full px-4 md:px-0 pb-32 flex flex-col gap-6">
-                <div class="flex justify-center py-40 opacity-0 animate-fade-in delay-200">
-                    <div class="flex flex-col items-center gap-4">
-                        <div class="relative">
-                            <div class="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-800 animate-ping absolute inset-0 opacity-50"></div>
-                            <i class="fas fa-circle-notch fa-spin text-purple-600 text-3xl relative z-10"></i>
-                        </div>
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Cargando Memoria...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ÁREA DE INPUT (Flotante Premium) -->
-        <div class="absolute bottom-0 left-0 w-full p-4 md:p-6 z-30 pointer-events-none">
-            <div class="max-w-3xl mx-auto w-full relative pointer-events-auto group/input">
-                
-                <!-- Botón Scroll Down (Condicional) -->
-                <button id="scroll-down-btn" onclick="App.ai.scrollToBottom(true)" class="absolute -top-14 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 text-slate-500 dark:text-white p-2 rounded-full shadow-xl border border-gray-100 dark:border-slate-700 hidden animate-bounce-short hover:scale-110 transition-transform z-0">
-                    <i class="fas fa-arrow-down text-sm"></i>
-                </button>
-
-                <form onsubmit="App.ai.handleSubmit(event)" class="relative bg-white dark:bg-[#151b2b] rounded-[2rem] shadow-2xl shadow-purple-900/5 dark:shadow-black/50 border border-gray-200 dark:border-slate-700/50 focus-within:border-purple-500/30 focus-within:ring-4 focus-within:ring-purple-500/10 transition-all duration-300">
-                    <textarea id="ai-input" rows="1" 
-                        class="w-full bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 px-6 py-4 pr-16 resize-none max-h-48 custom-scrollbar font-medium text-[15px] placeholder:text-slate-400 dark:placeholder:text-slate-500" 
-                        placeholder="Pregúntame cualquier cosa..." 
-                        onkeydown="App.ai.handleEnter(event)" 
-                        oninput="this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 200) + 'px'"></textarea>
-                    
-                    <button type="submit" id="ai-send-btn" class="absolute right-2 bottom-2 w-10 h-10 bg-slate-900 dark:bg-white text-white dark:text-black rounded-full hover:scale-105 hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:scale-95 disabled:cursor-not-allowed flex items-center justify-center">
-                        <i class="fas fa-arrow-up text-sm"></i>
-                    </button>
-                </form>
-                
-                <p class="text-center text-[10px] text-slate-400 dark:text-slate-500 mt-3 font-medium opacity-0 group-hover/input:opacity-100 transition-opacity duration-500">
-                    La IA puede cometer errores. Revisa el código importante.
-                </p>
-            </div>
-            
-            <!-- Gradiente inferior para suavizar scroll -->
-            <div class="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#f8f9fa] dark:from-[#0b0f19] to-transparent -z-10 pointer-events-none"></div>
-        </div>
-    </div>`;
-
-    // Setup Scroll Listener
-    const scroller = document.getElementById('ai-chat-scroller');
-    scroller.addEventListener('scroll', () => {
-        const isBottom = scroller.scrollHeight - scroller.scrollTop <= scroller.clientHeight + 100;
-        window.App.ai.state.userScrolledUp = !isBottom;
-        const btn = document.getElementById('scroll-down-btn');
-        if(btn) btn.classList.toggle('hidden', isBottom);
-    });
-
-    // Cargar Datos
-    await App.ai.loadConversation(user.uid, conversationId);
+    // 1. Verificar Sesión y Dependencias
+    const user = await _waitForDependencies();
     
-    // Actualizar Sidebar (Contexto IA)
-    if (App.aiService && App.aiService.getConversations) {
-        App.aiService.getConversations(user.uid).then(history => {
-            App.state.cache.aiConversations = history;
-            const sidebar = document.getElementById('sidebar');
-            if (sidebar) {
-                const wrapper = document.getElementById('shell-sidebar');
-                if(wrapper) wrapper.innerHTML = App.sidebar.render('ai');
-            }
-        });
-    }
-};
-
-// ============================================================================
-// 2. LÓGICA DE CARGA & MENSAJES
-// ============================================================================
-
-window.App.ai.loadConversation = async (userId, conversationId) => {
-    const container = document.getElementById('ai-messages-container');
-    if (!container) return;
-
-    if (!conversationId) {
-        container.innerHTML = _renderWelcomeScreen(App.state.currentUser.name);
+    if (!user) {
+        container.innerHTML = `<div class="flex items-center justify-center h-screen bg-slate-50 dark:bg-[#0f172a] text-slate-400 font-medium">Iniciando sesión...</div>`;
         return;
     }
 
+    // 2. Inicializar Estructura Global
+    window.App.state = window.App.state || {};
+    window.App.state.cache = window.App.state.cache || {};
+    
+    if (typeof window.App.state.cache.aiConversations === 'undefined') {
+        window.App.state.cache.aiConversations = null;
+    }
+
+    // 3. Loader Visual
+    container.innerHTML = `<div class="flex items-center justify-center h-screen bg-white dark:bg-[#0f172a]"><div class="flex flex-col items-center gap-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800 dark:border-white"></div></div></div>`;
+    
+    await _dependenciesPromise;
+
+    // 4. Estado Local
+    window.App.ai.state.currentConversationId = conversationId;
+    window.App.ai.state.pendingFiles = [];
+    window.App.ai.state.isMenuOpen = false;
+
+    // ------------------------------------------------------------------------
+    // [FIX] CARGA OBLIGATORIA DE DATOS CON FALLBACK
+    // ------------------------------------------------------------------------
     try {
-        const messages = await App.aiService.getMessages(userId, conversationId);
-        if (messages.length === 0) {
-            container.innerHTML = _renderWelcomeScreen(App.state.currentUser.name);
+        if (window.App.ai.syncSidebarData) {
+            const data = await window.App.ai.syncSidebarData(user.uid);
+            window.App.state.cache.aiConversations = Array.isArray(data) ? data : [];
         } else {
-            container.innerHTML = messages.map(m => _renderMessageBubble(m.role, m.content)).join('');
+            window.App.state.cache.aiConversations = [];
         }
-        // Pequeño delay para asegurar renderizado de imágenes/markdown antes de scroll
-        setTimeout(() => App.ai.scrollToBottom(true), 100);
+    } catch (err) {
+        console.warn("AI: Error cargando historial", err);
+        window.App.state.cache.aiConversations = [];
+    }
+
+    // 5. Render Sidebar
+    let sidebarHTML = window.App.sidebar && window.App.sidebar.render ? window.App.sidebar.render('ai') : '';
+
+    // 6. Construcción del DOM
+    container.innerHTML = `
+    <div class="fixed inset-0 z-0 w-full h-full bg-[#f8f9fa] dark:bg-[#050505] overflow-hidden flex text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 relative group/shell">
+        
+        <!-- SIDEBAR (Absolute Overlay) -->
+        <div id="ai-sidebar-wrapper" class="absolute top-0 left-0 h-full z-50 pointer-events-auto">${sidebarHTML}</div>
+
+        <!-- MAIN VIEWPORT (Centered) -->
+        <main id="ai-viewport" class="w-full h-full flex flex-col relative transition-all duration-300 ml-0">
+            
+            <!-- DROP ZONE -->
+            <div id="ai-drop-zone" class="absolute inset-0 z-40 flex flex-col h-full pointer-events-none">
+                
+                <div id="ai-drag-overlay" class="absolute inset-0 z-50 bg-indigo-600/90 hidden flex-col items-center justify-center backdrop-blur-md transition-opacity opacity-0 pointer-events-auto">
+                    <div class="bg-white p-10 rounded-[2.5rem] shadow-2xl animate-bounce-short text-center transform scale-110">
+                        <i class="fas fa-cloud-upload-alt text-6xl text-indigo-600 mb-6 block mx-auto"></i>
+                        <h3 class="text-3xl font-black text-gray-900 tracking-tight">Suelta tus archivos</h3>
+                    </div>
+                </div>
+
+                <!-- MODAL DELETE -->
+                <div id="ai-delete-modal" class="absolute inset-0 z-[60] bg-black/50 backdrop-blur-sm hidden flex-col items-center justify-center pointer-events-auto transition-opacity opacity-0">
+                    <div class="bg-white dark:bg-[#1e293b] p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 border border-slate-200 dark:border-slate-700 transform scale-95 transition-transform duration-200" id="ai-delete-modal-content">
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">¿Eliminar conversación?</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Esta acción no se puede deshacer.</p>
+                        <div class="flex justify-end gap-3">
+                            <button onclick="App.ai.closeDeleteModal()" class="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">Cancelar</button>
+                            <button onclick="App.ai.confirmDelete()" class="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-colors">Eliminar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TOP BAR -->
+                <header class="absolute top-0 left-0 w-full h-16 flex items-center justify-between px-6 z-20 pointer-events-auto pl-24 md:pl-6 transition-[padding]">
+                    <div class="flex items-center gap-4">
+                        <button class="md:hidden p-2 text-slate-500 hover:text-indigo-500 transition-colors" onclick="document.getElementById('sidebar').classList.toggle('hidden');">
+                            <i class="fas fa-bars text-lg"></i>
+                        </button>
+                        
+                        <!-- MODEL SELECTOR -->
+                        <div class="relative group/model">
+                            <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-slate-700 dark:text-slate-200 font-semibold text-sm">
+                                <span>${window.App.ai.state.modelName}</span>
+                                <i class="fas fa-chevron-down text-xs text-slate-400 opacity-50 group-hover/model:opacity-100 transition-opacity"></i>
+                            </button>
+                            <div class="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-[#1a1f2e] rounded-xl shadow-xl border border-slate-100 dark:border-white/5 py-1 hidden group-hover/model:block animate-scale-in origin-top-left z-50">
+                                ${AI_MODELS.map(m => `<div class="px-4 py-2.5 text-xs font-medium flex items-center justify-between ${m.disabled ? 'text-slate-400 cursor-not-allowed opacity-60' : 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 cursor-default'}">${m.name}${!m.disabled ? '<i class="fas fa-check"></i>' : ''}</div>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button onclick="App.ai.newChat()" class="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-all" title="Nuevo Chat">
+                            <i class="fas fa-plus text-xs"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- SCROLL AREA -->
+                <div id="ai-scroller" class="flex-1 overflow-y-auto custom-scrollbar scroll-smooth pt-20 pb-4 px-4 pointer-events-auto">
+                    <div id="ai-content" class="w-full max-w-3xl mx-auto min-h-full flex flex-col transition-all duration-300 justify-end pb-10">
+                        <!-- Content -->
+                    </div>
+                </div>
+
+                <!-- INPUT DOCK -->
+                <div class="w-full shrink-0 z-30 pb-6 pt-2 bg-gradient-to-t from-[#f8f9fa] dark:from-[#050505] via-[#f8f9fa] dark:via-[#050505] to-transparent transition-all duration-300 pointer-events-auto">
+                    <div class="w-full max-w-3xl mx-auto px-4 relative group/dock">
+                        
+                        <button id="scroll-btn" onclick="App.ai.scrollToBottom(true)" class="absolute -top-16 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 hidden animate-bounce hover:scale-110 transition-transform z-10 cursor-pointer">
+                            <i class="fas fa-arrow-down text-xs"></i>
+                        </button>
+
+                        <div class="relative flex items-end gap-3">
+                            <!-- GLOW EFFECT -->
+                            <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-[2rem] opacity-0 group-focus-within/dock:opacity-20 transition duration-1000 blur-xl -z-10"></div>
+
+                            <!-- (+) BTN RETRO -->
+                            <div class="relative z-50 shrink-0">
+                                <button onclick="App.ai.togglePlusMenu(event)" class="w-12 h-12 rounded-[1.2rem] bg-white dark:bg-[#151b28] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-white/10 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 group/plus cursor-pointer">
+                                    <i class="fas fa-plus text-lg transition-transform duration-300 group-hover/plus:rotate-90"></i>
+                                </button>
+                                <!-- MENÚ -->
+                                <div id="ai-plus-menu" class="hidden absolute bottom-full left-0 mb-4 w-72 bg-white dark:bg-[#151b28] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 p-2 transform origin-bottom-left transition-all duration-200 animate-scale-in flex-col gap-1 overflow-hidden ring-1 ring-black/5">
+                                    <div onclick="App.ai.toggleMode('tutor', event)" class="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer select-none group/option transition-colors">
+                                        <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900/30"><i class="fas fa-graduation-cap"></i></div><div class="flex flex-col"><span class="text-sm font-bold text-slate-700 dark:text-slate-200">Modo Tutor</span><span class="text-[10px] text-slate-400">Explicaciones paso a paso</span></div></div>
+                                        <div id="switch-tutor" class="w-10 h-6 bg-slate-200 dark:bg-slate-700 rounded-full relative transition-colors duration-300 shadow-inner"><div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-transform duration-300 shadow-sm"></div></div>
+                                    </div>
+                                    <div onclick="App.ai.toggleMode('canvas', event)" class="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer select-none group/option transition-colors">
+                                        <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 flex items-center justify-center border border-pink-100 dark:border-pink-900/30"><i class="fas fa-palette"></i></div><div class="flex flex-col"><span class="text-sm font-bold text-slate-700 dark:text-slate-200">Modo Canvas</span><span class="text-[10px] text-slate-400">Interfaz visual interactiva</span></div></div>
+                                        <div id="switch-canvas" class="w-10 h-6 bg-slate-200 dark:bg-slate-700 rounded-full relative transition-colors duration-300 shadow-inner"><div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-transform duration-300 shadow-sm"></div></div>
+                                    </div>
+                                    <div class="h-px bg-slate-100 dark:bg-white/5 my-1 mx-2"></div>
+                                    <button onclick="document.getElementById('ai-file-upload').click(); App.ai.togglePlusMenu()" class="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer select-none text-left transition-colors text-slate-700 dark:text-slate-200 group/upload">
+                                        <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-100 dark:border-emerald-900/30 group-hover/upload:scale-110 transition-transform"><i class="fas fa-paperclip"></i></div><span class="text-sm font-bold">Adjuntar Archivos</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- TEXTBOX -->
+                            <div class="flex-1 relative bg-white dark:bg-[#151b28] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 flex flex-col overflow-hidden transition-all duration-300 group/area ring-1 ring-black/5 dark:ring-white/5">
+                                <div id="file-preview-area" class="hidden px-5 pt-4 pb-2 flex gap-3 overflow-x-auto custom-scrollbar border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20"></div>
+                                <div class="flex items-end pr-2">
+                                    <textarea id="ai-input" rows="1" class="w-full bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 px-5 py-3.5 resize-none max-h-48 custom-scrollbar text-[15px] leading-relaxed placeholder:text-slate-400 dark:placeholder:text-slate-600 font-medium" placeholder="Escribe un mensaje..." onkeydown="App.ai.handleKey(event)" oninput="this.style.height='auto'; this.style.height = Math.min(this.scrollHeight, 192) + 'px'"></textarea>
+                                    <div class="flex items-center gap-2 pb-2.5 shrink-0">
+                                        <input type="file" id="ai-file-upload" class="hidden" multiple onchange="App.ai.handleFileSelect(event)">
+                                        <span id="ai-counter" class="text-[10px] text-slate-300 dark:text-slate-600 font-mono hidden sm:block opacity-0 transition-opacity w-10 text-right select-none">0/4k</span>
+                                        <button type="submit" id="ai-send-btn" onclick="App.ai.handleSubmit(event)" class="w-9 h-9 flex items-center justify-center bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 disabled:opacity-50 transition-all shadow-sm cursor-pointer ml-1"><i class="fas fa-arrow-up text-xs"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-center text-[10px] text-slate-400 dark:text-slate-600 mt-2 font-medium opacity-50 select-none">El asistente puede cometer errores. Verifica la información importante.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>`;
+
+    // 7. Force Refresh: Actualizar Sidebar Visualmente tras renderizar
+    setTimeout(() => {
+        const wrapper = document.getElementById('ai-sidebar-wrapper');
+        const hasData = window.App.state.cache.aiConversations && Array.isArray(window.App.state.cache.aiConversations);
+        if (wrapper && hasData) {
+            const freshSidebar = window.App.sidebar.render('ai');
+            wrapper.innerHTML = freshSidebar;
+        }
+    }, 50);
+
+    App.ai.setupDragAndDrop();
+    const scroller = document.getElementById('ai-scroller');
+    scroller.addEventListener('scroll', () => {
+        const isBottom = scroller.scrollHeight - scroller.scrollTop <= scroller.clientHeight + 150;
+        window.App.ai.state.userScrolledUp = !isBottom;
+        const btn = document.getElementById('scroll-btn');
+        if (btn) btn.classList.toggle('hidden', isBottom);
+    });
+
+    await App.ai.loadConversation(user.uid, conversationId);
+};
+
+// ============================================================================
+// 2. LÓGICA DE MENÚ Y MODOS
+// ============================================================================
+
+window.App.ai.togglePlusMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('ai-plus-menu');
+    const isOpen = !menu.classList.contains('hidden');
+    if (isOpen) {
+        menu.classList.add('hidden');
+        window.App.ai.state.isMenuOpen = false;
+        document.removeEventListener('click', _closeMenuOnClickOutside);
+    } else {
+        menu.classList.remove('hidden');
+        window.App.ai.state.isMenuOpen = true;
+        setTimeout(() => document.addEventListener('click', _closeMenuOnClickOutside), 10);
+    }
+};
+
+function _closeMenuOnClickOutside(e) {
+    const menu = document.getElementById('ai-plus-menu');
+    if (menu && !menu.contains(e.target)) {
+        menu.classList.add('hidden');
+        window.App.ai.state.isMenuOpen = false;
+        document.removeEventListener('click', _closeMenuOnClickOutside);
+    }
+}
+
+window.App.ai.toggleMode = (mode, e) => {
+    if (e) e.stopPropagation();
+    const currentState = window.App.ai.state.modes[mode];
+    window.App.ai.state.modes[mode] = !currentState;
+    
+    const switchEl = document.getElementById(`switch-${mode}`);
+    const knobEl = switchEl.querySelector('div');
+    
+    if (!currentState) {
+        switchEl.classList.remove('bg-slate-200', 'dark:bg-slate-700');
+        switchEl.classList.add('bg-indigo-500');
+        knobEl.classList.add('translate-x-4');
+        if(window.App.ui && window.App.ui.toast) App.ui.toast(`Modo ${mode} activado`, 'success');
+    } else {
+        switchEl.classList.add('bg-slate-200', 'dark:bg-slate-700');
+        switchEl.classList.remove('bg-indigo-500');
+        knobEl.classList.remove('translate-x-4');
+    }
+};
+
+window.App.ai.requestDelete = (e, chatId) => {
+    e.stopPropagation();
+    e.preventDefault();
+    window.App.ai.state.chatToDelete = chatId;
+    const modal = document.getElementById('ai-delete-modal');
+    const content = document.getElementById('ai-delete-modal-content');
+    modal.classList.remove('hidden', 'opacity-0');
+    modal.classList.add('flex', 'opacity-100');
+    setTimeout(() => content.classList.remove('scale-95'), 10);
+};
+
+window.App.ai.closeDeleteModal = () => {
+    window.App.ai.state.chatToDelete = null;
+    const modal = document.getElementById('ai-delete-modal');
+    const content = document.getElementById('ai-delete-modal-content');
+    content.classList.add('scale-95');
+    modal.classList.remove('opacity-100');
+    modal.classList.add('opacity-0');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 200);
+};
+
+window.App.ai.confirmDelete = async () => {
+    const chatId = window.App.ai.state.chatToDelete;
+    if (!chatId) return;
+    App.ai.closeDeleteModal();
+    const user = App.state.currentUser;
+    
+    try {
+        if(App.aiService && App.aiService.deleteConversation) {
+            // 1. Llamada al Backend (Firestore)
+            await App.aiService.deleteConversation(user.uid, chatId);
+            
+            // 2. [FIX] Actualización Optimista de la Caché Local
+            if (window.App.state.cache.aiConversations) {
+                window.App.state.cache.aiConversations = window.App.state.cache.aiConversations.filter(c => c.id !== chatId);
+            }
+
+            // 3. Si estabamos en el chat borrado, ir a nuevo chat
+            if (window.App.ai.state.currentConversationId === chatId) {
+                App.ai.newChat();
+            } else {
+                window.App.ai.triggerSidebarUpdate(); 
+            }
+            
+            if(window.App.ui && window.App.ui.toast) App.ui.toast("Conversación eliminada", "success");
+        }
     } catch (e) {
-        container.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full text-slate-400 py-20">
-                <i class="fas fa-wifi text-3xl mb-2 text-red-400"></i>
-                <p class="text-sm">No pudimos cargar la conversación.</p>
-            </div>`;
+        console.error(e);
+        if(window.App.ui && window.App.ui.toast) App.ui.toast("Error al eliminar", "error");
     }
 };
 
 // ============================================================================
-// 3. INTERACCIÓN (ENVÍO & STREAMING)
+// 3. LÓGICA DE INTERACCIÓN & CHAT
 // ============================================================================
 
-window.App.ai.handleEnter = (e) => {
+window.App.ai.handleKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         if (!window.App.ai.state.isGenerating) App.ai.handleSubmit(e);
@@ -199,233 +392,385 @@ window.App.ai.handleEnter = (e) => {
 
 window.App.ai.handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    const input = document.getElementById('ai-input');
-    const txt = input.value.trim();
-    if (!txt || window.App.ai.state.isGenerating) return;
+    if (window.App.ai.state.isGenerating) {
+        if(App.aiService && App.aiService.stopGeneration) App.aiService.stopGeneration();
+        _setLoadingState(false);
+        return;
+    }
 
-    const container = document.getElementById('ai-messages-container');
+    const input = document.getElementById('ai-input');
+    const text = input.value.trim();
+    const files = window.App.ai.state.pendingFiles;
+
+    if (!text && files.length === 0) return;
+
+    const container = document.getElementById('ai-content');
     const userId = App.state.currentUser.uid;
     let conversationId = window.App.ai.state.currentConversationId;
 
-    // UI Reset
-    input.value = '';
-    input.style.height = 'auto';
-    _toggleLoadingState(true);
-    
-    // Si estamos en bienvenida, limpiar
-    const welcome = container.querySelector('.welcome-screen');
-    if (welcome) {
-        welcome.classList.add('opacity-0', 'scale-95'); // Animación salida
-        setTimeout(() => { 
-            welcome.remove();
-            // Inyectar mensaje usuario
-            container.insertAdjacentHTML('beforeend', _renderMessageBubble('user', txt));
-            App.ai.scrollToBottom(true);
-        }, 300);
-    } else {
-        container.insertAdjacentHTML('beforeend', _renderMessageBubble('user', txt));
-        App.ai.scrollToBottom(true);
+    if (!conversationId || container.querySelector('.welcome-screen')) {
+        _setChatLayout(container);
+        container.innerHTML = '';
     }
 
+    input.value = '';
+    input.style.height = 'auto';
+    window.App.ai.state.pendingFiles = []; 
+    App.ai.renderFilePreviews(); 
+    _setLoadingState(true);
+    
+    container.insertAdjacentHTML('beforeend', _renderMessage('user', text, files));
+    App.ai.scrollToBottom(true);
+
     try {
-        // Crear conversación si es nueva
+        let historyForStream = [];
+
         if (!conversationId) {
-            const title = await App.aiService.generateTitle(txt);
+            const title = await App.aiService.generateTitle(text || "Consulta");
             conversationId = await App.aiService.createConversation(userId, title);
             window.App.ai.state.currentConversationId = conversationId;
-            history.replaceState(null, null, `#ai/${conversationId}`);
             
-            // Actualizar Sidebar silenciosamente
-            App.aiService.getConversations(userId).then(list => {
-                App.state.cache.aiConversations = list;
-                const wrapper = document.getElementById('shell-sidebar');
-                if(wrapper) wrapper.innerHTML = App.sidebar.render('ai');
-            });
+            // [CAMBIO V17] SE ELIMINÓ history.replaceState()
+            // El hash de la URL se mantiene en #ai, sin ID único visible.
+            
+            // TRIGGER UPDATE: Actualización reactiva del sidebar
+            window.App.ai.triggerSidebarUpdate();
+            
+            historyForStream = [{ role: 'user', content: text }]; 
+        } else {
+            const dbHistory = await App.aiService.getMessages(userId, conversationId);
+            historyForStream = dbHistory.map(m => ({ role: m.role, content: m.content }));
+            historyForStream.push({ role: 'user', content: text });
         }
 
-        // Guardar User Message
-        await App.aiService.saveMessage(userId, conversationId, 'user', txt);
+        const fileData = files.map(f => ({ name: f.file.name, type: f.type, size: f.file.size }));
+        App.aiService.saveMessage(userId, conversationId, 'user', text, fileData);
 
-        // Crear Burbuja IA con estado "Pensando"
-        const aiBubbleId = `ai-msg-${Date.now()}`;
-        const thinkingHtml = `
-            <div class="flex items-center gap-1 h-6" id="thinking-${aiBubbleId}">
-                <div class="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce"></div>
-                <div class="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce delay-75"></div>
-                <div class="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce delay-150"></div>
-            </div>`;
-            
-        container.insertAdjacentHTML('beforeend', `
-            <div class="flex gap-4 group animate-slide-up pb-2">
-                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-purple-500/20 mt-1">
-                    <i class="fas fa-brain text-[10px]"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="font-bold text-[11px] text-slate-900 dark:text-white mb-1.5 ml-1 opacity-90">ProgramBI AI</div>
-                    <div id="${aiBubbleId}" class="text-[15px] text-slate-700 dark:text-slate-300 leading-7 font-normal">
-                        ${thinkingHtml}
-                    </div>
-                </div>
-            </div>
-        `);
+        const aiId = `ai-msg-${Date.now()}`;
+        container.insertAdjacentHTML('beforeend', _renderAiSkeleton(aiId));
         App.ai.scrollToBottom(true);
 
-        // Iniciar Streaming
-        const messages = await App.aiService.getMessages(userId, conversationId);
-        const responseElem = document.getElementById(aiBubbleId);
+        const responseEl = document.getElementById(aiId);
+        const cursorEl = document.getElementById(`${aiId}-cursor`);
         let fullResponse = "";
-        let isFirstChunk = true;
 
         await App.aiService.streamMessage(
-            messages.map(m => ({ role: m.role, content: m.content })),
+            historyForStream, 
             (chunk) => {
-                if (isFirstChunk) {
-                    const thinking = document.getElementById(`thinking-${aiBubbleId}`);
-                    if(thinking) thinking.remove(); // Quitar animación pensar
-                    isFirstChunk = false;
-                }
                 fullResponse += chunk;
-                
-                // Renderizado
                 if (window.marked) {
-                    responseElem.innerHTML = window.marked.parse(fullResponse);
+                    responseEl.innerHTML = window.marked.parse(fullResponse);
                 } else {
-                    responseElem.innerText = fullResponse;
+                    responseEl.innerText = fullResponse;
                 }
                 App.ai.scrollToBottom();
             },
-            async (finalText) => {
-                if (finalText) {
+            async (finalText, error) => {
+                if (cursorEl) cursorEl.remove();
+                if (error && error !== 'abort') {
+                    responseEl.innerHTML += `<div class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm font-bold border border-red-200 dark:border-red-800 flex items-center gap-2"><i class="fas fa-exclamation-circle"></i> ${error}</div>`;
+                } else if (finalText) {
                     await App.aiService.saveMessage(userId, conversationId, 'assistant', finalText);
                 }
-                _toggleLoadingState(false);
+                _setLoadingState(false);
             }
         );
-
     } catch (err) {
         console.error(err);
-        App.ui.toast("Error de conexión con el cerebro", "error");
-        _toggleLoadingState(false);
-        const thinking = document.querySelector('[id^="thinking-"]');
-        if(thinking) thinking.parentElement.innerHTML = `<span class="text-red-400">Error: No pude conectar con el servidor.</span>`;
+        _setLoadingState(false);
+        if(window.App.ui && window.App.ui.toast) App.ui.toast("Error de conexión", "error");
+    }
+};
+
+window.App.ai.loadConversation = async (userId, conversationId) => {
+    const container = document.getElementById('ai-content');
+    if (!container) return;
+
+    if (!conversationId) {
+        _setWelcomeLayout(container);
+        container.innerHTML = _renderWelcomeScreen(App.state.currentUser.name);
+        return;
+    }
+
+    try {
+        const messages = await App.aiService.getMessages(userId, conversationId);
+        if (messages.length === 0) {
+            _setWelcomeLayout(container);
+            container.innerHTML = _renderWelcomeScreen(App.state.currentUser.name);
+        } else {
+            _setChatLayout(container);
+            container.innerHTML = messages.map(m => _renderMessage(m.role, m.content, m.files)).join('');
+            container.insertAdjacentHTML('beforeend', '<div class="h-4 w-full"></div>');
+        }
+        setTimeout(() => App.ai.scrollToBottom(true), 150);
+    } catch (e) {
+        _setWelcomeLayout(container);
+        container.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-400 gap-3 opacity-50"><i class="fas fa-wifi text-3xl"></i><p>No se pudo cargar el historial.</p></div>`;
     }
 };
 
 // ============================================================================
-// 4. HELPERS VISUALES
+// 4. SYNC DEL SIDEBAR (EVENT BASED)
 // ============================================================================
 
-window.App.ai.scrollToBottom = (force = false) => {
-    if (window.App.ai.state.userScrolledUp && !force) return;
-    const scroller = document.getElementById('ai-chat-scroller');
-    if (scroller) {
-        scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+window.App.ai.syncSidebarData = async (userId) => {
+    try {
+        if (!App.aiService) return;
+        const conversations = await App.aiService.getConversations(userId);
+        window.App.state = window.App.state || {};
+        window.App.state.cache = window.App.state.cache || {};
+        window.App.state.cache.aiConversations = conversations || [];
+        return conversations;
+    } catch (e) {
+        console.error("AI: Sync Error", e);
+        window.App.state.cache.aiConversations = [];
+        return [];
     }
 };
 
-window.App.ai.copyToClipboard = (btn) => {
-    const encoded = btn.parentElement.querySelector('.code-content').innerText;
-    const code = decodeURIComponent(encoded);
-    navigator.clipboard.writeText(code).then(() => {
-        const originalHtml = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check text-green-400"></i> Copiado';
-        btn.classList.add('text-green-400');
-        setTimeout(() => {
-            btn.innerHTML = originalHtml;
-            btn.classList.remove('text-green-400');
-        }, 2000);
-    });
-};
-
-window.App.ai.newChat = () => {
-    window.location.hash = '#ai';
-    App.ai.render(document.getElementById('ai-root') || document.getElementById('main-scroll-wrapper'));
-};
-
-function _renderMessageBubble(role, content) {
-    const isUser = role === 'user';
-    let rendered = content;
+// Función para despachar el evento de actualización
+window.App.ai.triggerSidebarUpdate = () => {
+    const event = new CustomEvent('ai:state:changed');
+    window.dispatchEvent(event);
     
-    if (window.marked && !isUser) {
-        rendered = window.marked.parse(content);
-    } else {
-        rendered = content.replace(/\n/g, '<br>');
+    const wrapper = document.getElementById('ai-sidebar-wrapper');
+    if (wrapper && window.App.sidebar && window.App.sidebar.render) {
+        wrapper.innerHTML = window.App.sidebar.render('ai');
+    }
+};
+
+window.App.ai.updateSidebar = async () => {
+    window.App.ai.triggerSidebarUpdate();
+};
+
+// ============================================================================
+// 5. HELPERS VISUALES
+// ============================================================================
+
+function _setWelcomeLayout(container) {
+    container.classList.remove('justify-end', 'pb-10');
+    container.classList.add('justify-center', 'items-center', 'h-full');
+}
+
+function _setChatLayout(container) {
+    container.classList.remove('justify-center', 'items-center', 'h-full');
+    container.classList.add('justify-end', 'pb-10');
+}
+
+function _renderMessage(role, content, files = []) {
+    const isUser = role === 'user';
+    let htmlContent = window.marked ? window.marked.parse(content || '') : content.replace(/\n/g, '<br>');
+
+    let filesHtml = '';
+    if (files.length > 0) {
+        filesHtml = `<div class="flex flex-wrap gap-2 mb-3 ${isUser ? 'justify-end' : ''}">
+            ${files.map(f => {
+                const isImg = f.type && f.type.startsWith('image/');
+                const url = f.previewUrl || '#'; 
+                return isImg 
+                    ? `<div class="w-32 h-32 rounded-xl overflow-hidden border border-black/5 dark:border-white/10 shadow-sm relative group cursor-pointer bg-slate-100 dark:bg-white/5">
+                        ${url !== '#' ? `<img src="${url}" class="w-full h-full object-cover">` : `<div class="flex items-center justify-center h-full text-slate-400"><i class="fas fa-image"></i></div>`}
+                      </div>`
+                    : `<div class="px-4 py-3 bg-white dark:bg-[#1e293b] rounded-xl flex items-center gap-3 text-xs font-mono border border-black/5 dark:border-white/5 shadow-sm text-slate-600 dark:text-slate-300">
+                        <div class="w-8 h-8 rounded bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-500"><i class="fas fa-file-code"></i></div>
+                        <span>${f.name}</span>
+                       </div>`;
+            }).join('')}
+        </div>`;
     }
 
     if (isUser) {
         return `
-        <div class="flex justify-end animate-slide-up">
-            <div class="bg-[#f4f4f4] dark:bg-[#21262d] text-slate-800 dark:text-slate-200 px-5 py-3 rounded-[20px] rounded-br-none max-w-[85%] shadow-sm border border-black/5 dark:border-white/5 text-[15px] leading-relaxed">
-                ${rendered}
-            </div>
+        <div class="flex flex-col items-end mb-10 w-full animate-fade-in-up group/msg">
+            ${filesHtml}
+            ${htmlContent ? `<div class="bg-white dark:bg-[#212121] text-slate-800 dark:text-slate-200 px-6 py-4 rounded-[1.5rem] rounded-br-sm max-w-[90%] md:max-w-[85%] shadow-sm border border-slate-100 dark:border-white/5 text-[16px] leading-7 rendering-pixelated relative">
+                ${htmlContent}
+            </div>` : ''}
         </div>`;
     } else {
         return `
-        <div class="flex gap-4 group animate-slide-up pb-2">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-purple-500/20 mt-1">
-                <i class="fas fa-brain text-[10px]"></i>
+        <div class="flex gap-4 md:gap-6 mb-12 w-full group/ai animate-fade-in pl-1">
+            <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/30 mt-1">
+                <i class="fas fa-star text-xs"></i>
             </div>
-            <div class="flex-1 min-w-0">
-                <div class="font-bold text-[11px] text-slate-900 dark:text-white mb-1.5 ml-1 opacity-90">ProgramBI AI</div>
-                <div class="text-[15px] text-slate-700 dark:text-slate-300 leading-7 font-normal prose dark:prose-invert max-w-none prose-p:my-2 prose-headings:mb-2 prose-headings:mt-4 prose-headings:font-bold prose-code:text-purple-600 dark:prose-code:text-purple-300 prose-pre:my-4">
-                    ${rendered}
+            <div class="flex-1 min-w-0 overflow-hidden">
+                <div class="text-[13px] font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2 select-none">
+                    ${window.App.ai.state.modelName}
+                    <span class="opacity-0 group-hover/ai:opacity-100 transition-opacity text-slate-400 text-[10px] font-normal cursor-pointer hover:text-indigo-500" onclick="App.ai.copyText(this)">
+                        <i class="far fa-copy ml-1"></i> Copiar
+                    </span>
+                </div>
+                <div class="prose dark:prose-invert prose-slate max-w-none text-[16px] leading-7 text-slate-700 dark:text-slate-300 font-normal break-words prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl prose-p:mb-5 prose-li:mb-1 prose-pre:bg-transparent prose-pre:p-0 prose-pre:m-0">
+                    ${htmlContent}
                 </div>
             </div>
         </div>`;
     }
 }
 
-function _renderWelcomeScreen(name) {
-    const suggestions = [
-        { icon: 'fa-code', title: 'Generar función', prompt: 'Escribe una función en Python para analizar un CSV' },
-        { icon: 'fa-bug', title: 'Depurar código', prompt: 'Tengo un error en mi useEffect de React, ¿puedes ayudarme?' },
-        { icon: 'fa-layer-group', title: 'Arquitectura', prompt: '¿Cuál es la mejor estructura de carpetas para una API Express?' },
-        { icon: 'fa-database', title: 'SQL Query', prompt: 'Ayúdame a optimizar una consulta SQL compleja' }
-    ];
-
+function _renderAiSkeleton(id) {
     return `
-    <div class="welcome-screen flex flex-col items-center justify-center min-h-[60vh] text-center px-4 animate-fade-in transition-all duration-500">
-        
-        <div class="mb-8 relative group cursor-default">
-            <div class="absolute inset-0 bg-purple-500/30 blur-2xl rounded-full group-hover:bg-purple-500/50 transition-all duration-500"></div>
-            <div class="w-20 h-20 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl flex items-center justify-center relative z-10 border border-gray-100 dark:border-slate-700">
-                <i class="fas fa-wand-magic-sparkles text-3xl text-transparent bg-clip-text bg-gradient-to-br from-purple-600 to-blue-500"></i>
-            </div>
+    <div class="flex gap-4 md:gap-6 mb-12 w-full animate-fade-in pl-1">
+        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/30 mt-1 animate-pulse">
+            <i class="fas fa-star text-xs"></i>
         </div>
-
-        <h1 class="text-3xl md:text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
-            Hola, <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-500">${name}</span>
-        </h1>
-        <p class="text-slate-500 dark:text-slate-400 text-lg mb-12 max-w-lg font-medium">
-            Soy tu arquitecto de software personal. <br>¿Qué vamos a construir hoy?
-        </p>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
-            ${suggestions.map(s => `
-                <button onclick="document.getElementById('ai-input').value='${s.prompt}'; App.ai.handleSubmit()" 
-                    class="flex items-center gap-4 p-4 text-left bg-white dark:bg-[#161b22] border border-gray-200 dark:border-slate-800 rounded-xl hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-lg transition-all group/card">
-                    <div class="w-10 h-10 rounded-lg bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover/card:text-purple-500 group-hover/card:bg-purple-50 dark:group-hover/card:bg-purple-900/20 transition-colors">
-                        <i class="fas ${s.icon}"></i>
-                    </div>
-                    <div>
-                        <div class="font-bold text-sm text-slate-700 dark:text-slate-200 group-hover/card:text-purple-600 dark:group-hover/card:text-purple-300 transition-colors">${s.title}</div>
-                        <div class="text-[11px] text-slate-400 dark:text-slate-500 line-clamp-1">"${s.prompt}"</div>
-                    </div>
-                </button>
-            `).join('')}
+        <div class="flex-1 min-w-0">
+            <div class="text-[13px] font-bold text-slate-900 dark:text-white mb-2">${window.App.ai.state.modelName}</div>
+            <div class="prose dark:prose-invert max-w-none text-[16px] leading-7 text-slate-700 dark:text-slate-300">
+                <span id="${id}"></span><span id="${id}-cursor" class="inline-block w-2 h-5 bg-indigo-500 ml-1 align-middle animate-blink rounded-sm"></span>
+            </div>
         </div>
     </div>`;
 }
 
-function _toggleLoadingState(loading) {
+function _renderWelcomeScreen(name) {
+    const suggestions = [
+        { icon: 'fa-search', title: 'Explorar Código', desc: 'Analizar repositorios complejos' },
+        { icon: 'fa-paint-brush', title: 'Diseñar UI', desc: 'Generar componentes Tailwind' },
+        { icon: 'fa-bug', title: 'Depurar App', desc: 'Encontrar errores lógicos' },
+        { icon: 'fa-bolt', title: 'Optimizar', desc: 'Mejorar rendimiento web' }
+    ];
+
+    return `
+    <div class="welcome-screen flex flex-col items-center justify-center w-full max-w-2xl mx-auto text-center px-4 animate-scale-in pb-16">
+        <h2 class="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+            Hola, <span class="bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">${name}</span>
+        </h2>
+        <p class="text-slate-500 dark:text-slate-400 mb-12 max-w-lg mx-auto text-lg leading-relaxed">
+            ¿Qué desafío técnico vamos a resolver hoy?
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+            ${suggestions.map(s => `
+                <button onclick="document.getElementById('ai-input').value='${s.title}'; document.getElementById('ai-input').focus();" 
+                    class="p-4 bg-white dark:bg-[#151b28] border border-slate-200 dark:border-white/5 rounded-2xl hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-xl transition-all group/btn text-left flex items-center gap-4 relative overflow-hidden">
+                    <div class="absolute inset-0 bg-indigo-50 dark:bg-indigo-900/10 opacity-0 group-hover/btn:opacity-100 transition-opacity"></div>
+                    <div class="w-12 h-12 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center text-slate-400 group-hover/btn:text-indigo-500 group-hover/btn:bg-white dark:group-hover/btn:bg-white/10 transition-all shadow-sm shrink-0 relative z-10">
+                        <i class="fas ${s.icon} text-xl"></i>
+                    </div>
+                    <div class="relative z-10">
+                        <span class="block text-sm font-bold text-slate-800 dark:text-slate-200 group-hover/btn:text-indigo-600 dark:group-hover/btn:text-indigo-300 transition-colors">${s.title}</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-500">${s.desc}</span>
+                    </div>
+                </button>`).join('')}
+        </div>
+    </div>`;
+}
+
+function _setLoadingState(loading) {
     window.App.ai.state.isGenerating = loading;
     const btn = document.getElementById('ai-send-btn');
+    if (!btn) return;
+
     if (loading) {
-        btn.innerHTML = '<div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>';
-        btn.classList.add('bg-black', 'dark:bg-white', 'cursor-not-allowed');
+        btn.innerHTML = '<i class="fas fa-circle-stop text-xs animate-pulse"></i>';
+        btn.classList.add('bg-slate-800', 'dark:bg-slate-700');
+        btn.classList.remove('hover:opacity-90');
     } else {
-        btn.innerHTML = '<i class="fas fa-arrow-up text-sm"></i>';
-        btn.classList.remove('bg-black', 'dark:bg-white', 'cursor-not-allowed');
+        btn.innerHTML = '<i class="fas fa-arrow-up text-xs"></i>';
+        btn.classList.remove('bg-slate-800', 'dark:bg-slate-700');
+        btn.classList.add('hover:opacity-90');
         setTimeout(() => document.getElementById('ai-input')?.focus(), 100);
     }
 }
+
+// ============================================================================
+// 6. GESTIÓN DE ARCHIVOS & UTILS COMPLETAS
+// ============================================================================
+
+window.App.ai.handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    App.ai.processFiles(files);
+    e.target.value = '';
+};
+
+window.App.ai.processFiles = (files) => {
+    const current = window.App.ai.state.pendingFiles;
+    if (current.length + files.length > 5) {
+        if(window.App.ui && window.App.ui.toast) App.ui.toast("Máximo 5 archivos", "warning");
+        return;
+    }
+    files.forEach(f => window.App.ai.state.pendingFiles.push({ 
+        file: f, 
+        id: Date.now()+Math.random(), 
+        previewUrl: URL.createObjectURL(f), 
+        type: f.type 
+    }));
+    App.ai.renderFilePreviews();
+};
+
+window.App.ai.removeFile = (id) => {
+    window.App.ai.state.pendingFiles = window.App.ai.state.pendingFiles.filter(f => f.id !== id);
+    App.ai.renderFilePreviews();
+};
+
+window.App.ai.renderFilePreviews = () => {
+    const container = document.getElementById('file-preview-area');
+    const files = window.App.ai.state.pendingFiles;
+    if (!container) return;
+
+    if (files.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+    container.innerHTML = files.map(f => {
+        const isImg = f.type && f.type.startsWith('image/');
+        return `<div class="relative group shrink-0 mb-1 animate-scale-in">
+            <div class="h-14 min-w-[3.5rem] max-w-[8rem] rounded-lg overflow-hidden border border-white/10 bg-white/5 relative flex items-center justify-center">
+                ${isImg ? `<img src="${f.previewUrl}" class="w-full h-full object-cover">` : `<i class="fas fa-file-code text-indigo-500"></i><span class="ml-2 text-[9px] uppercase">${f.file.name.split('.').pop()}</span>`}
+            </div>
+            <button onclick="App.ai.removeFile(${f.id})" class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-slate-600 text-slate-200 rounded-full flex items-center justify-center text-[8px] hover:bg-red-500 hover:text-white cursor-pointer"><i class="fas fa-times"></i></button>
+        </div>`;
+    }).join('');
+};
+
+window.App.ai.setupDragAndDrop = () => {
+    const zone = document.getElementById('ai-drop-zone');
+    const overlay = document.getElementById('ai-drag-overlay');
+    let counter = 0;
+    if(!zone || !overlay) return;
+
+    zone.addEventListener('dragenter', e => { e.preventDefault(); counter++; overlay.classList.remove('hidden'); setTimeout(()=>overlay.classList.remove('opacity-0'),10); });
+    zone.addEventListener('dragleave', e => { e.preventDefault(); counter--; if(counter<=0) { overlay.classList.add('opacity-0'); setTimeout(()=>overlay.classList.add('hidden'),300); counter=0; } });
+    zone.addEventListener('dragover', e => e.preventDefault());
+    zone.addEventListener('drop', e => { 
+        e.preventDefault(); counter=0; overlay.classList.add('opacity-0'); setTimeout(()=>overlay.classList.add('hidden'),300);
+        if(e.dataTransfer.files.length) App.ai.processFiles(Array.from(e.dataTransfer.files));
+    });
+};
+
+window.App.ai.newChat = () => { 
+    window.App.ai.state.currentConversationId = null; // Reiniciar ID para limpiar estado
+    window.location.hash = '#ai'; 
+    const root = document.getElementById('ai-root') || document.querySelector('main');
+    if(root) App.ai.render(root); 
+};
+
+window.App.ai.scrollToBottom = (force) => { 
+    if(window.App.ai.state.userScrolledUp && !force) return; 
+    const s = document.getElementById('ai-scroller'); 
+    if(s) s.scrollTo({top: s.scrollHeight, behavior: 'smooth'}); 
+};
+
+window.App.ai.copyCode = (btn) => {
+    try {
+        const content = decodeURIComponent(btn.parentElement.querySelector('.code-content').innerText);
+        navigator.clipboard.writeText(content);
+        const span = btn.querySelector('span');
+        const icon = btn.querySelector('i');
+        if(span) span.innerText = 'Copiado!';
+        icon.className = 'fas fa-check text-emerald-500';
+        setTimeout(() => {
+            icon.className = 'far fa-copy';
+            if(span) span.innerText = 'Copiar';
+        }, 2000);
+    } catch(e) { console.error(e); }
+};
+
+window.App.ai.copyText = (btn) => {
+    try {
+        const text = btn.parentElement.parentElement.querySelector('.prose').innerText;
+        navigator.clipboard.writeText(text);
+        if(window.App.ui && window.App.ui.toast) App.ui.toast("Texto copiado", "success");
+    } catch(e) { console.error(e); }
+};
