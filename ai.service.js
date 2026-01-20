@@ -1,9 +1,10 @@
 /**
- * ai.service.js (V11.0 - ROBUST DATA LAYER)
- * Capa de Datos Blindada: Ordenamiento en Cliente y Logs de Depuración.
- * * CAMBIOS V11:
- * 1. FIX CARGA: Eliminado 'orderBy' de Firestore (evita error de índices). Ordenamiento en JS.
- * 2. FIX BORRADO: Sintaxis doc() mejorada y logs explícitos.
+ * ai.service.js (V14.0 - CRITICAL STREAM FIX)
+ * Capa de Datos Blindada: Corrección de acumulador de texto.
+ * * CAMBIOS V14:
+ * 1. FIX CRÍTICO: 'streamMessage' ahora acumula la respuesta completa en una variable local.
+ * 2. FIX CALLBACK: 'onComplete' ahora devuelve el texto acumulado (antes devolvía "").
+ * -> Esto permite que 'ai.views.js' reciba el texto final y lo guarde en Firebase.
  */
 
 window.App = window.App || {};
@@ -48,6 +49,18 @@ const SYSTEM_PROMPT = {
 
 let _activeController = null;
 
+// Helper Privado para Actualizar UI Globalmente (Sidebar)
+const _updateCacheAndNotify = (conversations) => {
+    window.App.state = window.App.state || {};
+    window.App.state.cache = window.App.state.cache || {};
+    window.App.state.cache.aiConversations = conversations;
+    
+    // Despachar evento para que el Sidebar se entere
+    window.dispatchEvent(new CustomEvent('app:ai-history-updated', { 
+        detail: conversations 
+    }));
+};
+
 // ============================================================================
 // 2. MOTOR DE COMUNICACIÓN (PROXY STREAMING)
 // ============================================================================
@@ -60,6 +73,9 @@ App.aiService.streamMessage = async (history, onChunk, onComplete) => {
 
     _activeController = new AbortController();
     const signal = _activeController.signal;
+
+    // Acumulador local para asegurar que tenemos el texto completo al finalizar
+    let accumulatedResponse = ""; 
 
     const timeoutId = setTimeout(() => {
         if (_activeController) _activeController.abort();
@@ -130,6 +146,8 @@ App.aiService.streamMessage = async (history, onChunk, onComplete) => {
                         const json = JSON.parse(trimmed.substring(6));
                         const content = json.choices?.[0]?.delta?.content || "";
                         if (content) {
+                            // 1. Acumulamos el contenido aquí
+                            accumulatedResponse += content;
                             if (onChunk) onChunk(content);
                         }
                     } catch (e) { /* Ignorar JSON parciales */ }
@@ -138,7 +156,9 @@ App.aiService.streamMessage = async (history, onChunk, onComplete) => {
         }
 
         _activeController = null;
-        if (onComplete) onComplete(""); 
+        
+        // 2. Pasamos el texto COMPLETO al finalizar
+        if (onComplete) onComplete(accumulatedResponse); 
 
     } catch (error) {
         clearTimeout(timeoutId);
@@ -161,7 +181,7 @@ App.aiService.stopGeneration = () => {
 };
 
 // ============================================================================
-// 3. PERSISTENCIA (FIRESTORE - ROBUST MODE)
+// 3. PERSISTENCIA (FIRESTORE - SAFE MODE)
 // ============================================================================
 
 // A. Obtener Lista de Conversaciones (CLIENT SIDE SORTING)
@@ -169,7 +189,7 @@ App.aiService.getConversations = async (userId) => {
     try {
         if (!window.F || !window.F.db) throw new Error("Firebase no inicializado");
         
-        // NOTA: Eliminamos orderBy() de Firestore para evitar errores de índices inexistentes.
+        // Sin orderBy para evitar errores de índice
         const q = window.F.query(
             window.F.collection(window.F.db, `users/${userId}/ai_conversations`),
             window.F.limit(50) 
@@ -184,15 +204,21 @@ App.aiService.getConversations = async (userId) => {
             preview: doc.data().preview || "..."
         }));
 
-        // Ordenamiento seguro en JavaScript (Más reciente primero)
-        return conversations.sort((a, b) => {
+        // Ordenar en JS (Más reciente primero)
+        const sorted = conversations.sort((a, b) => {
             const dateA = new Date(a.updatedAt || 0);
             const dateB = new Date(b.updatedAt || 0);
             return dateB - dateA;
         });
 
+        // Actualizar caché reactiva
+        _updateCacheAndNotify(sorted);
+        
+        return sorted;
+
     } catch (e) { 
         console.error("Error fetching conversations:", e);
+        _updateCacheAndNotify([]);
         return []; 
     }
 };
@@ -207,13 +233,25 @@ App.aiService.createConversation = async (userId, title = "Nueva Consulta") => {
             model: AI_CONFIG.defaultModel,
             preview: "Iniciando..."
         });
+        
+        // Refrescar caché
+        App.aiService.getConversations(userId);
+        
         return docRef.id;
     } catch (e) { throw e; }
 };
 
-// C. Guardar Mensaje
+// C. Guardar Mensaje (CON VALIDACIÓN DE ID)
 App.aiService.saveMessage = async (userId, conversationId, role, content, files = []) => {
+    // 1. Validación de seguridad
+    if (!conversationId) {
+        console.error("❌ ERROR FATAL: Intentando guardar mensaje sin conversationId. Abortando.");
+        return; 
+    }
+
     try {
+        console.log(`💾 [AI SERVICE] Guardando mensaje (${role}) en: ${conversationId}`);
+        
         const msgData = {
             role, 
             content, 
@@ -221,8 +259,13 @@ App.aiService.saveMessage = async (userId, conversationId, role, content, files 
         };
         if (files && files.length > 0) msgData.files = files;
 
-        await window.F.addDoc(window.F.collection(window.F.db, `users/${userId}/ai_conversations/${conversationId}/messages`), msgData);
+        // 2. Guardar en Subcolección
+        await window.F.addDoc(
+            window.F.collection(window.F.db, `users/${userId}/ai_conversations/${conversationId}/messages`), 
+            msgData
+        );
 
+        // 3. Actualizar Preview en Conversación Padre
         let previewText = content ? content.substring(0, 80).replace(/\n/g, ' ') : "";
         if (files.length > 0 && !previewText) previewText = `[${files.length} Archivos adjuntos]`;
         else if (content.length > 80) previewText += "...";
@@ -231,39 +274,54 @@ App.aiService.saveMessage = async (userId, conversationId, role, content, files 
             updatedAt: new Date().toISOString(),
             preview: previewText
         });
-    } catch (e) { console.error("Error saving message:", e); }
-};
+        
+        console.log("✅ [AI SERVICE] Mensaje guardado correctamente.");
 
-// D. Obtener Historial
-App.aiService.getMessages = async (userId, conversationId) => {
-    try {
-        const q = window.F.query(
-            window.F.collection(window.F.db, `users/${userId}/ai_conversations/${conversationId}/messages`),
-            window.F.orderBy("createdAt", "asc")
-        );
-        const snap = await window.F.getDocs(q);
-        return snap.docs.map(doc => doc.data());
     } catch (e) { 
-        console.warn("Error getting messages (posible falta índice):", e);
-        try {
-            const q2 = window.F.collection(window.F.db, `users/${userId}/ai_conversations/${conversationId}/messages`);
-            const snap2 = await window.F.getDocs(q2);
-            let msgs = snap2.docs.map(doc => doc.data());
-            return msgs.sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
-        } catch(ex) {
-            return []; 
-        }
+        console.error("❌ [AI SERVICE] Error guardando mensaje:", e); 
     }
 };
 
-// E. Eliminar Conversación (CON LOGS)
-App.aiService.deleteConversation = async (userId, conversationId) => {
-    console.log(`[AI SERVICE] Intentando borrar chat: ${conversationId} del usuario ${userId}`);
+// D. Obtener Historial (SOLUCIÓN AL ERROR DE ÍNDICE)
+App.aiService.getMessages = async (userId, conversationId) => {
+    if (!conversationId) return [];
+
     try {
-        // [MODIFICACIÓN V11] Sintaxis doc() explícita para evitar errores de ruta
+        // [FIX CRÍTICO] NO USAMOS orderBy EN LA QUERY
+        // Pedimos los datos "crudos" y los ordenamos en memoria.
+        // Esto evita que Firebase lance error si falta el índice compuesto.
+        const msgsRef = window.F.collection(window.F.db, `users/${userId}/ai_conversations/${conversationId}/messages`);
+        
+        const snap = await window.F.getDocs(msgsRef);
+        
+        const msgs = snap.docs.map(doc => doc.data());
+        
+        // Ordenamiento seguro en Cliente (Más antiguo arriba, más nuevo abajo)
+        return msgs.sort((a, b) => {
+            const dateA = new Date(a.createdAt || 0);
+            const dateB = new Date(b.createdAt || 0);
+            return dateA - dateB;
+        });
+
+    } catch (e) { 
+        console.error("Error crítico obteniendo mensajes:", e);
+        return [];
+    }
+};
+
+// E. Eliminar Conversación
+App.aiService.deleteConversation = async (userId, conversationId) => {
+    console.log(`[AI SERVICE] Intentando borrar chat: ${conversationId}`);
+    try {
         const docRef = window.F.doc(window.F.db, "users", userId, "ai_conversations", conversationId);
         await window.F.deleteDoc(docRef);
-        console.log("[AI SERVICE] Borrado exitoso");
+        
+        // Actualización Optimista
+        if (window.App.state.cache.aiConversations) {
+            const filtered = window.App.state.cache.aiConversations.filter(c => c.id !== conversationId);
+            _updateCacheAndNotify(filtered);
+        }
+        
         return true;
     } catch (e) { 
         console.error("[AI SERVICE] Error al borrar:", e);
@@ -280,4 +338,4 @@ App.aiService.generateTitle = async (text) => {
     const cleanText = text.replace(/[#*`]/g, '').trim(); 
     if (cleanText.length < 30) return cleanText;
     return cleanText.split(' ').slice(0, 6).join(' ') + "...";
-};A
+};

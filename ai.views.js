@@ -1,10 +1,10 @@
 /**
- * ai.views.js (V17.0 - NO URL CHANGE & ROBUST DELETE)
- * Solución Definitiva: Sin URLs únicas por chat y borrado reforzado.
- * * CAMBIOS V17:
- * 1. NO URL: Se eliminó history.replaceState() al crear chat. Siempre es #ai.
- * 2. DELETE FIX: Limpieza agresiva de caché y DOM al borrar.
- * 3. SYNC: Mantiene la espera de dependencias V16.
+ * ai.views.js (V20.0 - OFFICIAL GROK BRANDING & PERSISTENCE GUARD)
+ * Branding Oficial y Blindaje de Datos.
+ * * CAMBIOS V20:
+ * 1. LOGO OFICIAL: Implementado icono de Grok desde CDN proporcionado.
+ * 2. NO PULSE: El logo es estático, eliminando cualquier parpadeo.
+ * 3. PERSISTENCE GUARD: Verificación redundante de ID antes de guardar respuesta IA.
  */
 
 window.App = window.App || {};
@@ -22,8 +22,12 @@ window.App.ai.state = {
     pendingFiles: [],
     modes: { tutor: false, canvas: false },
     isMenuOpen: false,
+    isModelMenuOpen: false, 
     chatToDelete: null
 };
+
+// BRANDING ASSETS
+const GROK_LOGO_URL = 'https://cdn.shopify.com/s/files/1/0564/3812/8712/files/grok-ai-icon.webp?v=1768942289';
 
 // Modelos (Visual)
 const AI_MODELS = [
@@ -117,6 +121,7 @@ window.App.ai.render = async (container, conversationId = null) => {
     window.App.ai.state.currentConversationId = conversationId;
     window.App.ai.state.pendingFiles = [];
     window.App.ai.state.isMenuOpen = false;
+    window.App.ai.state.isModelMenuOpen = false;
 
     // ------------------------------------------------------------------------
     // [FIX] CARGA OBLIGATORIA DE DATOS CON FALLBACK
@@ -175,14 +180,20 @@ window.App.ai.render = async (container, conversationId = null) => {
                             <i class="fas fa-bars text-lg"></i>
                         </button>
                         
-                        <!-- MODEL SELECTOR -->
-                        <div class="relative group/model">
-                            <button class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-slate-700 dark:text-slate-200 font-semibold text-sm">
+                        <!-- MODEL SELECTOR (MODIFICADO: ONCLICK) -->
+                        <div class="relative">
+                            <button onclick="App.ai.toggleModelMenu(event)" id="ai-model-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-slate-700 dark:text-slate-200 font-semibold text-sm select-none">
                                 <span>${window.App.ai.state.modelName}</span>
-                                <i class="fas fa-chevron-down text-xs text-slate-400 opacity-50 group-hover/model:opacity-100 transition-opacity"></i>
+                                <i class="fas fa-chevron-down text-xs text-slate-400 transition-transform duration-200" id="ai-model-arrow"></i>
                             </button>
-                            <div class="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-[#1a1f2e] rounded-xl shadow-xl border border-slate-100 dark:border-white/5 py-1 hidden group-hover/model:block animate-scale-in origin-top-left z-50">
-                                ${AI_MODELS.map(m => `<div class="px-4 py-2.5 text-xs font-medium flex items-center justify-between ${m.disabled ? 'text-slate-400 cursor-not-allowed opacity-60' : 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 cursor-default'}">${m.name}${!m.disabled ? '<i class="fas fa-check"></i>' : ''}</div>`).join('')}
+                            <!-- MENU DROPDOWN (SIN HOVER, CLASE HIDDEN CONTROLADA) -->
+                            <div id="ai-model-menu" class="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-[#1a1f2e] rounded-xl shadow-xl border border-slate-100 dark:border-white/5 py-1 hidden animate-scale-in origin-top-left z-50">
+                                ${AI_MODELS.map(m => `
+                                    <div class="px-4 py-2.5 text-xs font-medium flex items-center justify-between ${m.disabled ? 'text-slate-400 cursor-not-allowed opacity-60' : 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 cursor-default'}">
+                                        ${m.name}
+                                        ${!m.disabled ? '<i class="fas fa-check"></i>' : ''}
+                                    </div>
+                                `).join('')}
                             </div>
                         </div>
                     </div>
@@ -279,6 +290,40 @@ window.App.ai.render = async (container, conversationId = null) => {
 // ============================================================================
 // 2. LÓGICA DE MENÚ Y MODOS
 // ============================================================================
+
+// [NUEVO] Lógica del Menú de Modelos Persistente
+window.App.ai.toggleModelMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('ai-model-menu');
+    const arrow = document.getElementById('ai-model-arrow');
+    const isOpen = !menu.classList.contains('hidden');
+
+    if (isOpen) {
+        menu.classList.add('hidden');
+        if(arrow) arrow.classList.remove('rotate-180');
+        window.App.ai.state.isModelMenuOpen = false;
+        document.removeEventListener('click', _closeModelMenuOnClickOutside);
+    } else {
+        menu.classList.remove('hidden');
+        if(arrow) arrow.classList.add('rotate-180');
+        window.App.ai.state.isModelMenuOpen = true;
+        // Delay pequeño para evitar cierre inmediato
+        setTimeout(() => document.addEventListener('click', _closeModelMenuOnClickOutside), 10);
+    }
+};
+
+function _closeModelMenuOnClickOutside(e) {
+    const menu = document.getElementById('ai-model-menu');
+    const btn = document.getElementById('ai-model-btn');
+    // Si el clic NO fue en el menú y NO fue en el botón
+    if (menu && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.add('hidden');
+        const arrow = document.getElementById('ai-model-arrow');
+        if(arrow) arrow.classList.remove('rotate-180');
+        window.App.ai.state.isModelMenuOpen = false;
+        document.removeEventListener('click', _closeModelMenuOnClickOutside);
+    }
+}
 
 window.App.ai.togglePlusMenu = (e) => {
     if (e) e.stopPropagation();
@@ -406,6 +451,7 @@ window.App.ai.handleSubmit = async (e) => {
 
     const container = document.getElementById('ai-content');
     const userId = App.state.currentUser.uid;
+    // Captura segura del ID actual al inicio del proceso
     let conversationId = window.App.ai.state.currentConversationId;
 
     if (!conversationId || container.querySelector('.welcome-screen')) {
@@ -425,13 +471,11 @@ window.App.ai.handleSubmit = async (e) => {
     try {
         let historyForStream = [];
 
+        // 1. GARANTIZAR ID DE CONVERSACIÓN ANTES DE STREAMING
         if (!conversationId) {
             const title = await App.aiService.generateTitle(text || "Consulta");
             conversationId = await App.aiService.createConversation(userId, title);
-            window.App.ai.state.currentConversationId = conversationId;
-            
-            // [CAMBIO V17] SE ELIMINÓ history.replaceState()
-            // El hash de la URL se mantiene en #ai, sin ID único visible.
+            window.App.ai.state.currentConversationId = conversationId; // Actualizar estado global
             
             // TRIGGER UPDATE: Actualización reactiva del sidebar
             window.App.ai.triggerSidebarUpdate();
@@ -443,8 +487,12 @@ window.App.ai.handleSubmit = async (e) => {
             historyForStream.push({ role: 'user', content: text });
         }
 
+        // Variable local blindada para el callback del stream
+        // NOTA: Esta variable captura el ID en este momento exacto.
+        const activeConversationId = conversationId;
+
         const fileData = files.map(f => ({ name: f.file.name, type: f.type, size: f.file.size }));
-        App.aiService.saveMessage(userId, conversationId, 'user', text, fileData);
+        await App.aiService.saveMessage(userId, activeConversationId, 'user', text, fileData);
 
         const aiId = `ai-msg-${Date.now()}`;
         container.insertAdjacentHTML('beforeend', _renderAiSkeleton(aiId));
@@ -470,7 +518,22 @@ window.App.ai.handleSubmit = async (e) => {
                 if (error && error !== 'abort') {
                     responseEl.innerHTML += `<div class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm font-bold border border-red-200 dark:border-red-800 flex items-center gap-2"><i class="fas fa-exclamation-circle"></i> ${error}</div>`;
                 } else if (finalText) {
-                    await App.aiService.saveMessage(userId, conversationId, 'assistant', finalText);
+                    // 2. FIX DE PERSISTENCIA: Usar ID capturado y validar guardado
+                    // REDUNDANCIA: Si por alguna razón activeConversationId es null (improbable), usar el global.
+                    const targetId = activeConversationId || window.App.ai.state.currentConversationId;
+                    
+                    if (targetId) {
+                        try {
+                            console.log(`[AI VIEW] Guardando respuesta en chat: ${targetId}`);
+                            await App.aiService.saveMessage(userId, targetId, 'assistant', finalText);
+                        } catch (saveErr) {
+                            console.error("[AI VIEW] Error crítico guardando respuesta:", saveErr);
+                            // Opcional: Mostrar toast de error si falla la BD
+                            if(window.App.ui && window.App.ui.toast) App.ui.toast("Error guardando respuesta", "warning");
+                        }
+                    } else {
+                         console.error("[AI VIEW] Error Fatal: No hay ID de conversación para guardar.");
+                    }
                 }
                 _setLoadingState(false);
             }
@@ -579,6 +642,12 @@ function _renderMessage(role, content, files = []) {
         </div>`;
     }
 
+    // [CAMBIO V20.0] IMAGEN OFICIAL GROK (SIN SVG)
+    const grokLogo = `
+    <div class="shrink-0 mt-1 shadow-sm rounded-lg overflow-hidden w-8 h-8 select-none">
+        <img src="${GROK_LOGO_URL}" class="w-full h-full object-cover" alt="Grok AI" draggable="false">
+    </div>`;
+
     if (isUser) {
         return `
         <div class="flex flex-col items-end mb-10 w-full animate-fade-in-up group/msg">
@@ -590,9 +659,7 @@ function _renderMessage(role, content, files = []) {
     } else {
         return `
         <div class="flex gap-4 md:gap-6 mb-12 w-full group/ai animate-fade-in pl-1">
-            <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/30 mt-1">
-                <i class="fas fa-star text-xs"></i>
-            </div>
+            ${grokLogo}
             <div class="flex-1 min-w-0 overflow-hidden">
                 <div class="text-[13px] font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2 select-none">
                     ${window.App.ai.state.modelName}
@@ -609,11 +676,16 @@ function _renderMessage(role, content, files = []) {
 }
 
 function _renderAiSkeleton(id) {
+    // [CAMBIO V20.0] LOGO ESTÁTICO EN SKELETON (SIN PULSE)
+    // El contenedor de la respuesta mantiene fade-in, pero la imagen es sólida.
+    const grokLogo = `
+    <div class="shrink-0 mt-1 shadow-sm rounded-lg overflow-hidden w-8 h-8 select-none">
+        <img src="${GROK_LOGO_URL}" class="w-full h-full object-cover" alt="Grok AI" draggable="false">
+    </div>`;
+
     return `
     <div class="flex gap-4 md:gap-6 mb-12 w-full animate-fade-in pl-1">
-        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/30 mt-1 animate-pulse">
-            <i class="fas fa-star text-xs"></i>
-        </div>
+        ${grokLogo}
         <div class="flex-1 min-w-0">
             <div class="text-[13px] font-bold text-slate-900 dark:text-white mb-2">${window.App.ai.state.modelName}</div>
             <div class="prose dark:prose-invert max-w-none text-[16px] leading-7 text-slate-700 dark:text-slate-300">
