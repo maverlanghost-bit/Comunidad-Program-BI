@@ -1,9 +1,10 @@
-﻿﻿﻿﻿/**
- * components.sidebar.js (V60.0 - DELETE CHAT FEATURE)
- * Componente de Barra Lateral Global.
- * * * CAMBIOS V60.0:
- * - ADDED: Botón de eliminar (papelera) en el historial de IA.
- * - ACTION: Conectado a 'App.ai.requestDelete' para confirmación modal.
+﻿﻿/**
+ * components.sidebar.js (V61.0 - REACTIVE UPDATE)
+ * Componente de Barra Lateral Global con Arquitectura Reactiva.
+ * * CAMBIOS V61.0:
+ * - REACTIVIDAD: Suscripción al evento 'app:ai-history-updated' para refresco automático.
+ * - SELF-HEALING: Petición automática de datos si el caché está vacío al renderizar.
+ * - ROBUSTEZ: Manejo de estados de carga (Loading Skeletons) mejorado.
  */
 
 window.App = window.App || {};
@@ -25,6 +26,29 @@ const SidebarManager = {
             
             if (!window._sidebarEventsInitialized) {
                 this.attachGlobalListeners();
+                
+                // --- NUEVO LISTENER REACTIVO ---
+                window.addEventListener('app:ai-history-updated', () => {
+                    // Solo repintamos si estamos en la vista de IA o si el sidebar está visible
+                    const sidebar = document.getElementById('sidebar');
+                    if (sidebar) {
+                        // Forzamos un re-render parcial de la sección de IA si es necesario
+                        // O simplemente volvemos a renderizar el sidebar completo para simplificar
+                        const currentHash = window.location.hash.replace('#', '') || 'feed';
+                        // Identificar la sección activa base (feed, ai, discovery, etc)
+                        const activeId = currentHash.split('/')[0] || 'feed';
+                        
+                        // Reemplazar el HTML del sidebar con la versión actualizada
+                        const newHTML = window.App.sidebar.render(activeId);
+                        // Truco para no perder el scroll: parsear y reemplazar solo el contenido necesario
+                        // O, para máxima estabilidad, reemplazamos todo (el usuario apenas lo notará si es rápido)
+                        sidebar.outerHTML = newHTML;
+                        
+                        // Re-adjuntar listeners si se perdió el elemento DOM (aunque usamos delegación en document)
+                        // Como attachGlobalListeners está en document, no hace falta re-adjuntar.
+                    }
+                });
+
                 window._sidebarEventsInitialized = true;
             }
         } catch (error) {
@@ -98,6 +122,8 @@ const SidebarManager = {
     },
 
     attachGlobalListeners() {
+        // Usamos delegación de eventos en el documento para que funcione
+        // incluso si el sidebar se reemplaza por re-renderizado.
         document.addEventListener('click', (e) => {
             const pinBtn = e.target.closest('[data-sidebar-action="pin"]');
             if (pinBtn) { e.stopPropagation(); this.togglePin(pinBtn); return; }
@@ -124,11 +150,13 @@ SidebarManager.init();
 // ============================================================================
 
 window.App.sidebar.render = (activeId = 'feed') => {
+    // Protección contra renderizado prematuro
+    if (!App.state || !App.state.currentUser) return '';
     const user = App.state.currentUser;
-    if (!user) return '';
 
     const isPinned = SidebarManager.state.isPinned;
-    const isAIMode = activeId === 'ai';
+    // Detectar si estamos en modo IA (activeId empieza con 'ai')
+    const isAIMode = activeId === 'ai' || activeId.startsWith('ai/');
 
     const sidebarClasses = isPinned ? 'w-[280px]' : 'w-[80px] hover:w-[280px]';
     
@@ -170,8 +198,8 @@ window.App.sidebar.render = (activeId = 'feed') => {
             ${_renderNavItem('feed', 'Mi Feed', 'fa-home', activeId === 'feed', 'text-slate-400 group-hover/item:text-blue-500')}
             ${_renderNavItem('chat', 'Comunidad', 'fa-users', activeId === 'chat', 'text-slate-400 group-hover/item:text-emerald-500')} 
             
-            <!-- ITEM IA DESTACADO CON SVG GEMINI -->
-            ${_renderNavItemAI(activeId === 'ai')}
+            <!-- ITEM IA DESTACADO -->
+            ${_renderNavItemAI(isAIMode)}
             
             ${_renderNavItem('discovery', 'Explorar', 'fa-compass', activeId === 'discovery', 'text-slate-400 group-hover/item:text-amber-500')}
 
@@ -184,7 +212,7 @@ window.App.sidebar.render = (activeId = 'feed') => {
             <div class="my-4 h-px bg-slate-100 dark:bg-slate-800 mx-2"></div>
 
             <!-- SECCIÓN CONTEXTUAL (IA vs COMUNIDADES) -->
-            ${isAIMode ? _renderAIHistorySection() : _renderCommunitiesSection(user, activeId)}
+            ${isAIMode ? _renderAIHistorySection(user) : _renderCommunitiesSection(user, activeId)}
 
         </nav>
 
@@ -251,9 +279,22 @@ function _renderNavItemAI(isActive) {
     </a>`;
 }
 
-function _renderAIHistorySection() {
-    // Asegurar que existe el cache
+function _renderAIHistorySection(user) {
+    // 1. INTENTO SEGURO DE OBTENER DATOS
     const history = (window.App.state && window.App.state.cache) ? window.App.state.cache.aiConversations : null;
+    
+    // 2. SELF-HEALING: Si no hay datos, pedirlos automáticamente
+    if (history === null && user && window.App.aiService && window.App.aiService.getConversations) {
+        // Usamos setTimeout para no bloquear el renderizado actual
+        setTimeout(() => {
+            // Verificamos de nuevo para no hacer peticiones duplicadas innecesarias
+            if (!window.App.state.cache.aiConversations) {
+                console.log("Sidebar: Autorecuperando historial...");
+                App.aiService.getConversations(user.uid);
+            }
+        }, 50);
+    }
+
     const isLoading = history === null; 
 
     return `
@@ -273,6 +314,7 @@ function _renderAIHistorySection() {
             <div class="p-2 space-y-3 opacity-0 group-hover/sidebar:opacity-100 transition-opacity">
                 <div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-3/4 animate-pulse"></div>
                 <div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-1/2 animate-pulse"></div>
+                <div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-2/3 animate-pulse"></div>
             </div>
         ` : (history.length === 0 ? `
             <div class="text-center p-4 opacity-0 group-hover/sidebar:opacity-100 transition-opacity">
