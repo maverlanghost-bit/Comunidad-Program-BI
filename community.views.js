@@ -1,10 +1,11 @@
 /**
- * community.views.js (V61.5 - FIX: EXPLICIT SIDEBAR TRIGGER & CONTEXT)
+ * community.views.js (V62.2 - DASHBOARD STYLE WIDGET)
  * Motor de Vistas de Comunidad Interna.
- * * CAMBIOS V61.5:
- * - TRIGGER SIDEBAR: Se fuerza la llamada a App.renderSidebar(cid) al cargar.
- * - CONTEXTO: Se pasa el ID de la comunidad para que el sidebar se expanda correctamente.
- * - ZEN UI: Mantenimiento del header compacto.
+ * * CAMBIOS V62.2:
+ * - UI: Tarjeta "Continuar/Comenzar" rediseñada para coincidir exactamente con el estilo del Dashboard.
+ * - CLEANUP: Eliminada la sección "Sobre la comunidad" de la barra lateral.
+ * * CAMBIOS V62.1:
+ * - LOGIC: Algoritmo Smart Learning para detectar siguiente lección.
  */
 
 window.App = window.App || {};
@@ -81,7 +82,7 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
     const contentHTML = `
         <div id="community-root" data-cid="${cid}" class="flex flex-col min-h-full transition-colors duration-300 relative w-full">
             
-            <!-- PORTADA COMPACTA (Inline Tabs) -->
+            <!-- PORTADA COMPACTA (Inline Tabs & Branding) -->
             <div id="comm-header-wrapper" class="w-full bg-white dark:bg-[#0f172a] border-b border-gray-100 dark:border-slate-800">
                 ${_renderCommunityHeader(community, activeTab, user)}
             </div>
@@ -99,16 +100,10 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
     await App.render(contentHTML);
     _injectModals(community, user);
 
-    // ------------------------------------------------------------------------
-    // [FIX CRÍTICO] INVOCACIÓN MANUAL DEL SIDEBAR CON CONTEXTO
-    // ------------------------------------------------------------------------
+    // Trigger Sidebar Context (FIX V61.5)
     if (typeof window.App.renderSidebar === 'function') {
-        // Pasamos el ID de la comunidad para que el sidebar sepa cuál expandir
         await window.App.renderSidebar(cid); 
-    } else {
-        console.warn("⚠️ App.renderSidebar no encontrado.");
     }
-    // ------------------------------------------------------------------------
 
     // 3. Cargar Contenido Específico
     const container = document.getElementById('community-content');
@@ -117,13 +112,11 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
     switch (activeTab) {
         case 'inicio':
         case 'comunidad':
-            // Feed
             container.className = "flex-1 w-full max-w-[1200px] mx-auto animate-fade-in relative z-0 p-6 md:p-8 block";
             await _renderFeedTab(container, community, user);
             break;
             
         case 'clases':
-            // Aula (LMS)
             container.className = "flex-1 w-full flex flex-col animate-fade-in relative z-0 bg-white dark:bg-[#0f172a] min-h-[600px]";
             container.innerHTML = ''; 
             if (App.lms) {
@@ -152,14 +145,14 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
 };
 
 // ============================================================================
-// 2. COMPONENTES VISUALES: HEADER (INLINE TABS)
+// 2. COMPONENTES VISUALES: HEADER (BRANDING UPDATE)
 // ============================================================================
 
 function _renderCommunityHeader(c, activeTab, user) {
     const isMember = (user.joinedCommunities || []).includes(c.id);
     const isAdmin = user.role === 'admin';
 
-    // Estilos Zen para Tabs (Texto simple)
+    // Estilos Zen para Tabs
     const tabInactive = "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-6 transition-all text-sm h-full flex items-center";
     const tabActive = "text-[#1890ff] font-bold border-b-2 border-[#1890ff] px-3 py-6 text-sm h-full flex items-center";
 
@@ -168,23 +161,32 @@ function _renderCommunityHeader(c, activeTab, user) {
         return activeTab === tabName ? tabActive : tabInactive;
     };
 
+    // Lógica de Identidad Visual
+    const hasLogo = !!c.logoUrl;
+    const showTitle = c.showTitle !== false; // Default true
+
     return `
         <div class="max-w-[1200px] w-full mx-auto px-6">
             <div class="flex items-center justify-between h-[80px]">
-                <!-- GRUPO IZQUIERDA: Logo + Info + Tabs -->
+                <!-- GRUPO IZQUIERDA: Identidad + Tabs -->
                 <div class="flex items-center gap-6 h-full overflow-hidden">
                     
-                    <!-- Logo & Info -->
+                    <!-- BRANDING BLOCK -->
                     <div class="flex items-center gap-4 shrink-0">
-                        <div class="w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center text-slate-400 text-lg shrink-0">
-                            <i class="fas ${c.icon || 'fa-users'}"></i>
-                        </div>
+                        ${hasLogo 
+                            ? `<img src="${c.logoUrl}" class="h-10 w-auto object-contain max-w-[180px] select-none" alt="${c.name}">`
+                            : `<div class="w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center text-slate-400 text-lg shrink-0">
+                                <i class="fas ${c.icon || 'fa-users'}"></i>
+                               </div>`
+                        }
+                        
+                        ${showTitle ? `
                         <div class="hidden sm:block">
                             <h1 class="font-heading font-bold text-lg text-slate-900 dark:text-white leading-tight flex items-center gap-2">
                                 ${c.name}
                                 ${c.isPrivate ? '<i class="fas fa-lock text-[10px] text-slate-400"></i>' : ''}
                             </h1>
-                        </div>
+                        </div>` : ''}
                     </div>
 
                     <!-- SEPARADOR VERTICAL -->
@@ -241,14 +243,111 @@ App.community.leave = async (cid) => {
     } catch (e) { App.ui.toast("Error al intentar salir.", "error"); }
 };
 
+// Helper: Carga de Logo Local en Modal
+App.community.handleLogoSelect = (input) => {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('ec-logo').value = e.target.result;
+            App.ui.toast("Logo listo para guardar", "success");
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+};
+
 // ============================================================================
-// 4. TABS: FEED, LIVE (ZEN STYLE)
+// 4. LÓGICA SMART LEARNING (Continuar/Comenzar)
+// ============================================================================
+
+function _findNextLesson(community, user) {
+    if (!community.courses || community.courses.length === 0) return null;
+
+    const completed = user.completedModules || [];
+    const cid = community.id;
+
+    // Buscar el primer curso que no esté 100% completado
+    for (const course of community.courses) {
+        const totalClasses = course.classes ? course.classes.length : 0;
+        if (totalClasses === 0) continue;
+
+        // Calcular progreso del curso
+        const courseCompletedCount = (course.classes || []).filter(cls => 
+            completed.includes(`${cid}_${cls.id}`)
+        ).length;
+
+        // Si el curso tiene clases pendientes, devolvemos la primera pendiente
+        if (courseCompletedCount < totalClasses) {
+            const nextClass = course.classes.find(cls => !completed.includes(`${cid}_${cls.id}`));
+            if (nextClass) {
+                return {
+                    type: courseCompletedCount === 0 ? 'start' : 'continue',
+                    courseTitle: course.title,
+                    courseId: course.id,
+                    classId: nextClass.id,
+                    classTitle: nextClass.title,
+                    image: course.image,
+                    progress: Math.round((courseCompletedCount / totalClasses) * 100)
+                };
+            }
+        }
+    }
+    // Si todos están completados, podrías devolver null o un estado de "Todo listo"
+    return null; 
+}
+
+function _renderContinueLearningCard(nextLesson, communityId) {
+    if (!nextLesson) return '';
+
+    const isStart = nextLesson.type === 'start';
+    const headerTitle = isStart ? 'Comenzar' : 'Continuar';
+    const headerIcon = isStart ? 'fa-star text-yellow-500' : 'fa-bolt text-yellow-500';
+    const actionText = isStart ? 'Empezar Curso' : 'Continuar Clase';
+    const link = `#comunidades/${communityId}/clases/${nextLesson.courseId}`;
+    
+    // Onclick handler para reproducir inmediatamente al hacer clic en el botón principal
+    const clickHandler = `onclick="setTimeout(() => { if(window.App.lms) App.lms.playClass('${communityId}', '${nextLesson.courseId}', '${nextLesson.classId}'); }, 100)"`;
+
+    return `
+    <div class="card-zen p-5">
+        <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-xs uppercase tracking-wider flex items-center gap-2">
+            <i class="fas ${headerIcon}"></i> ${headerTitle}
+        </h3>
+        
+        <div class="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 border border-gray-100 dark:border-slate-700/50">
+            <div class="relative aspect-video rounded-lg overflow-hidden mb-3 group cursor-pointer" onclick="window.location.hash='${link}'">
+                <img src="${nextLesson.image || 'https://via.placeholder.com/400x200?text=Curso'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                <div class="absolute inset-0 bg-black/20 flex items-center justify-center group-hover:bg-black/10 transition-colors">
+                    <div class="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-[#1890ff] shadow-lg scale-90 group-hover:scale-100 transition-transform">
+                        <i class="fas fa-play text-xs"></i>
+                    </div>
+                </div>
+                ${!isStart ? `<div class="absolute bottom-0 left-0 h-1 bg-[#1890ff]" style="width: ${nextLesson.progress}%"></div>` : ''}
+            </div>
+            
+            <h4 class="font-bold text-slate-900 dark:text-white text-xs line-clamp-1 mb-1">${nextLesson.classTitle}</h4>
+            <p class="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1 mb-3">${nextLesson.courseTitle}</p>
+            
+            <a href="${link}" ${clickHandler} class="btn-primary block w-full py-2 text-center text-[10px] shadow-sm hover:shadow-md transition-shadow">
+                ${actionText}
+            </a>
+        </div>
+    </div>`;
+}
+
+// ============================================================================
+// 5. TABS: FEED, LIVE (ZEN STYLE)
 // ============================================================================
 
 async function _renderFeedTab(container, community, user) {
     const isAdmin = user.role === 'admin';
+    
+    // Calcular tarjeta de aprendizaje
+    const nextLesson = _findNextLesson(community, user);
+    const learningCardHTML = _renderContinueLearningCard(nextLesson, community.id);
+
     container.innerHTML = `
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
+        <!-- COLUMNA IZQUIERDA: FEED -->
         <div class="lg:col-span-8 space-y-6">
             ${isAdmin ? `
             <div class="card-zen p-4 flex items-center gap-4 cursor-pointer group" onclick="App.community.openCreatePostModal()">
@@ -264,25 +363,13 @@ async function _renderFeedTab(container, community, user) {
             </div>
         </div>
 
+        <!-- COLUMNA DERECHA: WIDGETS -->
         <div class="hidden lg:block lg:col-span-4 space-y-6 sticky top-8">
-            <div class="card-zen p-5">
-                <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-xs uppercase tracking-wider text-slate-400">Estadísticas</h3>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="text-center p-3 bg-gray-50 dark:bg-slate-800 rounded-xl">
-                        <div class="text-xl font-bold text-slate-900 dark:text-white">${App.ui.formatNumber(community.membersCount || 0)}</div>
-                        <div class="text-[10px] text-slate-400 uppercase font-bold">Miembros</div>
-                    </div>
-                    <div class="text-center p-3 bg-gray-50 dark:bg-slate-800 rounded-xl">
-                        <div class="text-xl font-bold text-slate-900 dark:text-white">${(community.courses || []).length}</div>
-                        <div class="text-[10px] text-slate-400 uppercase font-bold">Cursos</div>
-                    </div>
-                </div>
-            </div>
             
-            <div class="card-zen p-5">
-                <h3 class="font-bold text-slate-900 dark:text-white mb-2 text-xs uppercase tracking-wider text-slate-400">Acerca de</h3>
-                <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">${community.description || 'Sin descripción.'}</p>
-            </div>
+            <!-- WIDGET PRINCIPAL: ACCIÓN DE APRENDIZAJE -->
+            ${learningCardHTML}
+            
+            <!-- SIN WIDGETS ADICIONALES (CLEAN UI) -->
         </div>
     </div>`;
 
@@ -439,7 +526,7 @@ function _renderEmptyLiveHero(isAdmin) {
 }
 
 // ============================================================================
-// 5. INYECCION MODALES Y HANDLERS
+// 6. INYECCION MODALES Y HANDLERS
 // ============================================================================
 
 function _injectModals(community, user) {
@@ -481,7 +568,7 @@ function _injectModals(community, user) {
             </div>
         </div>`;
 
-        // C. Modal Editar Comunidad
+        // C. Modal Editar Comunidad (BRANDING UPDATE)
         modalsHtml += `
         <div id="edit-community-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="App.community.closeEditCommunityModal()"></div>
@@ -491,6 +578,20 @@ function _injectModals(community, user) {
                     <input type="hidden" id="ec-id" value="${community.id}">
                     <div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">Nombre</label><input type="text" id="ec-name" value="${community.name}" class="w-full input-zen p-2.5 text-sm"></div>
                     <div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">Descripción</label><textarea id="ec-desc" rows="3" class="w-full input-zen p-2.5 text-sm">${community.description || ''}</textarea></div>
+                    
+                    <!-- NEW: BRANDING -->
+                    <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase mb-2 block">Logo & Identidad</label>
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" id="ec-logo" value="${community.logoUrl || ''}" class="flex-1 input-zen p-2 text-xs" placeholder="URL Logo">
+                            <label class="cursor-pointer bg-white border px-3 flex items-center rounded hover:bg-gray-50"><i class="fas fa-upload text-xs"></i><input type="file" class="hidden" onchange="App.community.handleLogoSelect(this)"></label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="ec-show-title" class="accent-[#1890ff]" ${community.showTitle !== false ? 'checked' : ''}>
+                            <label for="ec-show-title" class="text-xs text-slate-600 cursor-pointer">Mostrar Título</label>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">Precio</label><input type="number" id="ec-price" value="${community.price || 0}" class="w-full input-zen p-2.5 text-sm"></div>
                         <div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">Privacidad</label><select id="ec-private" class="w-full input-zen p-2.5 text-sm"><option value="false" ${!community.isPrivate ? 'selected' : ''}>Público</option><option value="true" ${community.isPrivate ? 'selected' : ''}>Privado</option></select></div>
@@ -628,6 +729,8 @@ App.community.saveCommunityConfig = async () => {
     const data = {
         name: document.getElementById('ec-name').value,
         description: document.getElementById('ec-desc').value,
+        logoUrl: document.getElementById('ec-logo').value, // Nuevo
+        showTitle: document.getElementById('ec-show-title').checked, // Nuevo
         price: document.getElementById('ec-price').value,
         isPrivate: document.getElementById('ec-private').value === 'true'
     };

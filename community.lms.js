@@ -1,14 +1,10 @@
 /**
- * community.lms.js (V26.0 - FIX: SCROLL & LAYOUT ADAPTATION)
- * Motor LMS Completo: Catálogo, Player Estándar, MODO SUPER CLASE (IDE + NOTAS) y Administración.
- * * CAMBIOS V26.0:
- * - FIX SCROLL: Contenedores de Catálogo y Player aislados con 'h-full overflow-y-auto'.
- * - LAYOUT: Adaptación 'w-full relative' para respetar el margen dinámico de la Sidebar V47.
- * - CARACTERÍSTICAS:
- * - Catálogo: Grid visual con progreso y badges.
- * - Player: Reproductor de video con lista de reproducción y seguimiento.
- * - Super Clase: Entorno de desarrollo (IDE) redimensionable (Modal Fullscreen).
- * - Administración: CRUD total de cursos y clases.
+ * community.lms.js (V27.0 - SUPER CLASS MANAGER & UI POLISH)
+ * Motor LMS Completo: Catálogo, Player Estándar, MODO SUPER CLASE y Administración.
+ * * CAMBIOS V27.0:
+ * - UI FIX: Portadas de cursos ahora usan 'aspect-video' (16:9) sin sombreado oscuro.
+ * - FEATURE: Sistema de Reordenamiento de Clases (Subir/Bajar).
+ * - FEATURE: Edición de Clases (Modal para cambiar Título/URL).
  */
 
 window.App = window.App || {};
@@ -70,18 +66,18 @@ window.App.lms.renderCatalog = (container, community, user, isAdmin) => {
                         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden hover:shadow-xl hover:-translate-y-1 hover:border-[#1890ff]/30 transition-all duration-300 group cursor-pointer flex flex-col h-full relative" 
                              onclick="window.location.hash='#community/${commId}/clases/${course.id}'">
                             
-                            <!-- Portada -->
-                            <div class="h-44 relative overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
+                            <!-- Portada (FIX V27.0: Aspect Video & Sin Overlay) -->
+                            <div class="aspect-video relative overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
                                 ${course.image 
-                                    ? `<img src="${course.image}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110">` 
+                                    ? `<img src="${course.image}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">` 
                                     : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="fas fa-image text-3xl"></i></div>`
                                 }
-                                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent"></div>
+                                <!-- Eliminado el bg-gradient-to-t oscuro para colores puros -->
                                 
                                 <!-- Badges -->
                                 <div class="absolute top-3 right-3 flex gap-2">
-                                    ${course.isSuperClass ? `<span class="bg-indigo-600/90 backdrop-blur text-white px-2 py-1 rounded-lg text-[10px] font-bold border border-white/20 shadow-sm"><i class="fas fa-code mr-1"></i> IDE</span>` : ''}
-                                    <span class="bg-black/40 backdrop-blur text-white px-2.5 py-1 rounded-lg text-[10px] font-bold border border-white/20 shadow-sm">${total} Clases</span>
+                                    ${course.isSuperClass ? `<span class="bg-indigo-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold shadow-sm"><i class="fas fa-code mr-1"></i> IDE</span>` : ''}
+                                    <span class="bg-black/60 backdrop-blur text-white px-2.5 py-1 rounded-lg text-[10px] font-bold shadow-sm">${total} Clases</span>
                                 </div>
                                 
                                 <!-- Barra de Progreso Visual -->
@@ -105,8 +101,8 @@ window.App.lms.renderCatalog = (container, community, user, isAdmin) => {
                                 <!-- Botones Admin (Hover) -->
                                 ${isAdmin ? `
                                 <div class="absolute top-3 left-3 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onclick="event.stopPropagation(); App.lms.openEditCourseModal('${commId}', '${course.id}')" class="w-8 h-8 bg-white/90 text-slate-600 rounded-lg flex items-center justify-center hover:text-[#1890ff] shadow-lg"><i class="fas fa-pen text-xs"></i></button>
-                                    <button onclick="event.stopPropagation(); App.lms.deleteCourse('${course.id}', '${commId}')" class="w-8 h-8 bg-white/90 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-500 hover:text-white shadow-lg"><i class="fas fa-trash text-xs"></i></button>
+                                    <button onclick="event.stopPropagation(); App.lms.openEditCourseModal('${commId}', '${course.id}')" class="w-8 h-8 bg-white text-slate-600 rounded-lg flex items-center justify-center hover:text-[#1890ff] shadow-lg"><i class="fas fa-pen text-xs"></i></button>
+                                    <button onclick="event.stopPropagation(); App.lms.deleteCourse('${course.id}', '${commId}')" class="w-8 h-8 bg-white text-red-500 rounded-lg flex items-center justify-center hover:bg-red-500 hover:text-white shadow-lg"><i class="fas fa-trash text-xs"></i></button>
                                 </div>` : ''}
                             </div>
                         </div>`;
@@ -133,12 +129,17 @@ window.App.lms.renderPlayer = (container, community, courseId, user, isAdmin) =>
     const classes = course.classes || [];
     const commId = community.id;
 
-    // Inyectar modal de clases para admin
-    if (isAdmin && !document.getElementById('add-class-modal')) {
-        document.body.insertAdjacentHTML('beforeend', _renderAddClassModalLocal());
+    // Inyectar modales de clases (Agregar y Editar)
+    if (isAdmin) {
+        if (!document.getElementById('add-class-modal')) {
+            document.body.insertAdjacentHTML('beforeend', _renderAddClassModalLocal());
+        }
+        if (!document.getElementById('edit-class-modal')) {
+            document.body.insertAdjacentHTML('beforeend', _renderEditClassModalLocal());
+        }
     }
 
-    // FIX V26.0: Uso de 'h-full w-full' y 'relative' para asegurar ajuste al padre flex
+    // FIX V26.0: Uso de 'h-full w-full' y 'relative'
     container.innerHTML = `
         <div class="w-full h-full bg-[#F8FAFC] dark:bg-[#020617] animate-enter p-4 lg:p-6 overflow-y-auto custom-scrollbar transition-colors relative">
             <div class="max-w-[1600px] mx-auto pb-20">
@@ -214,6 +215,9 @@ window.App.lms.renderPlayer = (container, community, courseId, user, isAdmin) =>
                             <div class="overflow-y-auto custom-scrollbar p-2 space-y-1 max-h-[500px]">
                                 ${classes.map((cls, idx) => {
                                     const isCompleted = (user.completedModules || []).includes(`${commId}_${cls.id}`);
+                                    const isFirst = idx === 0;
+                                    const isLast = idx === classes.length - 1;
+
                                     return `
                                     <div class="relative group">
                                         <button onclick="App.lms.playClass('${commId}', '${course.id}', '${cls.id}')" id="btn-class-${cls.id}" class="w-full p-3 rounded-xl flex items-start gap-3 text-left hover:bg-gray-50 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-gray-200 dark:hover:border-slate-700">
@@ -225,7 +229,16 @@ window.App.lms.renderPlayer = (container, community, courseId, user, isAdmin) =>
                                                 <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 flex items-center gap-1"><i class="far fa-play-circle"></i> Video</p>
                                             </div>
                                         </button>
-                                        ${isAdmin ? `<div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10"><button onclick="event.stopPropagation(); App.lms.deleteClass('${course.id}', '${cls.id}', '${commId}')" class="w-6 h-6 bg-white dark:bg-slate-800 border border-red-100 dark:border-red-900/30 text-red-500 rounded flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer shadow-sm"><i class="fas fa-trash text-[9px]"></i></button></div>` : ''}
+                                        
+                                        <!-- FIX V27.0: Herramientas de Edición y Reordenamiento para Admin -->
+                                        ${isAdmin ? `
+                                        <div class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-lg p-1 shadow-sm border border-gray-100 dark:border-slate-700">
+                                            ${!isFirst ? `<button onclick="event.stopPropagation(); App.lms.moveClass('${course.id}', '${cls.id}', -1, '${commId}')" class="w-6 h-6 text-slate-500 hover:text-[#1890ff] rounded flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Subir"><i class="fas fa-arrow-up text-[10px]"></i></button>` : ''}
+                                            ${!isLast ? `<button onclick="event.stopPropagation(); App.lms.moveClass('${course.id}', '${cls.id}', 1, '${commId}')" class="w-6 h-6 text-slate-500 hover:text-[#1890ff] rounded flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Bajar"><i class="fas fa-arrow-down text-[10px]"></i></button>` : ''}
+                                            <div class="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-0.5 self-center"></div>
+                                            <button onclick="event.stopPropagation(); App.lms.openEditClassModal('${commId}', '${course.id}', '${cls.id}')" class="w-6 h-6 text-slate-500 hover:text-orange-500 rounded flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Editar"><i class="fas fa-pen text-[10px]"></i></button>
+                                            <button onclick="event.stopPropagation(); App.lms.deleteClass('${course.id}', '${cls.id}', '${commId}')" class="w-6 h-6 text-slate-500 hover:text-red-500 rounded flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Eliminar"><i class="fas fa-trash text-[10px]"></i></button>
+                                        </div>` : ''}
                                     </div>`;
                                 }).join('')}
                             </div>
@@ -721,6 +734,8 @@ window.App.lms.openAddClassModal = (cid, courseId) => {
     if (m) { 
         document.getElementById('ac-cid').value = cid; 
         document.getElementById('ac-courseid').value = courseId; 
+        document.getElementById('ac-title').value = '';
+        document.getElementById('ac-url').value = '';
         m.classList.remove('hidden'); 
     } 
 };
@@ -746,6 +761,80 @@ window.App.lms.saveClass = async () => {
         App.lms.closeAddClassModal();
         App.renderCommunity(cid, 'clases', courseId);
     } catch (e) { App.ui.toast("Error al guardar clase", "error"); }
+};
+
+// FEATURE V27.0: MODAL DE EDICIÓN DE CLASE
+window.App.lms.openEditClassModal = (cid, courseId, classId) => {
+    const comm = App.state.cache.communities[cid];
+    const course = comm.courses.find(c => c.id === courseId);
+    const cls = course.classes.find(c => c.id === classId);
+    
+    const m = document.getElementById('edit-class-modal');
+    if (m && cls) {
+        document.getElementById('ec-cid').value = cid;
+        document.getElementById('ec-courseid').value = courseId;
+        document.getElementById('ec-classid').value = classId;
+        document.getElementById('ec-title').value = cls.title;
+        document.getElementById('ec-url').value = cls.videoUrl;
+        m.classList.remove('hidden');
+    }
+};
+window.App.lms.closeEditClassModal = () => document.getElementById('edit-class-modal').classList.add('hidden');
+
+window.App.lms.updateClass = async () => {
+    const cid = document.getElementById('ec-cid').value;
+    const courseId = document.getElementById('ec-courseid').value;
+    const classId = document.getElementById('ec-classid').value;
+    const title = document.getElementById('ec-title').value;
+    const url = document.getElementById('ec-url').value;
+    
+    if (!title || !url) return App.ui.toast("Datos incompletos", "error");
+
+    try {
+        const commRef = window.F.doc(window.F.db, "communities", cid);
+        const commSnap = await window.F.getDoc(commRef);
+        let courses = commSnap.data().courses;
+        const cIdx = courses.findIndex(c => c.id === courseId);
+        
+        if (cIdx > -1) {
+            const clsIdx = courses[cIdx].classes.findIndex(c => c.id === classId);
+            if (clsIdx > -1) {
+                courses[cIdx].classes[clsIdx].title = title;
+                courses[cIdx].classes[clsIdx].videoUrl = url;
+                await window.F.updateDoc(commRef, { courses });
+                App.ui.toast("Clase actualizada", "success");
+                App.lms.closeEditClassModal();
+                App.renderCommunity(cid, 'clases', courseId);
+            }
+        }
+    } catch(e) { App.ui.toast("Error al editar", "error"); }
+};
+
+// FEATURE V27.0: REORDENAMIENTO DE CLASES
+window.App.lms.moveClass = async (courseId, classId, direction, cid) => {
+    try {
+        const commRef = window.F.doc(window.F.db, "communities", cid);
+        const commSnap = await window.F.getDoc(commRef);
+        let courses = commSnap.data().courses;
+        const cIdx = courses.findIndex(c => c.id === courseId);
+        
+        if (cIdx > -1) {
+            const classes = courses[cIdx].classes;
+            const clsIdx = classes.findIndex(c => c.id === classId);
+            
+            if (clsIdx > -1) {
+                const newIdx = clsIdx + direction;
+                if (newIdx >= 0 && newIdx < classes.length) {
+                    // Intercambiar posiciones
+                    [classes[clsIdx], classes[newIdx]] = [classes[newIdx], classes[clsIdx]];
+                    
+                    await window.F.updateDoc(commRef, { courses });
+                    App.ui.toast("Orden actualizado", "success");
+                    App.renderCommunity(cid, 'clases', courseId);
+                }
+            }
+        }
+    } catch(e) { App.ui.toast("Error al mover clase", "error"); }
 };
 
 window.App.lms.deleteClass = async (courseId, classId, cid) => {
@@ -829,6 +918,24 @@ function _renderAddClassModalLocal() {
                 <div class="space-y-1"><label class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 ml-1">Título</label><input type="text" id="ac-title" class="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] focus:bg-white dark:focus:bg-slate-800 transition-colors text-sm font-bold dark:text-white"></div>
                 <div class="space-y-1"><label class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 ml-1">Video URL (YouTube)</label><input type="text" id="ac-url" class="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] focus:bg-white dark:focus:bg-slate-800 transition-colors text-sm dark:text-white" placeholder="ID o Enlace completo"></div>
                 <button onclick="App.lms.saveClass()" class="w-full bg-[#1890ff] text-white py-3.5 rounded-xl font-bold mt-2 hover:bg-blue-600 transition-colors shadow-lg active:scale-95">Guardar Clase</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+function _renderEditClassModalLocal() {
+    return `
+    <div id="edit-class-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform transition-all">
+            <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
+                <h3 class="font-heading font-bold text-lg text-slate-900 dark:text-white">Editar Clase</h3>
+                <button onclick="App.lms.closeEditClassModal()" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="ec-cid"><input type="hidden" id="ec-courseid"><input type="hidden" id="ec-classid">
+                <div class="space-y-1"><label class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 ml-1">Título</label><input type="text" id="ec-title" class="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] focus:bg-white dark:focus:bg-slate-800 transition-colors text-sm font-bold dark:text-white"></div>
+                <div class="space-y-1"><label class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 ml-1">Video URL (YouTube)</label><input type="text" id="ec-url" class="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-[#1890ff] focus:bg-white dark:focus:bg-slate-800 transition-colors text-sm dark:text-white" placeholder="ID o Enlace completo"></div>
+                <button onclick="App.lms.updateClass()" class="w-full bg-[#1890ff] text-white py-3.5 rounded-xl font-bold mt-2 hover:bg-blue-600 transition-colors shadow-lg active:scale-95">Guardar Cambios</button>
             </div>
         </div>
     </div>`;

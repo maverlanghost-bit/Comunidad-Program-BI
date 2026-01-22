@@ -1,7 +1,8 @@
 /**
- * admin.views.js (V47.0 - PRO PLAN BUILDER)
+ * admin.views.js (V48.0 - BRANDING EDITION)
  * Panel de Control Unificado.
- * * CAMBIOS V47.0:
+ * * CAMBIOS V48.0:
+ * - BRANDING: Soporte para Logo Personalizado y Toggle de Título.
  * - PLANES: Soporte completo para facturación dual (Mensual/Anual).
  * - TRIALS: Configuración de días de prueba y flag "Sin Tarjeta".
  * - DYNAMIC V2: Constructor de variantes con Links de Pago independientes por opción.
@@ -14,6 +15,22 @@ window.App.admin = window.App.admin || {};
 window.App.admin.tempPlans = [];
 window.App.admin.tempGallery = [];
 window.App.admin.tempVariants = [];
+
+// ==========================================
+// 0. HELPERS GLOBALES ADMIN
+// ==========================================
+
+// Helper para convertir archivo local a Base64 (DataURL) para el Logo
+App.admin.handleLogoUpload = (input) => {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('comm-logo').value = e.target.result;
+            App.ui.toast("Logo procesado. Recuerda guardar cambios.", "success");
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+};
 
 // ==========================================
 // 1. RENDERIZADOR PRINCIPAL & SEGURIDAD
@@ -191,7 +208,9 @@ async function _loadAdminCommunities() {
                 <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 hover:shadow-xl hover:-translate-y-1 transition-all group relative">
                     <div class="flex items-start justify-between mb-4">
                         <div class="w-16 h-16 rounded-xl bg-gray-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-slate-700 relative">
-                            ${c.image ? `<img src="${c.image}" class="w-full h-full object-cover">` : `<i class="fas ${c.icon || 'fa-users'} text-2xl text-slate-400"></i>`}
+                            ${c.logoUrl ? `<img src="${c.logoUrl}" class="w-full h-full object-contain p-2">` : 
+                                (c.image ? `<img src="${c.image}" class="w-full h-full object-cover">` : `<i class="fas ${c.icon || 'fa-users'} text-2xl text-slate-400"></i>`)
+                            }
                             ${galleryCount > 1 ? `<div class="absolute bottom-1 right-1 bg-black/50 text-white text-[9px] px-1.5 rounded-md font-bold backdrop-blur-sm">+${galleryCount-1}</div>` : ''}
                         </div>
                         <div class="flex gap-2">
@@ -520,11 +539,15 @@ App.admin.openCommunityModal = () => {
     document.getElementById('modal-title').innerText = "Nueva Comunidad";
     document.getElementById('btn-save-community').innerText = "Crear Comunidad";
     
-    // Reset Inputs
-    ['comm-id','comm-name','comm-icon','comm-desc','comm-category'].forEach(id => {
+    // Reset Inputs (Incluyendo Logo y Toggle Título)
+    ['comm-id','comm-name','comm-logo','comm-icon','comm-desc','comm-category'].forEach(id => {
         const el = document.getElementById(id);
         if(el) el.value = '';
     });
+    
+    // Default: Mostrar título activado
+    const checkTitle = document.getElementById('comm-show-title');
+    if(checkTitle) checkTitle.checked = true;
     
     // Reset Stores
     App.admin.tempPlans = [];
@@ -553,9 +576,13 @@ App.admin.editCommunity = async (id) => {
         // Datos Básicos
         document.getElementById('comm-id').value = comm.id;
         document.getElementById('comm-name').value = comm.name || '';
+        document.getElementById('comm-logo').value = comm.logoUrl || ''; // Cargar URL Logo
         document.getElementById('comm-icon').value = comm.icon || '';
         document.getElementById('comm-desc').value = comm.description || '';
         document.getElementById('comm-category').value = comm.category || 'General';
+        
+        // Cargar Toggle Título (Si no existe la propiedad, asumimos true para no romper diseño)
+        document.getElementById('comm-show-title').checked = comm.showTitle !== false;
         
         // Cargar Galería
         App.admin.tempGallery = comm.gallery || [];
@@ -629,6 +656,8 @@ App.admin.saveCommunity = async () => {
     const data = {
         id: id,
         name: name,
+        logoUrl: document.getElementById('comm-logo').value.trim(), // Nuevo Campo
+        showTitle: document.getElementById('comm-show-title').checked, // Nuevo Campo
         icon: document.getElementById('comm-icon').value.trim(),
         description: document.getElementById('comm-desc').value.trim(),
         category: document.getElementById('comm-category').value,
@@ -827,10 +856,35 @@ function _renderCommunityModalUnified() {
                             <textarea id="comm-desc" rows="2" class="w-full p-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm dark:text-white focus:border-[#1890ff] outline-none resize-none"></textarea>
                         </div>
                     </div>
-                    <div class="md:col-span-4 space-y-4">
-                        <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Icono (FontAwesome)</label>
-                            <input type="text" id="comm-icon" class="w-full p-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm dark:text-white font-mono" placeholder="Ej: fa-rocket">
+
+                    <!-- IDENTIDAD VISUAL AVANZADA -->
+                    <div class="md:col-span-12 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                        <h5 class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-3 flex items-center gap-2">
+                            <i class="fas fa-id-badge"></i> Identidad Visual Avanzada
+                        </h5>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Columna 1: Logo -->
+                            <div>
+                                <label class="text-[10px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Logo Personalizado (URL)</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="comm-logo" class="flex-1 p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="https://... o sube una imagen">
+                                    <label class="cursor-pointer bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-500 hover:text-blue-600 rounded-lg px-3 flex items-center justify-center transition-colors">
+                                        <i class="fas fa-upload"></i>
+                                        <input type="file" class="hidden" accept="image/*" onchange="App.admin.handleLogoUpload(this)">
+                                    </label>
+                                </div>
+                            </div>
+                            <!-- Columna 2: Configuración -->
+                            <div class="space-y-3">
+                                 <div>
+                                    <label class="text-[10px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Icono Fallback (FontAwesome)</label>
+                                    <input type="text" id="comm-icon" class="w-full p-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-sm dark:text-white font-mono" placeholder="Ej: fa-rocket">
+                                </div>
+                                <div class="flex items-center gap-2 pt-1">
+                                    <input type="checkbox" id="comm-show-title" class="accent-blue-600 w-4 h-4 cursor-pointer" checked>
+                                    <label for="comm-show-title" class="text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">Mostrar Título de Texto en Header</label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
