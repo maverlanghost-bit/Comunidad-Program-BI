@@ -55,23 +55,23 @@ window.App.lms.renderCatalog = (container, community, user, isAdmin) => {
                 ${courses.length > 0 ? `
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
                     ${courses.map(course => {
-                        // Cálculo de Progreso
-                        const total = course.classes ? course.classes.length : 0;
-                        const completed = (course.classes || []).filter(cls => 
-                            (user.completedModules || []).includes(`${commId}_${cls.id}`)
-                        ).length;
-                        const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+        // Cálculo de Progreso
+        const total = course.classes ? course.classes.length : 0;
+        const completed = (course.classes || []).filter(cls =>
+            (user.completedModules || []).includes(`${commId}_${cls.id}`)
+        ).length;
+        const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
 
-                        return `
+        return `
                         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden hover:shadow-xl hover:-translate-y-1 hover:border-[#1890ff]/30 transition-all duration-300 group cursor-pointer flex flex-col h-full relative" 
                              onclick="window.location.hash='#community/${commId}/clases/${course.id}'">
                             
                             <!-- Portada (FIX V27.0: Aspect Video & Sin Overlay) -->
                             <div class="aspect-video relative overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-800">
-                                ${course.image 
-                                    ? `<img src="${course.image}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">` 
-                                    : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="fas fa-image text-3xl"></i></div>`
-                                }
+                                ${course.image
+                ? `<img src="${course.image}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">`
+                : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="fas fa-image text-3xl"></i></div>`
+            }
                                 <!-- Eliminado el bg-gradient-to-t oscuro para colores puros -->
                                 
                                 <!-- Badges -->
@@ -106,7 +106,7 @@ window.App.lms.renderCatalog = (container, community, user, isAdmin) => {
                                 </div>` : ''}
                             </div>
                         </div>`;
-                    }).join('')}
+    }).join('')}
                 </div>` : `
                 <div class="py-24 text-center border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-3xl">
                     <div class="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
@@ -125,7 +125,7 @@ window.App.lms.renderCatalog = (container, community, user, isAdmin) => {
 window.App.lms.renderPlayer = (container, community, courseId, user, isAdmin) => {
     const course = (community.courses || []).find(c => c.id === courseId);
     if (!course) return App.ui.toast("Curso no encontrado", "error");
-    
+
     const classes = course.classes || [];
     const commId = community.id;
 
@@ -214,11 +214,11 @@ window.App.lms.renderPlayer = (container, community, courseId, user, isAdmin) =>
                             </div>
                             <div class="overflow-y-auto custom-scrollbar p-2 space-y-1 max-h-[500px]">
                                 ${classes.map((cls, idx) => {
-                                    const isCompleted = (user.completedModules || []).includes(`${commId}_${cls.id}`);
-                                    const isFirst = idx === 0;
-                                    const isLast = idx === classes.length - 1;
+        const isCompleted = (user.completedModules || []).includes(`${commId}_${cls.id}`);
+        const isFirst = idx === 0;
+        const isLast = idx === classes.length - 1;
 
-                                    return `
+        return `
                                     <div class="relative group">
                                         <button onclick="App.lms.playClass('${commId}', '${course.id}', '${cls.id}')" id="btn-class-${cls.id}" class="w-full p-3 rounded-xl flex items-start gap-3 text-left hover:bg-gray-50 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-gray-200 dark:hover:border-slate-700">
                                             <div class="w-6 h-6 rounded flex items-center justify-center shrink-0 text-[10px] font-bold mt-0.5 transition-all ${isCompleted ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}">
@@ -240,7 +240,7 @@ window.App.lms.renderPlayer = (container, community, courseId, user, isAdmin) =>
                                             <button onclick="event.stopPropagation(); App.lms.deleteClass('${course.id}', '${cls.id}', '${commId}')" class="w-6 h-6 text-slate-500 hover:text-red-500 rounded flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Eliminar"><i class="fas fa-trash text-[10px]"></i></button>
                                         </div>` : ''}
                                     </div>`;
-                                }).join('')}
+    }).join('')}
                             </div>
                         </div>
                     </div>
@@ -269,7 +269,7 @@ window.App.lms.renderPlayer = (container, community, courseId, user, isAdmin) =>
 
 window.App.lms.renderSuperClass = async (commId, courseId) => {
     // Pausar reproductor de fondo si existe
-    if (window.player && typeof window.player.pauseVideo === 'function') try { window.player.pauseVideo(); } catch (e) {}
+    if (window.player && typeof window.player.pauseVideo === 'function') try { window.player.pauseVideo(); } catch (e) { }
 
     const comm = App.state.cache.communities[commId];
     const course = comm.courses.find(c => c.id === courseId);
@@ -285,22 +285,28 @@ window.App.lms.renderSuperClass = async (commId, courseId) => {
     // FIX: Se añadieron 'fixed inset-0 z-[5000] w-screen h-screen' para garantizar que cubra todo.
     const overlayHtml = `
     <div id="superclass-overlay" class="fixed inset-0 z-[5000] w-screen h-screen animate-fade-in flex flex-col bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white overflow-hidden transition-colors duration-300">
-        <!-- HEADER -->
-        <div class="h-12 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-[#020617] flex items-center justify-between px-4 shrink-0 transition-colors">
+        <!-- HEADER MEJORADO -->
+        <div class="h-14 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 to-white dark:from-[#020617] dark:to-[#0f172a] flex items-center justify-between px-4 sm:px-6 shrink-0 transition-colors shadow-sm">
             <div class="flex items-center gap-4">
-                <button onclick="App.lms.exitSuperClass('${commId}', '${courseId}')" class="text-slate-500 dark:text-slate-400 hover:text-[#1890ff] dark:hover:text-white transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wide">
-                    <i class="fas fa-arrow-left"></i> Volver
+                <button onclick="App.lms.exitSuperClass('${commId}', '${courseId}')" class="text-slate-500 dark:text-slate-400 hover:text-[#1890ff] dark:hover:text-white transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wide px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <i class="fas fa-arrow-left"></i> <span class="hidden sm:inline">Volver</span>
                 </button>
-                <div class="h-4 w-px bg-gray-300 dark:bg-slate-800"></div>
-                <h2 class="text-sm font-bold text-slate-800 dark:text-white truncate max-w-[200px] md:max-w-md">${cls.title}</h2>
+                <div class="h-6 w-px bg-gray-300 dark:bg-slate-800"></div>
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                        <i class="fas fa-terminal text-xs"></i>
+                    </div>
+                    <h2 class="text-sm font-bold text-slate-800 dark:text-white truncate max-w-[120px] sm:max-w-[260px] md:max-w-md">${cls.title}</h2>
+                </div>
             </div>
             
-            <div class="flex items-center gap-3">
-                <span class="text-[10px] font-bold uppercase tracking-widest text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded border border-indigo-100 dark:border-indigo-900/50 hidden sm:inline-block">
-                    ${course.codeLanguage || 'Editor'}
+            <div class="flex items-center gap-2 sm:gap-3">
+                <span class="text-[10px] font-bold uppercase tracking-widest text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2.5 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-900/50 hidden sm:inline-flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                    ${course.codeLanguage || 'JavaScript'}
                 </span>
-                <button onclick="App.lms.runCodeMock()" class="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-500 transition-colors shadow flex items-center gap-2">
-                    <i class="fas fa-play"></i> <span class="hidden sm:inline">Run Code</span>
+                <button onclick="App.lms.runCodeMock()" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg shadow-green-500/30 flex items-center gap-2 active:scale-95">
+                    <i class="fas fa-play"></i> <span class="hidden sm:inline">Ejecutar</span>
                 </button>
             </div>
         </div>
@@ -314,40 +320,61 @@ window.App.lms.renderSuperClass = async (commId, courseId) => {
                     <div id="sc-youtube-player" class="absolute inset-0 w-full h-full"></div>
                 </div>
 
-                <!-- BLOC DE NOTAS -->
-                <div class="flex-1 bg-white dark:bg-[#0f172a] flex flex-col min-h-[200px] border-t border-gray-200 dark:border-slate-800 transition-colors overflow-hidden">
-                    <div class="h-10 bg-gray-50 dark:bg-[#1e293b] border-b border-gray-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0 transition-colors">
-                        <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2"><i class="fas fa-sticky-note"></i> Mis Apuntes</span>
-                        <div class="flex gap-2">
-                            <button onclick="App.lms.downloadNotes('${course.title}')" class="text-slate-400 hover:text-[#1890ff] text-xs"><i class="fas fa-download"></i></button>
-                            <button onclick="App.lms.saveNotes()" class="text-slate-400 hover:text-green-500 text-xs"><i class="fas fa-save"></i></button>
+                <!-- BLOC DE NOTAS MEJORADO -->
+                <div class="flex-1 bg-gradient-to-b from-white to-gray-50 dark:from-[#0f172a] dark:to-[#1e293b] flex flex-col min-h-[200px] border-t border-gray-200 dark:border-slate-800 transition-colors overflow-hidden">
+                    <div class="h-12 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-b border-amber-100 dark:border-amber-900/30 flex items-center justify-between px-4 shrink-0 transition-colors">
+                        <span class="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-sticky-note"></i> Mis Apuntes
+                            <span class="text-[9px] font-medium text-amber-500 dark:text-amber-500/70 hidden sm:inline">(Markdown soportado)</span>
+                        </span>
+                        <div class="flex gap-1">
+                            <button onclick="App.lms.downloadNotes('${course.title}')" class="w-8 h-8 rounded-lg text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 flex items-center justify-center transition-colors" title="Descargar">
+                                <i class="fas fa-download text-sm"></i>
+                            </button>
+                            <button onclick="App.lms.saveNotes()" class="w-8 h-8 rounded-lg text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 flex items-center justify-center transition-colors" title="Guardar">
+                                <i class="fas fa-save text-sm"></i>
+                            </button>
                         </div>
                     </div>
-                    <textarea id="sc-notes-area" class="flex-1 bg-white dark:bg-[#0f172a] text-slate-800 dark:text-slate-300 p-4 text-sm outline-none resize-none font-mono leading-relaxed transition-colors custom-scrollbar" placeholder="Escribe tus apuntes aquí..."></textarea>
+                    <textarea id="sc-notes-area" class="flex-1 bg-transparent text-slate-800 dark:text-slate-300 p-5 text-sm outline-none resize-none font-mono leading-loose transition-colors custom-scrollbar placeholder:text-slate-400 dark:placeholder:text-slate-600" placeholder="📝 Escribe tus apuntes aquí...
+
+Tip: Usa **texto** para negritas, - para listas, # para títulos"></textarea>
                 </div>
             </div>
 
             <!-- GUTTER (BARRA DE REDIMENSIONAMIENTO) -->
-            <div id="sc-gutter" class="gutter hidden lg:block bg-gray-200 dark:bg-slate-800 w-[6px] hover:w-[8px] hover:bg-[#1890ff] cursor-col-resize z-50 transition-all h-full"></div>
+            <div id="sc-gutter" class="gutter hidden lg:flex bg-gradient-to-b from-gray-200 to-gray-300 dark:from-slate-700 dark:to-slate-800 w-[6px] hover:w-[8px] hover:bg-gradient-to-b hover:from-[#1890ff] hover:to-indigo-600 cursor-col-resize z-50 transition-all h-full items-center justify-center">
+                <div class="w-1 h-8 rounded-full bg-gray-400 dark:bg-slate-600 opacity-50"></div>
+            </div>
 
             <!-- PANEL DERECHO: CODE EDITOR -->
             <div id="sc-right-panel" class="relative bg-white dark:bg-[#1e1e1e] flex-1 flex flex-col transition-colors min-w-[300px] h-1/2 lg:h-full">
                 <div id="monaco-editor-container" class="w-full flex-1"></div>
                 
-                <!-- MOCK CONSOLE -->
-                <div class="h-32 bg-gray-100 dark:bg-[#000000] border-t border-gray-200 dark:border-slate-800 flex flex-col font-mono text-xs shrink-0">
-                    <div class="h-8 bg-gray-200 dark:bg-[#111] px-4 flex items-center justify-between text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider shrink-0">
-                        <span><i class="fas fa-terminal mr-2"></i>Consola</span>
-                        <button onclick="document.getElementById('sc-console-output').innerHTML=''" class="hover:text-red-500"><i class="fas fa-ban"></i></button>
+                <!-- CONSOLA MEJORADA -->
+                <div class="h-40 bg-gradient-to-b from-gray-900 to-black border-t-2 border-emerald-500/50 flex flex-col font-mono text-xs shrink-0 shadow-inner">
+                    <div class="h-10 bg-gradient-to-r from-gray-900 to-gray-800 px-4 flex items-center justify-between text-emerald-400 font-bold uppercase tracking-wider shrink-0 border-b border-gray-800">
+                        <span class="flex items-center gap-2">
+                            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                            <i class="fas fa-terminal mr-1"></i> Consola
+                        </span>
+                        <div class="flex gap-2">
+                            <button onclick="document.getElementById('sc-console-output').innerHTML=''" class="text-gray-500 hover:text-red-400 transition-colors px-2 py-1 rounded hover:bg-gray-800" title="Limpiar">
+                                <i class="fas fa-ban"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div id="sc-console-output" class="flex-1 p-3 overflow-y-auto text-slate-600 dark:text-green-400 whitespace-pre-wrap custom-scrollbar"></div>
+                    <div id="sc-console-output" class="flex-1 p-4 overflow-y-auto text-emerald-400 whitespace-pre-wrap custom-scrollbar bg-black/50"></div>
                 </div>
 
                 <!-- LOADING INDICATOR -->
                 <div id="monaco-loading" class="absolute inset-0 flex items-center justify-center bg-white dark:bg-[#1e1e1e] text-slate-500 z-10 transition-colors">
                     <div class="text-center">
-                        <i class="fas fa-circle-notch fa-spin text-2xl mb-2 text-[#1890ff]"></i>
-                        <p class="text-xs font-mono">Cargando IDE...</p>
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 mb-4 mx-auto animate-pulse">
+                            <i class="fas fa-code text-lg"></i>
+                        </div>
+                        <p class="text-sm font-bold text-slate-600 dark:text-slate-400">Cargando IDE...</p>
+                        <p class="text-xs text-slate-400 mt-1">Monaco Editor</p>
                     </div>
                 </div>
             </div>
@@ -355,7 +382,7 @@ window.App.lms.renderSuperClass = async (commId, courseId) => {
     </div>`;
 
     document.body.insertAdjacentHTML('beforeend', overlayHtml);
-    
+
     // Iniciar Resizer
     _initResizer();
 
@@ -377,7 +404,7 @@ window.App.lms.renderSuperClass = async (commId, courseId) => {
     try {
         const monaco = await App.utils.loadMonaco();
         document.getElementById('monaco-loading').style.display = 'none';
-        
+
         // Tema Dinámico (Día/Noche)
         const isDark = App.state.theme === 'dark';
         const editorTheme = isDark ? 'vs-dark' : 'vs';
@@ -422,11 +449,11 @@ function _initResizer() {
 
     document.addEventListener('mousemove', (e) => {
         if (!_scIsResizing) return;
-        
+
         const containerRect = container.getBoundingClientRect();
         const offsetX = e.clientX - containerRect.left;
         const totalWidth = containerRect.width;
-        
+
         // Limitar redimensionamiento entre 20% y 80%
         let newLeftWidth = (offsetX / totalWidth) * 100;
         if (newLeftWidth < 20) newLeftWidth = 20;
@@ -434,7 +461,7 @@ function _initResizer() {
 
         left.style.width = `${newLeftWidth}%`;
         // El panel derecho usa flex-1, se adapta automáticamente
-        
+
         // Forzar relayout del editor si existe para evitar glitches
         if (_editorInstance) _editorInstance.layout();
     });
@@ -451,13 +478,75 @@ function _initResizer() {
 // Helpers Super Clase
 window.App.lms.runCodeMock = () => {
     const consoleDiv = document.getElementById('sc-console-output');
-    if (!consoleDiv) return;
-    
+    if (!consoleDiv || !_editorInstance) return;
+
+    const code = _editorInstance.getValue();
     const timestamp = new Date().toLocaleTimeString();
-    const mockOutput = `[${timestamp}] Ejecutando script...\n> Hola Dev!\n> Proceso finalizado con código 0.`;
-    
-    consoleDiv.innerHTML += (consoleDiv.innerHTML ? '\n' : '') + mockOutput;
+
+    // Limpiar consola antes de ejecutar
+    consoleDiv.innerHTML = '';
+
+    // Capturar console.log personalizado
+    const logs = [];
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+
+    console.log = (...args) => {
+        logs.push({ type: 'log', msg: args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') });
+        originalLog.apply(console, args);
+    };
+    console.error = (...args) => {
+        logs.push({ type: 'error', msg: args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') });
+        originalError.apply(console, args);
+    };
+    console.warn = (...args) => {
+        logs.push({ type: 'warn', msg: args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') });
+        originalWarn.apply(console, args);
+    };
+
+    try {
+        // Ejecutar código JavaScript
+        const result = eval(code);
+
+        // Si hay un resultado que no sea undefined, mostrarlo
+        if (result !== undefined) {
+            logs.push({ type: 'result', msg: `→ ${typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)}` });
+        }
+
+        // Mostrar header de éxito
+        consoleDiv.innerHTML = `<div class="text-green-400 font-bold mb-2">[${timestamp}] ✓ Código ejecutado correctamente</div>`;
+
+    } catch (error) {
+        // Mostrar error
+        consoleDiv.innerHTML = `<div class="text-red-400 font-bold mb-2">[${timestamp}] ✗ Error en la ejecución</div>`;
+        logs.push({ type: 'error', msg: `${error.name}: ${error.message}` });
+    }
+
+    // Restaurar console original
+    console.log = originalLog;
+    console.error = originalError;
+    console.warn = originalWarn;
+
+    // Renderizar logs en la consola
+    logs.forEach(log => {
+        const colorClass = log.type === 'error' ? 'text-red-400' :
+            log.type === 'warn' ? 'text-yellow-400' :
+                log.type === 'result' ? 'text-cyan-400' :
+                    'text-green-400';
+        consoleDiv.innerHTML += `<div class="${colorClass}">${log.msg}</div>`;
+    });
+
+    if (logs.length === 0) {
+        consoleDiv.innerHTML += `<div class="text-slate-500 italic">Sin output</div>`;
+    }
+
     consoleDiv.scrollTop = consoleDiv.scrollHeight;
+
+    // Toast de feedback
+    if (App.ui && App.ui.toast) {
+        App.ui.toast("Código ejecutado", "success");
+    }
 };
 
 window.App.lms.saveNotes = () => {
@@ -482,7 +571,7 @@ window.App.lms.downloadNotes = (title) => {
 window.App.lms.exitSuperClass = (commId, courseId) => {
     // Auto-guardar notas
     if (document.getElementById('sc-notes-area')) window.App.lms.saveNotes();
-    
+
     const overlay = document.getElementById('superclass-overlay');
     if (overlay) {
         overlay.classList.add('opacity-0');
@@ -490,7 +579,7 @@ window.App.lms.exitSuperClass = (commId, courseId) => {
             overlay.remove();
             // Restaurar scroll del body
             document.body.style.overflow = '';
-            
+
             if (_editorInstance) { _editorInstance.dispose(); _editorInstance = null; }
             App.renderCommunity(commId, 'clases', courseId);
         }, 300);
@@ -572,11 +661,11 @@ window.App.lms.markClassComplete = async (cid) => {
 
     try {
         await window.F.updateDoc(window.F.doc(window.F.db, "users", uid), { completedModules: window.F.arrayUnion(moduleId) });
-        
+
         // Actualizar estado local
         if (!App.state.currentUser.completedModules) App.state.currentUser.completedModules = [];
         if (!App.state.currentUser.completedModules.includes(moduleId)) App.state.currentUser.completedModules.push(moduleId);
-        
+
         App.ui.toast("Progreso guardado", "success");
 
         // Actualizar barra de progreso
@@ -593,7 +682,7 @@ window.App.lms.markClassComplete = async (cid) => {
                 iconDiv.innerHTML = '<i class="fas fa-check"></i>';
             }
         }
-        
+
         if (btn) {
             btn.innerHTML = '<i class="fas fa-check-circle"></i> <span>Lección Completada</span>';
             btn.className = "px-5 py-3 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-bold text-xs flex items-center justify-center gap-2 cursor-default border border-green-200 dark:border-green-800 w-full";
@@ -609,10 +698,10 @@ function _updateCourseProgressUI(cid, classes, user) {
     const total = classes.length;
     const completedCount = classes.filter(cl => (user.completedModules || []).includes(`${cid}_${cl.id}`)).length;
     const pct = total === 0 ? 0 : Math.round((completedCount / total) * 100);
-    
+
     const bar = document.getElementById('course-progress-bar');
     const badge = document.getElementById('course-progress-badge');
-    
+
     if (bar) bar.style.width = `${pct}%`;
     if (badge) badge.innerText = `${pct}%`;
 }
@@ -622,11 +711,11 @@ function _updateCourseProgressUI(cid, classes, user) {
 // ============================================================================
 
 // --- GESTIÓN DE CURSOS ---
-window.App.lms.openCreateCourseModal = (cid) => { 
-    const m = document.getElementById('create-course-modal'); 
-    if (!m) return; 
-    document.getElementById('course-cid').value = cid; 
-    m.classList.remove('hidden'); 
+window.App.lms.openCreateCourseModal = (cid) => {
+    const m = document.getElementById('create-course-modal');
+    if (!m) return;
+    document.getElementById('course-cid').value = cid;
+    m.classList.remove('hidden');
 };
 window.App.lms.closeCreateCourseModal = () => document.getElementById('create-course-modal').classList.add('hidden');
 
@@ -637,9 +726,9 @@ window.App.lms.saveCourse = async () => {
     const img = document.getElementById('course-img').value;
     const isSuperClass = document.getElementById('course-superclass').value === 'true';
     const codeLanguage = document.getElementById('course-language').value;
-    
+
     if (!title) return App.ui.toast("El título es obligatorio", "error");
-    
+
     const btn = document.getElementById('btn-save-course');
     btn.innerHTML = "Guardando..."; btn.disabled = true;
 
@@ -647,28 +736,28 @@ window.App.lms.saveCourse = async () => {
         const commRef = window.F.doc(window.F.db, "communities", cid);
         const commSnap = await window.F.getDoc(commRef);
         let courses = commSnap.data().courses || [];
-        
-        const newCourse = { 
-            id: 'c_' + Date.now(), 
-            title, 
-            description: desc, 
-            image: img, 
-            isSuperClass, 
-            codeLanguage, 
-            classes: [], 
-            createdAt: new Date().toISOString() 
+
+        const newCourse = {
+            id: 'c_' + Date.now(),
+            title,
+            description: desc,
+            image: img,
+            isSuperClass,
+            codeLanguage,
+            classes: [],
+            createdAt: new Date().toISOString()
         };
-        
+
         courses.push(newCourse);
         await window.F.updateDoc(commRef, { courses });
         App.ui.toast("Curso creado", "success");
         App.lms.closeCreateCourseModal();
         App.renderCommunity(cid, 'clases');
-    } catch (e) { 
-        console.error(e); 
-        App.ui.toast("Error al crear", "error"); 
-    } finally { 
-        btn.innerHTML = "Crear Curso"; btn.disabled = false; 
+    } catch (e) {
+        console.error(e);
+        App.ui.toast("Error al crear", "error");
+    } finally {
+        btn.innerHTML = "Crear Curso"; btn.disabled = false;
     }
 };
 
@@ -676,17 +765,17 @@ window.App.lms.openEditCourseModal = (cid, courseId) => {
     const comm = App.state.cache.communities[cid];
     const course = comm.courses.find(c => c.id === courseId);
     if (!course) return;
-    
+
     const m = document.getElementById('edit-course-modal');
     document.getElementById('edit-course-cid').value = cid;
     document.getElementById('edit-course-id').value = courseId;
     document.getElementById('edit-course-title').value = course.title;
     document.getElementById('edit-course-desc').value = course.description || '';
     document.getElementById('edit-course-img').value = course.image || '';
-    
-    if(document.getElementById('edit-course-superclass')) document.getElementById('edit-course-superclass').value = course.isSuperClass ? 'true' : 'false';
-    if(document.getElementById('edit-course-language')) document.getElementById('edit-course-language').value = course.codeLanguage || 'python';
-    
+
+    if (document.getElementById('edit-course-superclass')) document.getElementById('edit-course-superclass').value = course.isSuperClass ? 'true' : 'false';
+    if (document.getElementById('edit-course-language')) document.getElementById('edit-course-language').value = course.codeLanguage || 'python';
+
     m.classList.remove('hidden');
 };
 window.App.lms.closeEditCourseModal = () => document.getElementById('edit-course-modal').classList.add('hidden');
@@ -699,13 +788,13 @@ window.App.lms.updateCourse = async () => {
     const img = document.getElementById('edit-course-img').value;
     const isSuperClass = document.getElementById('edit-course-superclass').value === 'true';
     const codeLanguage = document.getElementById('edit-course-language').value;
-    
+
     try {
         const commRef = window.F.doc(window.F.db, "communities", cid);
         const commSnap = await window.F.getDoc(commRef);
         let courses = commSnap.data().courses;
         const cIdx = courses.findIndex(c => c.id === courseId);
-        
+
         if (cIdx > -1) {
             courses[cIdx] = { ...courses[cIdx], title, description: desc, image: img, isSuperClass, codeLanguage };
             await window.F.updateDoc(commRef, { courses });
@@ -729,15 +818,15 @@ window.App.lms.deleteCourse = async (courseId, cid) => {
 };
 
 // --- GESTIÓN DE CLASES ---
-window.App.lms.openAddClassModal = (cid, courseId) => { 
-    const m = document.getElementById('add-class-modal'); 
-    if (m) { 
-        document.getElementById('ac-cid').value = cid; 
-        document.getElementById('ac-courseid').value = courseId; 
+window.App.lms.openAddClassModal = (cid, courseId) => {
+    const m = document.getElementById('add-class-modal');
+    if (m) {
+        document.getElementById('ac-cid').value = cid;
+        document.getElementById('ac-courseid').value = courseId;
         document.getElementById('ac-title').value = '';
         document.getElementById('ac-url').value = '';
-        m.classList.remove('hidden'); 
-    } 
+        m.classList.remove('hidden');
+    }
 };
 window.App.lms.closeAddClassModal = () => document.getElementById('add-class-modal').classList.add('hidden');
 
@@ -746,15 +835,15 @@ window.App.lms.saveClass = async () => {
     const courseId = document.getElementById('ac-courseid').value;
     const title = document.getElementById('ac-title').value;
     const url = document.getElementById('ac-url').value;
-    
+
     if (!title || !url) return App.ui.toast("Datos incompletos", "error");
-    
+
     try {
         const commRef = window.F.doc(window.F.db, "communities", cid);
         const commSnap = await window.F.getDoc(commRef);
         let courses = commSnap.data().courses;
         const cIdx = courses.findIndex(c => c.id === courseId);
-        
+
         courses[cIdx].classes.push({ id: 'cl_' + Date.now(), title, videoUrl: url, duration: '10:00' });
         await window.F.updateDoc(commRef, { courses });
         App.ui.toast("Clase agregada", "success");
@@ -768,7 +857,7 @@ window.App.lms.openEditClassModal = (cid, courseId, classId) => {
     const comm = App.state.cache.communities[cid];
     const course = comm.courses.find(c => c.id === courseId);
     const cls = course.classes.find(c => c.id === classId);
-    
+
     const m = document.getElementById('edit-class-modal');
     if (m && cls) {
         document.getElementById('ec-cid').value = cid;
@@ -787,7 +876,7 @@ window.App.lms.updateClass = async () => {
     const classId = document.getElementById('ec-classid').value;
     const title = document.getElementById('ec-title').value;
     const url = document.getElementById('ec-url').value;
-    
+
     if (!title || !url) return App.ui.toast("Datos incompletos", "error");
 
     try {
@@ -795,7 +884,7 @@ window.App.lms.updateClass = async () => {
         const commSnap = await window.F.getDoc(commRef);
         let courses = commSnap.data().courses;
         const cIdx = courses.findIndex(c => c.id === courseId);
-        
+
         if (cIdx > -1) {
             const clsIdx = courses[cIdx].classes.findIndex(c => c.id === classId);
             if (clsIdx > -1) {
@@ -807,7 +896,7 @@ window.App.lms.updateClass = async () => {
                 App.renderCommunity(cid, 'clases', courseId);
             }
         }
-    } catch(e) { App.ui.toast("Error al editar", "error"); }
+    } catch (e) { App.ui.toast("Error al editar", "error"); }
 };
 
 // FEATURE V27.0: REORDENAMIENTO DE CLASES
@@ -817,24 +906,24 @@ window.App.lms.moveClass = async (courseId, classId, direction, cid) => {
         const commSnap = await window.F.getDoc(commRef);
         let courses = commSnap.data().courses;
         const cIdx = courses.findIndex(c => c.id === courseId);
-        
+
         if (cIdx > -1) {
             const classes = courses[cIdx].classes;
             const clsIdx = classes.findIndex(c => c.id === classId);
-            
+
             if (clsIdx > -1) {
                 const newIdx = clsIdx + direction;
                 if (newIdx >= 0 && newIdx < classes.length) {
                     // Intercambiar posiciones
                     [classes[clsIdx], classes[newIdx]] = [classes[newIdx], classes[clsIdx]];
-                    
+
                     await window.F.updateDoc(commRef, { courses });
                     App.ui.toast("Orden actualizado", "success");
                     App.renderCommunity(cid, 'clases', courseId);
                 }
             }
         }
-    } catch(e) { App.ui.toast("Error al mover clase", "error"); }
+    } catch (e) { App.ui.toast("Error al mover clase", "error"); }
 };
 
 window.App.lms.deleteClass = async (courseId, classId, cid) => {
@@ -844,7 +933,7 @@ window.App.lms.deleteClass = async (courseId, classId, cid) => {
         const commSnap = await window.F.getDoc(commRef);
         let courses = commSnap.data().courses;
         const cIdx = courses.findIndex(c => c.id === courseId);
-        
+
         if (cIdx > -1) {
             courses[cIdx].classes = courses[cIdx].classes.filter(c => c.id !== classId);
             await window.F.updateDoc(commRef, { courses });

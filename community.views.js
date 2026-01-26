@@ -300,35 +300,72 @@ function _renderContinueLearningCard(nextLesson, communityId) {
 
     const isStart = nextLesson.type === 'start';
     const headerTitle = isStart ? 'Comenzar' : 'Continuar';
-    const headerIcon = isStart ? '' : '<i class="fas fa-bolt text-yellow-500"></i>';
+    const headerIcon = isStart ? '<i class="fas fa-play-circle text-emerald-500"></i>' : '<i class="fas fa-bolt text-yellow-500"></i>';
     const actionText = isStart ? 'Empezar Curso' : 'Continuar Clase';
     const link = `#comunidades/${communityId}/clases/${nextLesson.courseId}`;
 
     // Onclick handler para reproducir inmediatamente al hacer clic en el botón principal
     const clickHandler = `onclick="setTimeout(() => { if(window.App.lms) App.lms.playClass('${communityId}', '${nextLesson.courseId}', '${nextLesson.classId}'); }, 100)"`;
 
+    // Gradient colors based on state
+    const buttonGradient = isStart
+        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/30'
+        : 'bg-gradient-to-r from-[#1890ff] to-indigo-600 hover:from-[#1477d9] hover:to-indigo-700 shadow-blue-500/30';
+
     return `
-    <div class="card-zen p-5">
-        <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-xs uppercase tracking-wider flex items-center gap-2">
-            ${headerIcon} ${headerTitle}
-        </h3>
+    <div class="card-zen p-0 overflow-hidden group/cta">
+        <!-- Header con gradiente sutil -->
+        <div class="px-5 py-4 border-b border-gray-100 dark:border-slate-800 bg-gradient-to-r from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
+            <h3 class="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-2">
+                ${headerIcon} ${headerTitle}
+            </h3>
+        </div>
         
-        <div class="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 border border-gray-100 dark:border-slate-700/50">
-            <div class="relative aspect-video rounded-lg overflow-hidden mb-3 group cursor-pointer" onclick="window.location.hash='${link}'">
-                <img src="${nextLesson.image || 'https://via.placeholder.com/400x200?text=Curso'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-                <div class="absolute inset-0 bg-black/20 flex items-center justify-center group-hover:bg-black/10 transition-colors">
-                    <div class="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-[#1890ff] shadow-lg scale-90 group-hover:scale-100 transition-transform">
-                        <i class="fas fa-play text-xs"></i>
+        <div class="p-5">
+            <!-- Thumbnail con overlay mejorado -->
+            <div class="relative aspect-video rounded-2xl overflow-hidden mb-4 group cursor-pointer shadow-lg ring-1 ring-black/5 dark:ring-white/5" onclick="window.location.hash='${link}'">
+                <img src="${nextLesson.image || 'https://via.placeholder.com/400x200?text=Curso'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
+                
+                <!-- Overlay con gradiente -->
+                <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center group-hover:from-black/50 transition-all">
+                    <div class="w-14 h-14 bg-white/95 backdrop-blur-sm rounded-full flex items-center justify-center text-[#1890ff] shadow-2xl scale-90 group-hover:scale-100 transition-all duration-300 ring-4 ring-white/30">
+                        <i class="fas fa-play text-xl ml-1"></i>
                     </div>
                 </div>
-                ${!isStart ? `<div class="absolute bottom-0 left-0 h-1 bg-[#1890ff]" style="width: ${nextLesson.progress}%"></div>` : ''}
+                
+                <!-- Barra de progreso -->
+                ${!isStart ? `
+                <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-black/30">
+                    <div class="h-full bg-gradient-to-r from-[#1890ff] to-indigo-500 shadow-[0_0_10px_rgba(24,144,255,0.8)]" style="width: ${nextLesson.progress}%"></div>
+                </div>
+                ` : ''}
+                
+                <!-- Badge de progreso -->
+                ${!isStart ? `
+                <div class="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-full text-[10px] font-bold">
+                    ${nextLesson.progress}% completado
+                </div>
+                ` : `
+                <div class="absolute top-3 right-3 bg-emerald-500 text-white px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
+                    <i class="fas fa-star text-[8px]"></i> Nuevo
+                </div>
+                `}
             </div>
             
-            <h4 class="font-bold text-slate-900 dark:text-white text-xs line-clamp-1 mb-1">${nextLesson.classTitle}</h4>
-            <p class="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1 mb-3">${nextLesson.courseTitle}</p>
+            <!-- Info -->
+            <div class="mb-4">
+                <h4 class="font-bold text-slate-900 dark:text-white text-sm line-clamp-1 mb-1">${nextLesson.classTitle}</h4>
+                <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 flex items-center gap-1.5">
+                    <i class="fas fa-book-open text-[10px]"></i> ${nextLesson.courseTitle}
+                </p>
+            </div>
             
-            <a href="${link}" ${clickHandler} class="btn-primary block w-full py-2 text-center text-[10px] shadow-sm hover:shadow-md transition-shadow">
-                ${actionText}
+            <!-- Botón Premium -->
+            <a href="${link}" ${clickHandler} class="block w-full py-3.5 text-center text-sm font-bold text-white rounded-2xl ${buttonGradient} shadow-lg hover:shadow-xl transition-all duration-300 active:scale-[0.98] group/btn">
+                <span class="flex items-center justify-center gap-2">
+                    <i class="fas ${isStart ? 'fa-play' : 'fa-forward'} text-xs transition-transform group-hover/btn:translate-x-0.5"></i>
+                    ${actionText}
+                </span>
             </a>
         </div>
     </div>`;
