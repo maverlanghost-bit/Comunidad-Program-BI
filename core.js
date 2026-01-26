@@ -49,13 +49,13 @@ App.render = (htmlContent) => {
 
         // Limpieza de listeners previos para evitar fugas de memoria
         if (App.state.listeners.chat && typeof App.state.listeners.chat === 'function') {
-            App.state.listeners.chat(); 
+            App.state.listeners.chat();
             delete App.state.listeners.chat;
         }
 
         requestAnimationFrame(() => {
             const hash = window.location.hash;
-            
+
             // Definición de Rutas Internas (App Mode)
             // Estas rutas activan la interfaz con Sidebar y Header
             const internalSections = ['/inicio', '/clases', '/live', '/miembros'];
@@ -64,7 +64,7 @@ App.render = (htmlContent) => {
 
             if (App.state.currentUser && isAppMode) {
                 document.body.classList.add('app-mode');
-                
+
                 // Determinar contexto para el Sidebar Activo
                 let activeId = 'feed';
                 if (hash.includes('#comunidades/')) activeId = hash.split('/')[1];
@@ -72,13 +72,27 @@ App.render = (htmlContent) => {
                 else if (hash.startsWith('#ai')) activeId = 'ai';
                 else if (hash.startsWith('#admin')) activeId = 'admin';
                 else if (hash.startsWith('#discovery')) activeId = 'discovery';
-                
+
                 // Renderizar Sidebar (Delegado al componente Sidebar)
                 const sidebarHTML = App.sidebar.render(activeId);
-                
+
                 // ESTRUCTURA MAESTRA (SHELL)
                 appRoot.innerHTML = `
                     <div class="flex h-screen w-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300">
+                        
+                        <!-- Mobile Menu Toggle Button -->
+                        <button 
+                            class="mobile-menu-toggle"
+                            onclick="document.body.classList.toggle('mobile-menu-open')"
+                            aria-label="Toggle Menu">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        
+                        <!-- Mobile Overlay -->
+                        <div 
+                            class="mobile-overlay" 
+                            onclick="document.body.classList.remove('mobile-menu-open')">
+                        </div>
                         
                         <!-- 1. Sidebar Spacer (Dinámico) -->
                         <div id="shell-sidebar" class="w-[72px] h-full shrink-0 z-50 relative border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] flex flex-col transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
@@ -129,9 +143,9 @@ App.api = {
         try {
             const cred = await window.F.signInWithEmailAndPassword(window.F.auth, email, password);
             return cred.user;
-        } catch (e) { 
-            console.error("Login Error:", e); 
-            throw e; 
+        } catch (e) {
+            console.error("Login Error:", e);
+            throw e;
         }
     },
 
@@ -141,20 +155,20 @@ App.api = {
             const user = cred.user;
             // Crear documento de usuario inicial en Firestore
             await window.F.setDoc(window.F.doc(window.F.db, "users", user.uid), {
-                uid: user.uid, 
-                email: data.email, 
-                name: data.name, 
+                uid: user.uid,
+                email: data.email,
+                name: data.name,
                 role: 'student',
                 avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random&color=fff`,
-                joinedCommunities: [], 
-                completedModules: [], 
-                points: 0, 
+                joinedCommunities: [],
+                completedModules: [],
+                points: 0,
                 createdAt: new Date().toISOString()
             });
             return user;
-        } catch (e) { 
-            console.error("Register Error:", e); 
-            throw e; 
+        } catch (e) {
+            console.error("Register Error:", e);
+            throw e;
         }
     },
 
@@ -162,8 +176,8 @@ App.api = {
         try {
             await window.F.signOut(window.F.auth);
             App.state.currentUser = null;
-            window.location.hash = '#comunidades'; 
-            window.location.reload(); 
+            window.location.hash = '#comunidades';
+            window.location.reload();
         } catch (e) { console.error("Logout Error:", e); }
     },
 
@@ -245,20 +259,20 @@ App.api = {
             const batch = window.F.writeBatch(window.F.db);
             const commRef = window.F.doc(window.F.db, "communities", communityId);
             const userRef = window.F.doc(window.F.db, "users", uid);
-            
+
             // Actualizar contadores y arrays de forma atómica
             batch.update(commRef, { membersCount: window.F.increment(1), members: window.F.arrayUnion(uid) });
             batch.update(userRef, { joinedCommunities: window.F.arrayUnion(communityId) });
-            
+
             await batch.commit();
-            
+
             // Actualizar estado local inmediatamente para reflejar cambios en UI
             if (!App.state.currentUser.joinedCommunities) App.state.currentUser.joinedCommunities = [];
-            if (!App.state.currentUser.joinedCommunities.includes(communityId)) { 
-                App.state.currentUser.joinedCommunities.push(communityId); 
+            if (!App.state.currentUser.joinedCommunities.includes(communityId)) {
+                App.state.currentUser.joinedCommunities.push(communityId);
             }
-            if (App.state.cache.communities[communityId]) { 
-                App.state.cache.communities[communityId].membersCount = (App.state.cache.communities[communityId].membersCount || 0) + 1; 
+            if (App.state.cache.communities[communityId]) {
+                App.state.cache.communities[communityId].membersCount = (App.state.cache.communities[communityId].membersCount || 0) + 1;
             }
             return true;
         } catch (e) { throw e; }
@@ -271,19 +285,19 @@ App.api = {
             const batch = window.F.writeBatch(window.F.db);
             const commRef = window.F.doc(window.F.db, "communities", communityId);
             const userRef = window.F.doc(window.F.db, "users", uid);
-            
+
             batch.update(commRef, { membersCount: window.F.increment(-1), members: window.F.arrayRemove(uid) });
             batch.update(userRef, { joinedCommunities: window.F.arrayRemove(communityId) });
-            
+
             await batch.commit();
-            
+
             // Limpiar estado local
-            if (App.state.currentUser.joinedCommunities) { 
-                App.state.currentUser.joinedCommunities = App.state.currentUser.joinedCommunities.filter(id => id !== communityId); 
+            if (App.state.currentUser.joinedCommunities) {
+                App.state.currentUser.joinedCommunities = App.state.currentUser.joinedCommunities.filter(id => id !== communityId);
             }
-            if (App.state.cache.communities[communityId]) { 
-                const currentCount = App.state.cache.communities[communityId].membersCount || 1; 
-                App.state.cache.communities[communityId].membersCount = Math.max(0, currentCount - 1); 
+            if (App.state.cache.communities[communityId]) {
+                const currentCount = App.state.cache.communities[communityId].membersCount || 1;
+                App.state.cache.communities[communityId].membersCount = Math.max(0, currentCount - 1);
             }
             return true;
         } catch (e) { throw e; }
@@ -298,11 +312,11 @@ App.api = {
 
     createCommunity: async (data) => {
         try {
-            const docRef = await window.F.addDoc(window.F.collection(window.F.db, "communities"), { 
-                ...data, 
-                membersCount: 0, 
-                createdAt: new Date().toISOString(), 
-                courses: [], 
+            const docRef = await window.F.addDoc(window.F.collection(window.F.db, "communities"), {
+                ...data,
+                membersCount: 0,
+                createdAt: new Date().toISOString(),
+                courses: [],
                 channels: [],
                 isPublic: true
             });
@@ -314,8 +328,8 @@ App.api = {
     updateCommunity: async (communityId, data) => {
         try {
             await window.F.updateDoc(window.F.doc(window.F.db, "communities", communityId), data);
-            if (App.state.cache.communities[communityId]) { 
-                App.state.cache.communities[communityId] = { ...App.state.cache.communities[communityId], ...data }; 
+            if (App.state.cache.communities[communityId]) {
+                App.state.cache.communities[communityId] = { ...App.state.cache.communities[communityId], ...data };
             }
             return true;
         } catch (e) { throw e; }
@@ -325,7 +339,7 @@ App.api = {
     getPosts: async (communityId) => {
         try {
             let q = window.F.query(
-                window.F.collection(window.F.db, "posts"), 
+                window.F.collection(window.F.db, "posts"),
                 window.F.where("communityId", "==", communityId)
             );
             const snap = await window.F.getDocs(q);
@@ -341,12 +355,12 @@ App.api = {
 
     createPost: async (postData) => {
         try {
-            const cleanData = { 
-                ...postData, 
-                likes: 0, 
-                likedBy: [], 
-                comments: [], 
-                createdAt: new Date().toISOString() 
+            const cleanData = {
+                ...postData,
+                likes: 0,
+                likedBy: [],
+                comments: [],
+                createdAt: new Date().toISOString()
             };
             const docRef = await window.F.addDoc(window.F.collection(window.F.db, "posts"), cleanData);
             return docRef.id;
@@ -354,9 +368,9 @@ App.api = {
     },
 
     deletePost: async (postId) => {
-        try { 
-            await window.F.deleteDoc(window.F.doc(window.F.db, "posts", postId)); 
-            return true; 
+        try {
+            await window.F.deleteDoc(window.F.doc(window.F.db, "posts", postId));
+            return true;
         } catch (e) { throw e; }
     },
 
@@ -367,14 +381,14 @@ App.api = {
             const ref = window.F.doc(window.F.db, "posts", postId);
             const docSnap = await window.F.getDoc(ref);
             if (!docSnap.exists()) return false;
-            
+
             const post = docSnap.data();
             const likedBy = post.likedBy || [];
-            
-            if (likedBy.includes(uid)) { 
-                await window.F.updateDoc(ref, { likes: window.F.increment(-1), likedBy: window.F.arrayRemove(uid) }); 
-            } else { 
-                await window.F.updateDoc(ref, { likes: window.F.increment(1), likedBy: window.F.arrayUnion(uid) }); 
+
+            if (likedBy.includes(uid)) {
+                await window.F.updateDoc(ref, { likes: window.F.increment(-1), likedBy: window.F.arrayRemove(uid) });
+            } else {
+                await window.F.updateDoc(ref, { likes: window.F.increment(1), likedBy: window.F.arrayUnion(uid) });
             }
             return true;
         } catch (e) { return false; }
@@ -383,9 +397,9 @@ App.api = {
     // --- UTILIDADES ---
     fileToBase64: (file) => {
         return new Promise((resolve, reject) => {
-            const reader = new FileReader(); 
+            const reader = new FileReader();
             reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result); 
+            reader.onload = () => resolve(reader.result);
             reader.onerror = error => reject(error);
         });
     }
@@ -397,35 +411,35 @@ App.api = {
 App.ui = {
     toast: (msg, type = 'info') => {
         let c = document.getElementById('toast-container');
-        if (!c) { 
-            c = document.createElement('div'); 
-            c.id = 'toast-container'; 
-            c.className = "fixed bottom-5 right-5 z-[10000] flex flex-col gap-2 pointer-events-none"; 
-            document.body.appendChild(c); 
+        if (!c) {
+            c = document.createElement('div');
+            c.id = 'toast-container';
+            c.className = "fixed bottom-5 right-5 z-[10000] flex flex-col gap-2 pointer-events-none";
+            document.body.appendChild(c);
         }
         const el = document.createElement('div');
         const bg = type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-slate-900 dark:bg-slate-700');
         el.className = `${bg} text-white px-6 py-4 rounded-xl shadow-2xl animate-slide-up border border-white/10 flex items-center gap-3 pointer-events-auto min-w-[300px]`;
         const icon = type === 'success' ? '<i class="fas fa-check-circle"></i>' : (type === 'error' ? '<i class="fas fa-exclamation-triangle"></i>' : '<i class="fas fa-info-circle"></i>');
         el.innerHTML = `${icon} <span class="font-bold text-sm">${msg}</span>`;
-        c.appendChild(el); 
-        setTimeout(() => { 
+        c.appendChild(el);
+        setTimeout(() => {
             el.style.transition = "all 0.3s ease"; el.style.opacity = '0'; el.style.transform = 'translateY(10px)';
             setTimeout(() => el.remove(), 300);
         }, 3000);
     },
-    
+
     skeleton: () => `<div class="bg-white dark:bg-slate-800 p-6 rounded-2xl mb-4 animate-pulse h-32"></div>`,
-    
+
     formatNumber: (n) => new Intl.NumberFormat('es-ES', { notation: "compact" }).format(n || 0),
-    
+
     formatDate: (d) => {
-        if (!d) return ''; 
-        const date = new Date(d); 
-        const now = new Date(); 
+        if (!d) return '';
+        const date = new Date(d);
+        const now = new Date();
         const diff = (now - date) / 1000;
-        if (diff < 60) return 'Hace un momento'; 
-        if (diff < 3600) return `Hace ${Math.floor(diff / 60)} min`; 
+        if (diff < 60) return 'Hace un momento';
+        if (diff < 3600) return `Hace ${Math.floor(diff / 60)} min`;
         if (diff < 86400) return `Hace ${Math.floor(diff / 3600)} h`;
         return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
     }
@@ -476,8 +490,8 @@ App.search = {
         return results.slice(0, 6);
     },
     renderResults: (results) => {
-        const container = document.getElementById('global-search-results'); 
-        if (!container) return; 
+        const container = document.getElementById('global-search-results');
+        if (!container) return;
         container.classList.remove('hidden');
         if (results.length === 0) { container.innerHTML = `<div class="p-4 text-xs text-slate-500 italic text-center">No encontramos coincidencias.</div>`; return; }
         container.innerHTML = results.map(r => `
@@ -495,6 +509,31 @@ App.search = {
 };
 
 // =============================================================================
+// 6. SINGLE COMMUNITY AUTO-REDIRECT HELPER
+// =============================================================================
+/**
+ * Checks if user is enrolled in exactly one community and redirects to it.
+ * Returns true if redirect happened, false otherwise.
+ */
+App.checkAndRedirectSingleCommunity = (user) => {
+    if (!user || !user.joinedCommunities || !Array.isArray(user.joinedCommunities)) {
+        return false;
+    }
+
+    const communities = user.joinedCommunities;
+
+    // Only redirect if user has exactly 1 community
+    if (communities.length === 1) {
+        const communityId = communities[0];
+        console.log(`[Single Community Redirect] Redirecting to ${communityId}`);
+        window.location.hash = `#comunidades/${communityId}/inicio`;
+        return true;
+    }
+
+    return false; // 0 or 2+ communities = show feed
+};
+
+// =============================================================================
 // 7. ROUTER INTELIGENTE (MODIFICADO V60.0)
 // =============================================================================
 App.handleRoute = async () => {
@@ -504,7 +543,7 @@ App.handleRoute = async () => {
         await new Promise(r => setTimeout(r, 100));
         attempts++;
     }
-    
+
     if (!window.F || !window.F.initialized) {
         console.error("Firebase failed to initialize after 5s");
         // No detenemos ejecución, permitimos que Auth intente recuperar
@@ -520,7 +559,7 @@ App.handleRoute = async () => {
     if (route === 'community') { window.location.hash = `#comunidades/${args.join('/')}`; return; }
 
     // Ruta por defecto
-    if (!route) { route = 'comunidades'; App.state.currentRoute = 'comunidades'; } 
+    if (!route) { route = 'comunidades'; App.state.currentRoute = 'comunidades'; }
     else { App.state.currentRoute = route; App.state.params = args; }
 
     // Listener de Auth State
@@ -539,7 +578,7 @@ App.handleRoute = async () => {
         // --- RUTA 1: CHAT GLOBAL (LAZY LOAD & SELF-HEALING) ---
         if (route === 'chat') {
             if (!currentUser) { window.location.hash = '#comunidades'; return; }
-            
+
             // 1. Mostrar pantalla de carga
             await App.render(`
                 <div id="global-chat-container" class="w-full h-full bg-white dark:bg-[#0f172a] flex flex-col relative items-center justify-center">
@@ -552,12 +591,12 @@ App.handleRoute = async () => {
             const container = document.getElementById('global-chat-container');
             const loadChat = async () => {
                 if (window.App.chat) return; // Ya cargado
-                await new Promise((resolve, reject) => { 
-                    const s = document.createElement('script'); 
-                    s.src = 'community.chat.js'; 
-                    s.onload = resolve; 
+                await new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = 'community.chat.js';
+                    s.onload = resolve;
                     s.onerror = () => reject(new Error("No se pudo cargar community.chat.js"));
-                    document.body.appendChild(s); 
+                    document.body.appendChild(s);
                 });
                 await new Promise(r => setTimeout(r, 100)); // Esperar parseo
             };
@@ -570,14 +609,14 @@ App.handleRoute = async () => {
                 } else {
                     throw new Error("Módulo de chat cargado pero inválido.");
                 }
-            } catch (e) { 
+            } catch (e) {
                 console.error(e);
                 container.innerHTML = `
                     <div class="text-red-500 p-10 text-center">
                         <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
                         <p>Error cargando chat.</p>
                         <button onclick="location.reload()" class="underline text-xs">Reintentar</button>
-                    </div>`; 
+                    </div>`;
             }
             return;
         }
@@ -585,12 +624,12 @@ App.handleRoute = async () => {
         // --- RUTA 2: ASISTENTE IA (LAZY LOAD & SELF-HEALING) ---
         if (route === 'ai') {
             // [FIX V60] Evitar redirect inmediato si auth está inicializando
-            if (!currentUser) { 
+            if (!currentUser) {
                 // Si llegamos aquí y no hay usuario, es seguro redirigir
-                window.location.hash = '#comunidades'; 
-                return; 
+                window.location.hash = '#comunidades';
+                return;
             }
-            
+
             // 1. Renderizar Pantalla de Carga Estilizada
             await App.render(`
                 <div id="ai-root" class="w-full h-full bg-white dark:bg-[#0f172a] flex flex-col relative items-center justify-center">
@@ -615,27 +654,27 @@ App.handleRoute = async () => {
 
                 const promises = [];
                 // Cargar Servicio (API)
-                if (missingService) promises.push(new Promise((resolve) => { 
-                    const s = document.createElement('script'); 
-                    s.src = 'ai.service.js'; 
-                    s.onload = resolve; 
-                    document.body.appendChild(s); 
+                if (missingService) promises.push(new Promise((resolve) => {
+                    const s = document.createElement('script');
+                    s.src = 'ai.service.js';
+                    s.onload = resolve;
+                    document.body.appendChild(s);
                 }));
                 // Cargar Vista (UI)
-                if (missingView) promises.push(new Promise((resolve) => { 
-                    const s = document.createElement('script'); 
-                    s.src = 'ai.views.js'; 
-                    s.onload = resolve; 
-                    document.body.appendChild(s); 
+                if (missingView) promises.push(new Promise((resolve) => {
+                    const s = document.createElement('script');
+                    s.src = 'ai.views.js';
+                    s.onload = resolve;
+                    document.body.appendChild(s);
                 }));
-                
+
                 await Promise.all(promises);
                 await new Promise(r => setTimeout(r, 200)); // Estabilizar
             };
 
             try {
                 await loadAIModules();
-                
+
                 if (window.App.ai && window.App.ai.render) {
                     await window.App.ai.render(container, conversationId);
                 } else {
@@ -661,7 +700,7 @@ App.handleRoute = async () => {
             } else {
                 const cid = args[0];
                 const sub = args[1];
-                
+
                 // Sub-rutas internas de la comunidad
                 if (sub === 'app' || ['inicio', 'clases', 'live'].includes(sub)) {
                     if (App.renderCommunity) App.renderCommunity(cid, sub || 'inicio', args[2]);
@@ -674,9 +713,13 @@ App.handleRoute = async () => {
         }
         else if (route === 'feed') {
             if (currentUser) {
+                // Check if user should be redirected to their single community
+                const redirected = App.checkAndRedirectSingleCommunity(currentUser);
+                if (redirected) return; // Stop processing if redirected
+
                 // Dashboard si existe, sino Feed público
-                if (App.renderDashboard) App.renderDashboard(); 
-                else if (App.public && App.public.renderFeed) App.public.renderFeed(); 
+                if (App.renderDashboard) App.renderDashboard();
+                else if (App.public && App.public.renderFeed) App.public.renderFeed();
             }
             else window.location.hash = '#comunidades';
         }
@@ -686,9 +729,9 @@ App.handleRoute = async () => {
         }
         else if (['login', 'register'].includes(route)) {
             if (currentUser) window.location.hash = '#feed';
-            else { 
-                await App.public.renderDiscovery(); 
-                setTimeout(() => App.public.openAuthModal(route), 100); 
+            else {
+                await App.public.renderDiscovery();
+                setTimeout(() => App.public.openAuthModal(route), 100);
             }
         }
         else {

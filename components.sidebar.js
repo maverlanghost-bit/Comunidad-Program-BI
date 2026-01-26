@@ -25,7 +25,7 @@ const SidebarManager = {
         try {
             this.applyPinState();
             this.injectGlobalModals();
-            
+
             if (!window._sidebarEventsInitialized) {
                 this.attachGlobalListeners();
                 window.addEventListener('app:ai-history-updated', () => this.refresh());
@@ -112,7 +112,7 @@ const SidebarManager = {
     handleFileSelect(input) {
         const file = input.files[0];
         if (!file) return;
-        
+
         if (file.size > 2 * 1024 * 1024) {
             App.ui.toast("Imagen muy grande (Máx 2MB)", "error");
             return;
@@ -130,7 +130,7 @@ const SidebarManager = {
     applyPinState() {
         const sb = document.getElementById('sidebar');
         if (!sb) return;
-        
+
         // FIX UX: Solo forzamos width si realmente está PINNED por el usuario.
         // Si no, dejamos que CSS hover haga su magia (evita snaps).
         if (this.state.isPinned) {
@@ -148,7 +148,7 @@ const SidebarManager = {
     updatePinIcon() {
         const btn = document.getElementById('pin-btn');
         if (!btn) return;
-        
+
         if (this.state.isPinned) {
             // Visible y activo
             btn.classList.add('text-blue-600', 'bg-blue-50', 'dark:text-blue-400', 'dark:bg-blue-900/20', 'opacity-100');
@@ -190,7 +190,7 @@ const SidebarManager = {
         this.state.isUserMenuOpen = !this.state.isUserMenuOpen;
         const menu = document.getElementById('user-popup-menu');
         const arrow = document.getElementById('user-menu-arrow');
-        
+
         if (menu && arrow) {
             if (this.state.isUserMenuOpen) {
                 menu.classList.remove('hidden', 'opacity-0', 'scale-95', 'translate-y-4');
@@ -200,7 +200,7 @@ const SidebarManager = {
                 menu.classList.add('opacity-0', 'scale-95', 'translate-y-4');
                 menu.classList.remove('opacity-100', 'scale-100', 'translate-y-0');
                 arrow.classList.remove('rotate-180');
-                setTimeout(() => { if (!this.state.isUserMenuOpen) menu.classList.add('hidden'); }, 200); 
+                setTimeout(() => { if (!this.state.isUserMenuOpen) menu.classList.add('hidden'); }, 200);
             }
             if (this.state.isUserMenuOpen) menu.classList.remove('hidden');
         }
@@ -250,9 +250,9 @@ window.App.sidebar.openNameModal = () => {
     const card = document.getElementById('modal-name-card');
     const backdrop = document.getElementById('modal-name-backdrop');
     const input = document.getElementById('input-new-name');
-    
+
     if (App.state.currentUser) input.value = App.state.currentUser.name || '';
-    
+
     modal.classList.remove('hidden');
     setTimeout(() => {
         backdrop.classList.remove('opacity-0');
@@ -277,14 +277,14 @@ window.App.sidebar.confirmChangeName = async () => {
 window.App.sidebar.openAvatarModal = () => {
     SidebarManager.toggleUserMenu();
     SidebarManager.state.tempAvatarFile = null;
-    
+
     const modal = document.getElementById('modal-upload-avatar');
     const card = document.getElementById('modal-avatar-card');
     const backdrop = document.getElementById('modal-avatar-backdrop');
     const img = document.getElementById('avatar-preview-img');
-    
+
     img.src = App.state.currentUser?.avatar || 'https://ui-avatars.com/api/?background=random';
-    
+
     modal.classList.remove('hidden');
     setTimeout(() => {
         backdrop.classList.remove('opacity-0');
@@ -295,7 +295,7 @@ window.App.sidebar.openAvatarModal = () => {
 
 window.App.sidebar.confirmUploadAvatar = async () => {
     if (!SidebarManager.state.tempAvatarFile) return App.ui.toast("Selecciona una imagen primero", "warning");
-    
+
     const btn = document.getElementById('btn-save-avatar');
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Guardando...';
     btn.disabled = true;
@@ -305,8 +305,8 @@ window.App.sidebar.confirmUploadAvatar = async () => {
         App.ui.toast("Foto actualizada", "success");
         SidebarManager.refresh();
         App.sidebar.closeModals();
-    } catch (e) { 
-        App.ui.toast("Error al subir", "error"); 
+    } catch (e) {
+        App.ui.toast("Error al subir", "error");
     } finally {
         btn.innerHTML = 'Actualizar';
         btn.disabled = false;
@@ -319,7 +319,7 @@ window.App.sidebar.closeModals = () => {
         const m = document.getElementById(id);
         const card = m.querySelector('div[id$="-card"]');
         const backdrop = m.querySelector('div[id$="-backdrop"]');
-        
+
         if (!m.classList.contains('hidden')) {
             card.classList.remove('opacity-100', 'scale-100');
             card.classList.add('opacity-0', 'scale-90');
@@ -341,18 +341,18 @@ window.App.sidebar.render = (activeId = 'feed') => {
     // Si no está pinned, es 'hover:w-[280px]', lo que permite que el mouse mantenga abierto el menú.
     const isPinned = SidebarManager.state.isPinned;
     const sidebarClasses = isPinned ? 'w-[280px]' : 'w-[80px] hover:w-[280px]';
-    
+
     const isAIMode = activeId === 'ai' || activeId.startsWith('ai/');
     const isDark = App.state.theme === 'dark';
     const themeLabelText = isDark ? 'Modo Noche' : 'Modo Día';
-    
+
     // FIX: Visibilidad de texto. Si está pinned, siempre visible. Si no, solo en hover.
     const textVisibilityClass = isPinned ? 'opacity-100 delay-0' : 'opacity-0 group-hover/sidebar:opacity-100 delay-75';
 
     // FIX: El botón de pin se oculta por defecto (opacity-0) para no molestar en 80px,
     // y aparece en hover o si está pinned.
-    const pinBtnClass = isPinned 
-        ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20 opacity-100' 
+    const pinBtnClass = isPinned
+        ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20 opacity-100'
         : 'text-slate-400 opacity-0 group-hover/sidebar:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800';
 
     return `
@@ -463,7 +463,7 @@ function _renderNavItem(id, label, icon, isActive, iconColorClasses = '', textCl
     const finalIconColor = isActive ? 'text-blue-600 dark:text-blue-400' : colorClasses;
 
     return `
-    <a href="#${id}" class="flex items-center gap-4 p-3 rounded-2xl transition-all duration-200 ${finalClass} overflow-hidden group/item relative select-none">
+    <a href="#${id}" onclick="document.body.classList.remove('mobile-menu-open')" class="flex items-center gap-4 p-3 rounded-2xl transition-all duration-200 ${finalClass} overflow-hidden group/item relative select-none">
         <div class="w-6 flex justify-center shrink-0 text-lg transition-colors ${finalIconColor}"><i class="fas ${icon}"></i></div>
         <span class="text-sm whitespace-nowrap transition-opacity duration-200 origin-left ${textClass}">${label}</span>
     </a>`;
@@ -476,7 +476,7 @@ function _renderNavItemAI(isActive, textClass = '') {
     const iconColor = isActive ? 'text-fuchsia-600 dark:text-fuchsia-400' : 'text-slate-400 group-hover/item:text-fuchsia-500';
 
     return `
-    <a href="#ai" class="flex items-center gap-4 p-3 rounded-2xl transition-all duration-200 ${containerClass} overflow-hidden group/item relative select-none">
+    <a href="#ai" onclick="document.body.classList.remove('mobile-menu-open')" class="flex items-center gap-4 p-3 rounded-2xl transition-all duration-200 ${containerClass} overflow-hidden group/item relative select-none">
         <div class="w-6 flex justify-center shrink-0">
             <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 transition-colors ${iconColor}">
                 <path d="M12 3C12 3 14 9 16 11C18 13 22 13 22 13C22 13 18 13 16 15C14 17 12 23 12 23C12 23 10 17 8 15C6 13 2 13 2 13C2 13 6 13 8 11C10 9 12 3 12 3Z" />
@@ -503,9 +503,9 @@ function _renderAIHistorySection(user, textClass = '') {
         <span class="font-bold text-xs whitespace-nowrap transition-opacity duration-200 ${textClass}">Nueva Conversación</span>
     </button>
     <div class="space-y-1 overflow-y-auto max-h-[300px] custom-scrollbar px-1">
-        ${isLoading ? `<div class="p-2 space-y-3 transition-opacity ${textClass}"><div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-3/4 animate-pulse"></div><div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-1/2 animate-pulse"></div></div>` 
-        : (history.length === 0 ? `<div class="text-center p-4 transition-opacity ${textClass}"><p class="text-[11px] text-slate-400">Tu historial aparecerá aquí</p></div>` 
-        : history.map(chat => `
+        ${isLoading ? `<div class="p-2 space-y-3 transition-opacity ${textClass}"><div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-3/4 animate-pulse"></div><div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-1/2 animate-pulse"></div></div>`
+            : (history.length === 0 ? `<div class="text-center p-4 transition-opacity ${textClass}"><p class="text-[11px] text-slate-400">Tu historial aparecerá aquí</p></div>`
+                : history.map(chat => `
             <div class="group/chat-item relative">
                 <a href="#ai/${chat.id}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white transition-colors group/item pr-8">
                     <i class="far fa-message w-4 text-center shrink-0 text-slate-300 group-hover/item:text-violet-400 text-[10px]"></i>
@@ -526,11 +526,11 @@ function _renderCommunitiesSection(user, activeId, textClass = '') {
     </div>
     <div class="space-y-1">
         ${list.map(cid => {
-            const c = (window.App.state && window.App.state.cache && window.App.state.cache.communities) ? window.App.state.cache.communities[cid] : null;
-            if (!c) return ''; 
-            const isOpen = SidebarManager.state.openMenus.includes(cid) || activeId === cid || window.location.hash.includes(`/${cid}/`);
-            return _renderCommunityDropdown(c, activeId, isOpen, textClass);
-        }).join('')}
+        const c = (window.App.state && window.App.state.cache && window.App.state.cache.communities) ? window.App.state.cache.communities[cid] : null;
+        if (!c) return '';
+        const isOpen = SidebarManager.state.openMenus.includes(cid) || activeId === cid || window.location.hash.includes(`/${cid}/`);
+        return _renderCommunityDropdown(c, activeId, isOpen, textClass);
+    }).join('')}
     </div>
     ${list.length === 0 ? `<div class="text-center p-4 transition-opacity ${textClass}"><p class="text-[11px] text-slate-400 mb-2">Aún no sigues comunidades</p><button onclick="window.location.hash='#discovery'" class="text-[11px] font-bold text-blue-500 hover:underline">Explorar catálogo</button></div>` : ''}`;
 }
@@ -538,7 +538,7 @@ function _renderCommunitiesSection(user, activeId, textClass = '') {
 function _renderCommunityDropdown(c, activeId, isOpen, textClass) {
     const isContextActive = activeId === c.id || window.location.hash.includes(`/${c.id}/`);
     const headerClass = isContextActive ? 'bg-blue-50/50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50';
-    
+
     // --- BRANDING ---
     let iconHtml;
     if (c.logoUrl) {
@@ -569,5 +569,5 @@ function _renderCommunityDropdown(c, activeId, isOpen, textClass) {
 function _renderSubLink(cid, tab, label, icon, isLive = false) {
     const isActive = window.location.hash === `#community/${cid}/${tab}` || (tab === 'inicio' && window.location.hash === `#community/${cid}`);
     const colorClass = isActive ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
-    return `<a href="#comunidades/${cid}/${tab}" class="flex items-center gap-3 py-1.5 rounded-lg text-xs transition-colors ${colorClass}"><i class="fas ${icon} w-3 text-center ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-300'} ${isLive?'text-rose-500 animate-pulse':''}"></i><span>${label}</span></a>`;
+    return `<a href="#comunidades/${cid}/${tab}" onclick="document.body.classList.remove('mobile-menu-open')" class="flex items-center gap-3 py-1.5 rounded-lg text-xs transition-colors ${colorClass}"><i class="fas ${icon} w-3 text-center ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-300'} ${isLive ? 'text-rose-500 animate-pulse' : ''}"></i><span>${label}</span></a>`;
 }

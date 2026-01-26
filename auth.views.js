@@ -20,10 +20,10 @@ window.App.renderLogin = () => {
     }
 
     const html = `
-    <div class="min-h-screen w-full flex bg-white animate-fade-in relative overflow-hidden font-sans">
+    <div class="min-h-screen w-full flex bg-white dark:bg-[#020617] animate-fade-in relative overflow-hidden font-sans">
         
-        <!-- IZQUIERDA: ARTE VISUAL & BRANDING -->
-        <div class="hidden lg:flex lg:w-1/2 bg-slate-900 relative flex-col justify-between p-12 overflow-hidden">
+        <!-- IZQUIERDA: ARTE VISUAL & BRANDING (Hidden on Mobile) -->
+        <div class="hidden lg:flex lg:w-1/2 bg-slate-900 relative flex-col justify-between p-12 overflow-hidden desktop-only">
             <div class="absolute inset-0 bg-gradient-to-br from-[#1890ff]/30 to-slate-900/90 z-10"></div>
             <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40"></div>
             
@@ -49,14 +49,14 @@ window.App.renderLogin = () => {
         </div>
 
         <!-- DERECHA: FORMULARIO -->
-        <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white relative">
-            <div class="w-full max-w-md space-y-8 animate-slide-up">
+        <div class="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 bg-white dark:bg-[#020617] relative">
+            <div class="w-full max-w-md space-y-6 sm:space-y-8 animate-slide-up">
                 <div class="text-center lg:text-left">
                     <div class="lg:hidden w-12 h-12 bg-[#1890ff] rounded-xl flex items-center justify-center text-white text-2xl shadow-lg mx-auto mb-6">
                         <i class="fas fa-cubes"></i>
                     </div>
-                    <h2 class="text-3xl font-heading font-bold text-slate-900">Bienvenido de nuevo</h2>
-                    <p class="text-slate-500 mt-2">Ingresa tus credenciales para continuar aprendiendo.</p>
+                    <h2 class="text-2xl sm:text-3xl font-heading font-bold text-slate-900 dark:text-white">Bienvenido de nuevo</h2>
+                    <p class="text-slate-500 dark:text-slate-400 mt-2 text-sm sm:text-base">Ingresa tus credenciales para continuar aprendiendo.</p>
                 </div>
 
                 <form onsubmit="App.handleLogin(event)" class="space-y-5" id="login-form">
@@ -113,9 +113,9 @@ window.App.renderRegister = () => {
     }
 
     const html = `
-    <div class="min-h-screen w-full flex bg-white animate-fade-in relative overflow-hidden font-sans">
-        <!-- IZQUIERDA (Simétrica) -->
-        <div class="hidden lg:flex lg:w-1/2 bg-slate-900 relative flex-col justify-between p-12 overflow-hidden">
+    <div class="min-h-screen w-full flex bg-white dark:bg-[#020617] animate-fade-in relative overflow-hidden font-sans">
+        <!-- IZQUIERDA (Simétrica - Hidden on Mobile) -->
+        <div class="hidden lg:flex lg:w-1/2 bg-slate-900 relative flex-col justify-between p-12 overflow-hidden desktop-only">
             <div class="absolute inset-0 bg-gradient-to-br from-[#1890ff]/30 to-slate-900/90 z-10"></div>
             <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2071&auto=format&fit=crop')] bg-cover bg-center opacity-40 mix-blend-overlay"></div>
             
@@ -132,11 +132,14 @@ window.App.renderRegister = () => {
         </div>
 
         <!-- DERECHA: FORMULARIO -->
-        <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white relative">
-            <div class="w-full max-w-md space-y-8 animate-slide-up">
+        <div class="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 bg-white dark:bg-[#020617] relative">
+            <div class="w-full max-w-md space-y-6 sm:space-y-8 animate-slide-up">
                 <div class="text-center lg:text-left">
-                    <h2 class="text-3xl font-heading font-bold text-slate-900">Crear Cuenta</h2>
-                    <p class="text-slate-500 mt-2">Completa tus datos para comenzar tu prueba gratuita.</p>
+                    <div class="lg:hidden w-12 h-12 bg-[#1890ff] rounded-xl flex items-center justify-center text-white text-2xl shadow-lg mx-auto mb-6">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-heading font-bold text-slate-900 dark:text-white">Crear Cuenta</h2>
+                    <p class="text-slate-500 dark:text-slate-400 mt-2 text-sm sm:text-base">Completa tus datos para comenzar tu prueba gratuita.</p>
                 </div>
 
                 <form onsubmit="App.handleRegister(event)" class="space-y-5" id="register-form">
@@ -184,7 +187,7 @@ window.App.handleLogin = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('btn-login');
     const form = document.getElementById('login-form');
-    
+
     // Obtener valores limpios
     const email = form.email.value.trim();
     const password = form.password.value;
@@ -195,7 +198,7 @@ window.App.handleLogin = async (e) => {
     }
 
     // UX: Bloquear botón y mostrar carga
-    btn.disabled = true; 
+    btn.disabled = true;
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Verificando...';
 
@@ -205,7 +208,7 @@ window.App.handleLogin = async (e) => {
         // La redirección ocurre automáticamente en core.js -> onAuthStateChanged
     } catch (error) {
         console.warn("Login Failed:", error);
-        
+
         // Manejo de errores específicos (Firebase style codes)
         let msg = 'Error de conexión.';
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
@@ -215,11 +218,11 @@ window.App.handleLogin = async (e) => {
         }
 
         App.ui.toast(msg, 'error');
-        
+
         // UX: Restaurar botón
-        btn.disabled = false; 
+        btn.disabled = false;
         btn.innerHTML = originalText;
-        
+
         // Limpiar password para reintento seguro
         form.password.value = '';
         form.password.focus();
@@ -230,7 +233,7 @@ window.App.handleRegister = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('btn-register');
     const form = document.getElementById('register-form');
-    
+
     const name = form.name.value.trim();
     const email = form.email.value.trim();
     const password = form.password.value;
@@ -244,7 +247,7 @@ window.App.handleRegister = async (e) => {
     }
 
     // UX: Bloquear
-    btn.disabled = true; 
+    btn.disabled = true;
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Creando cuenta...';
 
@@ -254,7 +257,7 @@ window.App.handleRegister = async (e) => {
         // Redirección automática en core.js
     } catch (error) {
         console.error("Registration Failed:", error);
-        
+
         let msg = 'Error al registrarse.';
         if (error.code === 'auth/email-already-in-use') {
             msg = 'Este correo ya está registrado.';
@@ -263,9 +266,9 @@ window.App.handleRegister = async (e) => {
         }
 
         App.ui.toast(msg, 'error');
-        
+
         // UX: Restaurar
-        btn.disabled = false; 
+        btn.disabled = false;
         btn.innerHTML = originalText;
     }
 };
