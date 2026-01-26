@@ -78,15 +78,23 @@ App.render = (htmlContent) => {
 
                 // ESTRUCTURA MAESTRA (SHELL)
                 appRoot.innerHTML = `
-                    <div class="flex h-screen w-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300">
+                    <div class="flex flex-col h-screen w-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300">
                         
-                        <!-- Mobile Menu Toggle Button -->
-                        <button 
-                            class="mobile-menu-toggle"
-                            onclick="document.body.classList.toggle('mobile-menu-open')"
-                            aria-label="Toggle Menu">
-                            <i class="fas fa-bars"></i>
-                        </button>
+                        <!-- Mobile Header Bar (Fixed top) -->
+                        <div class="mobile-header-bar lg:hidden flex items-center gap-3 px-4 h-14 bg-white dark:bg-[#0f172a] border-b border-gray-200 dark:border-slate-800 shrink-0 z-50">
+                            <button 
+                                class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300"
+                                onclick="document.body.classList.toggle('mobile-menu-open')"
+                                aria-label="Toggle Menu">
+                                <i class="fas fa-bars text-lg"></i>
+                            </button>
+                            <a href="#feed" class="flex items-center gap-2">
+                                <div class="w-8 h-8 bg-blue-600/10 dark:bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 text-sm">
+                                    <i class="fas fa-code"></i>
+                                </div>
+                                <span class="font-bold text-slate-800 dark:text-white text-sm">ProgramBI</span>
+                            </a>
+                        </div>
                         
                         <!-- Mobile Overlay -->
                         <div 
@@ -94,14 +102,18 @@ App.render = (htmlContent) => {
                             onclick="document.body.classList.remove('mobile-menu-open')">
                         </div>
                         
-                        <!-- 1. Sidebar Spacer (Dinámico) -->
-                        <div id="shell-sidebar" class="w-[72px] h-full shrink-0 z-50 relative border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] flex flex-col transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
-                            ${sidebarHTML}
-                        </div>
+                        <!-- Sidebar (Single render - positioned by CSS for mobile/desktop) -->
+                        ${sidebarHTML}
                         
-                        <!-- 2. Contenido Scrolleable (Main Scroll Wrapper) -->
-                        <div id="main-scroll-wrapper" class="flex-1 h-full overflow-y-auto overflow-x-hidden relative scroll-smooth custom-scrollbar">
-                            ${htmlContent}
+                        <!-- Main Content Area -->
+                        <div class="flex flex-1 overflow-hidden">
+                            <!-- Desktop Sidebar Spacer (takes up space in flex layout) -->
+                            <div id="shell-sidebar" class="hidden lg:block w-[72px] h-full shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"></div>
+                            
+                            <!-- Main Content -->
+                            <div id="main-scroll-wrapper" class="flex-1 h-full overflow-y-auto overflow-x-hidden relative scroll-smooth custom-scrollbar">
+                                ${htmlContent}
+                            </div>
                         </div>
                     </div>
                 `;
