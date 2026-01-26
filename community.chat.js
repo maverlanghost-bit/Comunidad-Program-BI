@@ -16,8 +16,8 @@ window.App.chat = window.App.chat || {};
 const CHAT_CONFIG = {
     MAX_FILE_SIZE: 10 * 1024 * 1024,
     ALLOWED_MIME_TYPES: [
-        'image/jpeg', 'image/png', 'image/gif', 'image/webp', 
-        'application/pdf', 'text/plain', 'application/zip', 
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'application/pdf', 'text/plain', 'application/zip',
         'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'text/javascript', 'text/html', 'text/css', 'application/json'
@@ -99,7 +99,7 @@ window.App.chat.render = async (container, communityId, user) => {
             return;
         }
     }
-    
+
     window.App.chat.state.communityData = community;
     window.App.chat.state.supportThreads = community.supportThreads || [];
 
@@ -117,7 +117,7 @@ window.App.chat.render = async (container, communityId, user) => {
     }
 
     _setupHybridListeners(communityId);
-    await App.chat.switchChannel(communityId, activeChId, true); 
+    await App.chat.switchChannel(communityId, activeChId, true);
 };
 
 function _cleanupListeners() {
@@ -153,13 +153,13 @@ function _setupHybridListeners(cid) {
         window.F.collection(window.F.db, "communities", cid, "active_threads"),
         (snapshot) => {
             const newThreads = [];
-            snapshot.forEach(doc => { 
+            snapshot.forEach(doc => {
                 if (doc.exists()) {
                     const data = doc.data();
                     // FIX: Asegurar que siempre hay un UID, usando el ID del documento si falta en la data
                     // Esto arregla el bug donde no se puede borrar porque uid es undefined
-                    newThreads.push({ ...data, uid: data.uid || doc.id }); 
-                } 
+                    newThreads.push({ ...data, uid: data.uid || doc.id });
+                }
             });
             _mergeThreads(newThreads);
         },
@@ -170,8 +170,8 @@ function _setupHybridListeners(cid) {
 
 function _mergeThreads(newBatch) {
     const currentMap = new Map();
-    window.App.chat.state.supportThreads.forEach(t => { if(t && t.uid) currentMap.set(t.uid, t); });
-    newBatch.forEach(t => { if(t && t.uid) currentMap.set(t.uid, { ...currentMap.get(t.uid), ...t }); });
+    window.App.chat.state.supportThreads.forEach(t => { if (t && t.uid) currentMap.set(t.uid, t); });
+    newBatch.forEach(t => { if (t && t.uid) currentMap.set(t.uid, { ...currentMap.get(t.uid), ...t }); });
     window.App.chat.state.supportThreads = Array.from(currentMap.values());
     _updateSidebar(window.App.chat.state.communityData, window.App.chat.state.communityData.channels, window.App.chat.state.activeChannelId);
 }
@@ -185,9 +185,9 @@ function _renderShellHTML(community, channels, user, activeId) {
     const groupedChannels = _groupChannels(channels);
     const isCollapsed = window.App.chat.state.isSidebarCollapsed;
     const sidebarClasses = isCollapsed ? 'w-[70px] hover:w-72' : 'w-72';
-    
+
     // Contenedor input sin fondo blanco (bg-transparent)
-    const inputAreaClasses = "shrink-0 p-4 sm:p-6 bg-transparent relative z-40"; 
+    const inputAreaClasses = "shrink-0 p-3 sm:p-6 bg-transparent relative z-40";
 
     return `
     <div id="chat-shell" class="flex flex-col h-full w-full overflow-hidden bg-white dark:bg-[#0b1120] relative font-sans text-sm text-slate-900 dark:text-slate-100">
@@ -200,17 +200,25 @@ function _renderShellHTML(community, channels, user, activeId) {
                 </div>
             </div>
 
-            <!-- SIDEBAR IZQUIERDO -->
-            <div id="chat-sidebar" class="${sidebarClasses} bg-[#F8FAFC] dark:bg-[#0f172a] border-r border-gray-200 dark:border-slate-800 flex flex-col shrink-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] relative z-20 group/sidebar shadow-[1px_0_20px_rgba(0,0,0,0.02)]">
+            <!-- MOBILE CHAT SIDEBAR OVERLAY -->
+            <div id="chat-sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 lg:hidden hidden" onclick="App.chat.closeMobileSidebar()"></div>
+
+            <!-- SIDEBAR IZQUIERDO (Hidden on mobile by default, toggleable) -->
+            <div id="chat-sidebar" class="fixed lg:relative top-0 left-0 h-full ${sidebarClasses} bg-[#F8FAFC] dark:bg-[#0f172a] border-r border-gray-200 dark:border-slate-800 flex flex-col shrink-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] z-50 shadow-[1px_0_20px_rgba(0,0,0,0.02)] group/sidebar -translate-x-full lg:translate-x-0">
                 <!-- Header Sidebar -->
                 <div class="h-14 flex items-center justify-between px-4 shrink-0 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151e32]">
                     <div class="flex items-center gap-3 overflow-hidden opacity-0 group-hover/sidebar:opacity-100 ${!isCollapsed ? 'opacity-100' : ''} transition-opacity duration-200">
                         <button onclick="window.location.hash='#feed'" class="text-slate-400 hover:text-indigo-500 transition-colors"><i class="fas fa-arrow-left"></i></button>
                         <span class="font-bold text-xs uppercase tracking-wider truncate text-slate-700 dark:text-slate-300 select-none">${community.name}</span>
                     </div>
-                    <button onclick="App.chat.toggleSidebar()" class="text-slate-400 hover:text-indigo-500 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 ml-auto" title="${isCollapsed ? 'Fijar' : 'Ocultar'}">
-                        <i class="fas ${isCollapsed ? 'fa-thumbtack transform rotate-45' : 'fa-columns'}"></i>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="App.chat.closeMobileSidebar()" class="lg:hidden text-slate-400 hover:text-indigo-500 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700" title="Cerrar">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button onclick="App.chat.toggleSidebar()" class="hidden lg:block text-slate-400 hover:text-indigo-500 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700" title="${isCollapsed ? 'Fijar' : 'Ocultar'}">
+                            <i class="fas ${isCollapsed ? 'fa-thumbtack transform rotate-45' : 'fa-columns'}"></i>
+                        </button>
+                    </div>
                 </div>
                 <!-- Channels List -->
                 <div id="sidebar-channels" class="flex-1 overflow-y-auto custom-scrollbar py-3 space-y-1">
@@ -220,7 +228,7 @@ function _renderShellHTML(community, channels, user, activeId) {
                 <div class="p-3 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151e32]">
                     <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer group" title="${user.name}">
                         <div class="relative shrink-0">
-                            <img src="${user.avatar || 'https://ui-avatars.com/api/?name='+user.name}" class="w-9 h-9 rounded-full bg-gray-200 object-cover shadow-sm">
+                            <img src="${user.avatar || 'https://ui-avatars.com/api/?name=' + user.name}" class="w-9 h-9 rounded-full bg-gray-200 object-cover shadow-sm">
                             <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-[#151e32] rounded-full"></div>
                         </div>
                         <div class="flex-1 min-w-0 opacity-0 group-hover/sidebar:opacity-100 ${!isCollapsed ? 'opacity-100' : ''} transition-opacity duration-200">
@@ -235,34 +243,39 @@ function _renderShellHTML(community, channels, user, activeId) {
             <!-- MAIN CHAT AREA -->
             <div class="flex-1 flex flex-col min-w-0 bg-[#F1F5F9] dark:bg-[#0b1120] relative z-0 h-full transition-all duration-300" id="main-chat-viewport">
                 <!-- Navbar -->
-                <div class="h-14 border-b border-gray-200 dark:border-slate-800 flex items-center px-6 shrink-0 justify-between bg-white dark:bg-[#0b1120] z-30 shadow-sm/30">
-                    <div class="flex items-center gap-4 min-w-0">
-                        <div id="header-icon-container" class="w-9 h-9 flex items-center justify-center transition-all">
+                <div class="h-14 border-b border-gray-200 dark:border-slate-800 flex items-center px-4 sm:px-6 shrink-0 justify-between bg-white dark:bg-[#0b1120] z-30 shadow-sm/30 gap-3">
+                    <!-- Mobile Menu Toggle -->
+                    <button onclick="App.chat.openMobileSidebar()" class="lg:hidden w-10 h-10 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors shrink-0">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    
+                    <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                        <div id="header-icon-container" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center transition-all shrink-0">
                             <i id="header-icon" class="fas fa-hashtag text-slate-400"></i>
                         </div>
-                        <div class="flex flex-col">
+                        <div class="flex flex-col min-w-0">
                             <h3 id="header-title" class="font-bold text-slate-800 dark:text-slate-100 text-sm truncate leading-none">...</h3>
-                            <p id="header-desc" class="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-none mt-1.5 font-medium">...</p>
+                            <p id="header-desc" class="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 truncate leading-none mt-1 sm:mt-1.5 font-medium">...</p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-1 text-slate-400">
+                    <div class="flex items-center gap-1 text-slate-400 shrink-0">
                         <!-- BOTÓN AI (SOLO ADMIN) -->
                         ${isAdmin ? `
-                        <button onclick="App.chat.toggleAIPanel()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors shadow-sm relative group" title="Asistente Grok 4.1">
+                        <button onclick="App.chat.toggleAIPanel()" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors shadow-sm relative group" title="Asistente Grok 4.1">
                             <i class="fas fa-robot text-sm"></i>
                             <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-[#0b1120]"></span>
                         </button>
-                        <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                        <div class="hidden sm:block w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
                         ` : ''}
                         
-                        <button class="hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors" title="Buscar"><i class="fas fa-search"></i></button>
+                        <button class="hidden sm:flex hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors" title="Buscar"><i class="fas fa-search"></i></button>
                     </div>
                 </div>
 
                 <!-- Messages Scroller -->
                 <div class="flex-1 relative min-h-0">
                     <div id="chat-scroller" class="absolute inset-0 overflow-y-auto custom-scrollbar scroll-smooth">
-                        <div id="chat-messages-container" class="min-h-full flex flex-col justify-end p-4 sm:p-6 pb-2 space-y-3 z-10"></div>
+                        <div id="chat-messages-container" class="min-h-full flex flex-col justify-end p-3 sm:p-6 pb-2 space-y-3 z-10"></div>
                     </div>
                 </div>
 
@@ -336,7 +349,7 @@ window.App.chat.toggleSidebar = () => {
     localStorage.setItem('chat_sidebar_collapsed', state.isSidebarCollapsed);
     const sb = document.getElementById('chat-sidebar');
     if (sb) {
-        if(state.isSidebarCollapsed) {
+        if (state.isSidebarCollapsed) {
             sb.classList.remove('w-72');
             sb.classList.add('w-[70px]', 'hover:w-72');
         } else {
@@ -345,6 +358,21 @@ window.App.chat.toggleSidebar = () => {
         }
         _updateSidebar(state.communityData, state.communityData.channels, state.activeChannelId);
     }
+};
+
+// Mobile sidebar controls
+window.App.chat.openMobileSidebar = () => {
+    const sb = document.getElementById('chat-sidebar');
+    const overlay = document.getElementById('chat-sidebar-overlay');
+    if (sb) sb.classList.remove('-translate-x-full');
+    if (overlay) overlay.classList.remove('hidden');
+};
+
+window.App.chat.closeMobileSidebar = () => {
+    const sb = document.getElementById('chat-sidebar');
+    const overlay = document.getElementById('chat-sidebar-overlay');
+    if (sb) sb.classList.add('-translate-x-full');
+    if (overlay) overlay.classList.add('hidden');
 };
 
 window.App.chat.switchSidebarTab = (tabName) => {
@@ -376,12 +404,12 @@ function _renderChannelsHTML(grouped, activeId, isAdmin, cid, user) {
     const activeTab = window.App.chat.state.adminSidebarTab;
     const hideOnCollapse = "opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 " + (!isCollapsed ? "opacity-100" : "");
     const showOnCollapse = isCollapsed ? "block group-hover/sidebar:hidden" : "hidden";
-    
+
     // NOTIFICACIÓN INTELIGENTE
     const threads = window.App.chat.state.supportThreads || [];
     const unreadCount = threads.filter(t => !window.App.chat.state.readThreadIds.has(t.uid)).length;
     const hasUnread = unreadCount > 0;
-    
+
     const notificationDot = hasUnread ? `<span class="absolute top-0 right-0 w-2.5 h-2.5 bg-purple-600 rounded-full border-2 border-gray-100 dark:border-slate-800 animate-pulse"></span>` : '';
 
     if (isAdmin) {
@@ -411,19 +439,19 @@ function _renderChannelsHTML(grouped, activeId, isAdmin, cid, user) {
             const sortedThreads = [...threads].sort((a, b) => {
                 const da = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
                 const db = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
-                return db - da; 
+                return db - da;
             });
 
             sortedThreads.forEach(t => {
                 // Validación estricta
-                if(!t) return;
+                if (!t) return;
                 // Fallback de seguridad por si t.uid viene vacío de la DB
                 const safeUid = t.uid || 'unknown_uid';
                 const threadId = `${CHAT_CONFIG.SUPPORT_CHANNEL_PREFIX}${safeUid}`;
                 const displayAvatar = (t.avatar && t.avatar.length > 5) ? t.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name || 'Alumno')}&background=random&color=fff&size=64`;
-                
+
                 const isUnread = !window.App.chat.state.readThreadIds.has(safeUid);
-                
+
                 html += _renderChannelItem(cid, threadId, t.name, 'fa-user', activeId === threadId, isCollapsed, true, displayAvatar, '', { isSupport: true, uid: safeUid, isUnread });
             });
             return html;
@@ -431,7 +459,7 @@ function _renderChannelsHTML(grouped, activeId, isAdmin, cid, user) {
     } else {
         const myThreadId = `${CHAT_CONFIG.SUPPORT_CHANNEL_PREFIX}${user.uid}`;
         const isActive = activeId === myThreadId;
-        
+
         html += `
         <div class="px-3 mb-6 relative">
             <div class="${hideOnCollapse} absolute left-3 right-3 top-0 z-10">
@@ -483,7 +511,7 @@ function _renderChannelsHTML(grouped, activeId, isAdmin, cid, user) {
 function _renderChannelItem(cid, id, name, icon, isActive, isCollapsed, isAdmin, avatar = null, extraClasses = '', chObj = null) {
     const activeBg = "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border-l-4 border-indigo-500";
     const normalBg = "text-slate-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 border-l-4 border-transparent";
-    
+
     let actionBtn = '';
     let unreadIndicator = '';
 
@@ -496,7 +524,7 @@ function _renderChannelItem(cid, id, name, icon, isActive, isCollapsed, isAdmin,
                  title="Eliminar Chat">
                  <i class="fas fa-trash text-[10px]"></i>
             </div>`;
-            
+
             if (chObj.isUnread) {
                 unreadIndicator = `<div class="w-2 h-2 bg-purple-600 rounded-full ml-auto mr-2 shrink-0"></div>`;
             }
@@ -524,7 +552,7 @@ function _renderChannelItem(cid, id, name, icon, isActive, isCollapsed, isAdmin,
 
 function _updateSidebar(community, channels, activeId) {
     const container = document.getElementById('sidebar-channels');
-    if(container) container.innerHTML = _renderChannelsHTML(_groupChannels(channels), activeId, App.chat.state.currentUser.role === 'admin', community.id, App.chat.state.currentUser);
+    if (container) container.innerHTML = _renderChannelsHTML(_groupChannels(channels), activeId, App.chat.state.currentUser.role === 'admin', community.id, App.chat.state.currentUser);
 }
 
 // ============================================================================
@@ -534,9 +562,9 @@ function _updateSidebar(community, channels, activeId) {
 window.App.chat.toggleAIPanel = () => {
     const panel = document.getElementById('ai-panel');
     if (!panel) return;
-    
+
     window.App.chat.state.aiPanelOpen = !window.App.chat.state.aiPanelOpen;
-    
+
     if (window.App.chat.state.aiPanelOpen) {
         panel.classList.remove('translate-x-full');
     } else {
@@ -546,13 +574,13 @@ window.App.chat.toggleAIPanel = () => {
 
 window.App.chat.switchAIMode = (mode) => {
     window.App.chat.state.aiMode = mode;
-    
+
     const btnAssistant = document.getElementById('btn-ai-assistant');
     const btnChat = document.getElementById('btn-ai-chat');
-    
+
     const activeClass = "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30";
     const inactiveClass = "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 border-transparent";
-    
+
     if (mode === 'assistant') {
         btnAssistant.className = `flex-1 py-2 rounded-lg text-xs font-bold transition-colors border ${activeClass}`;
         btnChat.className = `flex-1 py-2 rounded-lg text-xs font-bold transition-colors border ${inactiveClass}`;
@@ -574,7 +602,7 @@ window.App.chat.switchAIMode = (mode) => {
 window.App.chat.solveWithAI = async (msgContent, studentName) => {
     if (!window.App.chat.state.aiPanelOpen) window.App.chat.toggleAIPanel();
     window.App.chat.switchAIMode('assistant');
-    
+
     const container = document.getElementById('ai-messages-area');
     container.innerHTML = `
         <div class="bg-white dark:bg-[#1e293b] p-3 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm mb-4">
@@ -610,7 +638,7 @@ window.App.chat.solveWithAI = async (msgContent, studentName) => {
 
     try {
         await window.App.aiService.streamMessage(
-            [{ role: 'user', content: prompt }], 
+            [{ role: 'user', content: prompt }],
             (chunk) => {
                 fullResponse += chunk;
                 responseEl.innerText = fullResponse;
@@ -638,10 +666,10 @@ window.App.chat.sendToAI = async () => {
     const input = document.getElementById('ai-input-field');
     const text = input.value.trim();
     if (!text) return;
-    
+
     input.value = '';
     const container = document.getElementById('ai-messages-area');
-    
+
     container.insertAdjacentHTML('beforeend', `
         <div class="flex justify-end mb-4 animate-fade-in">
             <div class="bg-indigo-600 text-white px-4 py-2 rounded-l-xl rounded-tr-xl text-xs max-w-[85%] shadow-md">
@@ -649,7 +677,7 @@ window.App.chat.sendToAI = async () => {
             </div>
         </div>
     `);
-    
+
     const aiId = `ai-gen-${Date.now()}`;
     container.insertAdjacentHTML('beforeend', `
         <div class="flex gap-3 mb-4 animate-fade-in">
@@ -701,7 +729,7 @@ window.App.chat.switchChannel = async (cid, chId, force = false) => {
     if (!force && window.App.chat.state.activeChannelId === chId) return;
     window.App.chat.state.activeChannelId = chId;
     window.App.chat.state.editingMessageId = null;
-    
+
     // (V12.2) Marcar como leído si es un chat de soporte
     if (chId.startsWith(CHAT_CONFIG.SUPPORT_CHANNEL_PREFIX)) {
         const targetUid = chId.replace(CHAT_CONFIG.SUPPORT_CHANNEL_PREFIX, '');
@@ -709,7 +737,7 @@ window.App.chat.switchChannel = async (cid, chId, force = false) => {
             window.App.chat.state.readThreadIds.add(targetUid);
         }
     }
-    
+
     _updateSidebar(window.App.chat.state.communityData, window.App.chat.state.communityData.channels, chId);
 
     let channelName = "Cargando...", channelDesc = "", channelIcon = "fa-hashtag", headerImage = null, isSupport = false;
@@ -739,12 +767,12 @@ window.App.chat.switchChannel = async (cid, chId, force = false) => {
     }
 
     const titleEl = document.getElementById('header-title');
-    if(titleEl) titleEl.innerText = channelName;
+    if (titleEl) titleEl.innerText = channelName;
     const descEl = document.getElementById('header-desc');
-    if(descEl) descEl.innerText = channelDesc;
-    
+    if (descEl) descEl.innerText = channelDesc;
+
     const iconContainer = document.getElementById('header-icon-container');
-    if(iconContainer) {
+    if (iconContainer) {
         if (headerImage) {
             iconContainer.innerHTML = `<img src="${headerImage}" class="w-full h-full object-cover rounded-full">`;
             iconContainer.className = "w-10 h-10 rounded-full bg-white p-0.5 shadow-sm border border-slate-200 dark:border-slate-700 shrink-0";
@@ -790,7 +818,7 @@ window.App.chat.loadMessages = async (cid, chid, user) => {
     try {
         const allPosts = await App.api.getPosts(cid);
         const messages = allPosts.filter(p => p.channelId === chid).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        
+
         if (messages.length === 0) {
             const isSupport = chid.startsWith(CHAT_CONFIG.SUPPORT_CHANNEL_PREFIX);
             const emptyIcon = isSupport ? 'fa-hand-sparkles' : 'fa-comments';
@@ -809,20 +837,20 @@ window.App.chat.loadMessages = async (cid, chid, user) => {
         messages.forEach((m, idx) => {
             const dateStr = new Date(m.createdAt).toLocaleDateString();
             if (dateStr !== lastDate) {
-                html += `<div class="flex items-center my-6 select-none"><div class="h-px bg-slate-200 dark:bg-slate-800 flex-1"></div><span class="text-[10px] font-bold text-slate-400 px-3 uppercase tracking-widest bg-[#F1F5F9] dark:bg-[#0b1120] rounded-full">${new Date(m.createdAt).toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'})}</span><div class="h-px bg-slate-200 dark:bg-slate-800 flex-1"></div></div>`;
+                html += `<div class="flex items-center my-6 select-none"><div class="h-px bg-slate-200 dark:bg-slate-800 flex-1"></div><span class="text-[10px] font-bold text-slate-400 px-3 uppercase tracking-widest bg-[#F1F5F9] dark:bg-[#0b1120] rounded-full">${new Date(m.createdAt).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}</span><div class="h-px bg-slate-200 dark:bg-slate-800 flex-1"></div></div>`;
                 lastDate = dateStr;
             }
             const groupTimeout = isGlobalChannel ? 60000 : CHAT_CONFIG.GROUPING_TIMEOUT_MS;
             const prevMsg = messages[idx - 1];
             const isGrouped = prevMsg && prevMsg.authorId === m.authorId && (new Date(m.createdAt) - new Date(prevMsg.createdAt) < groupTimeout);
-            
+
             html += _renderMessageBubble(m, user, isGrouped, isGlobalChannel);
         });
-        
+
         container.innerHTML = html;
-        
+
         const scroller = document.getElementById('chat-scroller');
-        if(scroller) {
+        if (scroller) {
             scroller.style.scrollBehavior = 'auto';
             scroller.scrollTop = scroller.scrollHeight;
             setTimeout(() => scroller.style.scrollBehavior = 'smooth', 100);
@@ -835,8 +863,8 @@ function _renderMessageBubble(m, user, isGrouped, isGlobalChannel) {
     const isMe = m.authorId === user.uid;
     const isAdmin = m.author.role === 'admin';
     const isEditing = window.App.chat.state.editingMessageId === m.id;
-    const time = new Date(m.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    let alignRight = isMe; 
+    const time = new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let alignRight = isMe;
     if (isGlobalChannel) {
         if (isAdmin) alignRight = false;
         else alignRight = true;
@@ -865,7 +893,7 @@ function _renderMessageBubble(m, user, isGrouped, isGlobalChannel) {
 
     const content = Utils.parseMarkdown(m.content || '');
     const atts = _renderAttachments(m.attachments);
-    const canAction = user.role === 'admin'; 
+    const canAction = user.role === 'admin';
     const actions = canAction ? _renderMsgActions(m.communityId, m.id, m.content, m.author.name) : '';
 
     const avatarHtml = `<img src="${m.author.avatar}" class="w-8 h-8 rounded-full bg-gray-200 object-cover shadow-sm select-none" title="${m.author.name}">`;
@@ -905,7 +933,7 @@ function _renderMessageBubble(m, user, isGrouped, isGlobalChannel) {
 function _renderMsgActions(cid, pid, rawContent, authorName) {
     const safeContent = encodeURIComponent(rawContent);
     const safeName = encodeURIComponent(authorName || 'Alumno');
-    
+
     const aiBtn = `
         <button onclick="App.chat.solveWithAI('${safeContent}', '${safeName}')" class="w-6 h-6 flex items-center justify-center text-indigo-400 hover:text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 rounded-full transition-colors" title="Resolver con IA">
             <i class="fas fa-magic text-[10px]"></i>
@@ -921,7 +949,7 @@ function _renderMsgActions(cid, pid, rawContent, authorName) {
 }
 
 function _renderAttachments(atts) {
-    if(!atts || !atts.length) return '';
+    if (!atts || !atts.length) return '';
     const images = atts.filter(a => a.type === 'image');
     const files = atts.filter(a => a.type !== 'image');
     let html = '';
@@ -929,7 +957,7 @@ function _renderAttachments(atts) {
         html += `<div class="mt-2 grid grid-cols-2 gap-2 max-w-sm">${images.map(img => `<img src="${img.url}" class="rounded-lg border border-black/5 dark:border-white/10 cursor-zoom-in hover:opacity-90 max-h-40 w-full object-cover shadow-sm" onclick="window.open('${img.url}')">`).join('')}</div>`;
     }
     if (files.length > 0) {
-        html += `<div class="mt-2 space-y-1">${files.map(f => `<div class="flex items-center gap-3 p-2 bg-black/5 dark:bg-white/5 rounded-lg group/file cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors" onclick="window.open('${f.url}')"><div class="w-8 h-8 bg-white dark:bg-slate-700 rounded flex items-center justify-center text-indigo-500 shadow-sm"><i class="fas fa-file"></i></div><div class="flex-1 min-w-0"><div class="text-xs font-bold truncate opacity-90">${f.name}</div><div class="text-[9px] opacity-60">${Utils.formatBytes(f.size||0)}</div></div><i class="fas fa-download opacity-50 group-hover/file:opacity-100"></i></div>`).join('')}</div>`;
+        html += `<div class="mt-2 space-y-1">${files.map(f => `<div class="flex items-center gap-3 p-2 bg-black/5 dark:bg-white/5 rounded-lg group/file cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors" onclick="window.open('${f.url}')"><div class="w-8 h-8 bg-white dark:bg-slate-700 rounded flex items-center justify-center text-indigo-500 shadow-sm"><i class="fas fa-file"></i></div><div class="flex-1 min-w-0"><div class="text-xs font-bold truncate opacity-90">${f.name}</div><div class="text-[9px] opacity-60">${Utils.formatBytes(f.size || 0)}</div></div><i class="fas fa-download opacity-50 group-hover/file:opacity-100"></i></div>`).join('')}</div>`;
     }
     return html;
 }
@@ -960,7 +988,7 @@ window.App.chat.saveEdit = async (cid, pid) => {
 };
 
 window.App.chat.deleteMessage = async (cid, pid) => {
-    if(confirm("¿Estás seguro de eliminar este mensaje?")) {
+    if (confirm("¿Estás seguro de eliminar este mensaje?")) {
         await window.F.deleteDoc(window.F.doc(window.F.db, "posts", pid));
         App.chat.loadMessages(cid, window.App.chat.state.activeChannelId, App.state.currentUser);
     }
@@ -971,12 +999,12 @@ window.App.chat.createChannelPrompt = async (cid, category = "General") => {
     if (!name) return;
     const cleanId = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
     try {
-        await window.F.updateDoc(window.F.doc(window.F.db, "communities", cid), { 
-            channels: window.F.arrayUnion({ id: cleanId, name: name.trim(), type: 'text', category: category, createdAt: new Date().toISOString() }) 
+        await window.F.updateDoc(window.F.doc(window.F.db, "communities", cid), {
+            channels: window.F.arrayUnion({ id: cleanId, name: name.trim(), type: 'text', category: category, createdAt: new Date().toISOString() })
         });
         App.chat.state.communityData.channels.push({ id: cleanId, name: name.trim(), type: 'text', category: category });
         _updateSidebar(App.chat.state.communityData, App.chat.state.communityData.channels, App.chat.state.activeChannelId);
-    } catch(e) { App.ui.toast("Error", "error"); }
+    } catch (e) { App.ui.toast("Error", "error"); }
 };
 
 window.App.chat.openChannelManager = (cid, chid, name, currentCat) => {
@@ -993,24 +1021,24 @@ window.App.chat.saveChannelChanges = async () => {
     const chid = document.getElementById('cm-chid').value;
     const newName = document.getElementById('cm-name').value.trim();
     const newCat = document.getElementById('cm-cat').value.trim();
-    if(!newName || !newCat) return App.ui.toast("Campos requeridos", "warning");
+    if (!newName || !newCat) return App.ui.toast("Campos requeridos", "warning");
     const commData = App.chat.state.communityData;
-    const newChannels = commData.channels.map(c => { if(c.id === chid) return { ...c, name: newName, category: newCat }; return c; });
+    const newChannels = commData.channels.map(c => { if (c.id === chid) return { ...c, name: newName, category: newCat }; return c; });
     try {
         await window.F.updateDoc(window.F.doc(window.F.db, "communities", cid), { channels: newChannels });
         App.chat.state.communityData.channels = newChannels;
         App.ui.toast("Canal actualizado", "success");
         document.getElementById('channel-manager-modal').classList.add('hidden');
         _updateSidebar(App.chat.state.communityData, newChannels, App.chat.state.activeChannelId);
-        if(App.chat.state.activeChannelId === chid) {
+        if (App.chat.state.activeChannelId === chid) {
             document.getElementById('header-title').innerText = newName;
             document.getElementById('header-desc').innerText = newCat;
         }
-    } catch(e) { App.ui.toast("Error al guardar", "error"); }
+    } catch (e) { App.ui.toast("Error al guardar", "error"); }
 };
 
 window.App.chat.deleteChannel = async () => {
-    if(!confirm("¿Eliminar este canal y todo su historial?")) return;
+    if (!confirm("¿Eliminar este canal y todo su historial?")) return;
     const cid = document.getElementById('cm-cid').value;
     const chid = document.getElementById('cm-chid').value;
     const newChannels = App.chat.state.communityData.channels.filter(c => c.id !== chid);
@@ -1019,39 +1047,39 @@ window.App.chat.deleteChannel = async () => {
         App.chat.state.communityData.channels = newChannels;
         App.ui.toast("Canal eliminado", "success");
         document.getElementById('channel-manager-modal').classList.add('hidden');
-        if(App.chat.state.activeChannelId === chid) App.chat.switchChannel(cid, newChannels[0]?.id || 'general');
+        if (App.chat.state.activeChannelId === chid) App.chat.switchChannel(cid, newChannels[0]?.id || 'general');
         else _updateSidebar(App.chat.state.communityData, newChannels, App.chat.state.activeChannelId);
-    } catch(e) { App.ui.toast("Error al borrar", "error"); }
+    } catch (e) { App.ui.toast("Error al borrar", "error"); }
 };
 
 window.App.chat.renameCategory = async (cid, oldName) => {
     const newName = prompt(`Renombrar categoría "${oldName}" a:`, oldName);
     if (!newName || newName === oldName) return;
     const commData = App.chat.state.communityData;
-    const newChannels = commData.channels.map(c => { if(c.category === oldName) return { ...c, category: newName }; return c; });
+    const newChannels = commData.channels.map(c => { if (c.category === oldName) return { ...c, category: newName }; return c; });
     try {
         await window.F.updateDoc(window.F.doc(window.F.db, "communities", cid), { channels: newChannels });
         App.chat.state.communityData.channels = newChannels;
         App.ui.toast(`Categoría renombrada: ${newName}`, "success");
         _updateSidebar(App.chat.state.communityData, newChannels, App.chat.state.activeChannelId);
-    } catch(e) { App.ui.toast("Error al renombrar", "error"); }
+    } catch (e) { App.ui.toast("Error al renombrar", "error"); }
 };
 
 // (V12.1) NUEVA FUNCIÓN: ELIMINAR HILO DE SOPORTE
 window.App.chat.deleteSupportThread = async (cid, uid) => {
-    if(!confirm("¿Eliminar este chat con el alumno? Se borrará de tu lista.")) return;
+    if (!confirm("¿Eliminar este chat con el alumno? Se borrará de tu lista.")) return;
     try {
         await window.F.deleteDoc(window.F.doc(window.F.db, "communities", cid, "active_threads", uid));
-        
+
         // Si estábamos viendo ese chat, volver al global
         const currentId = `${CHAT_CONFIG.SUPPORT_CHANNEL_PREFIX}${uid}`;
         if (window.App.chat.state.activeChannelId === currentId) {
-             App.chat.switchSidebarTab('global');
-             const generalCh = window.App.chat.state.communityData.channels[0]?.id || 'general';
-             App.chat.switchChannel(cid, generalCh);
+            App.chat.switchSidebarTab('global');
+            const generalCh = window.App.chat.state.communityData.channels[0]?.id || 'general';
+            App.chat.switchChannel(cid, generalCh);
         }
         App.ui.toast("Chat eliminado de la lista", "success");
-    } catch(e) {
+    } catch (e) {
         console.error(e);
         App.ui.toast("Error al eliminar chat", "error");
     }
@@ -1067,10 +1095,10 @@ window.App.chat.handleSendMessage = async (e, cid, chid, isSupport) => {
     const txt = input.value.trim();
     const atts = window.App.chat.state.pendingAttachments;
 
-    if(!txt && atts.length === 0) return;
+    if (!txt && atts.length === 0) return;
 
-    input.value = ''; 
-    window.App.chat.state.pendingAttachments = []; 
+    input.value = '';
+    window.App.chat.state.pendingAttachments = [];
     document.getElementById('attachments-preview').innerHTML = '';
     document.getElementById('attachments-preview').classList.add('hidden');
 
@@ -1086,22 +1114,22 @@ window.App.chat.handleSendMessage = async (e, cid, chid, isSupport) => {
         };
 
         await App.api.createPost({
-            communityId: cid, 
-            channelId: chid, 
-            content: txt, 
+            communityId: cid,
+            channelId: chid,
+            content: txt,
             attachments: uploaded,
-            type: uploaded.length > 0 ? 'media' : 'text', 
-            authorId: user.uid, 
-            author: cleanAuthor, 
+            type: uploaded.length > 0 ? 'media' : 'text',
+            authorId: user.uid,
+            author: cleanAuthor,
             createdAt: new Date().toISOString()
         });
 
         App.chat.loadMessages(cid, chid, user);
 
-    } catch(e) { 
-        console.error("Error crítico enviando mensaje:", e); 
+    } catch (e) {
+        console.error("Error crítico enviando mensaje:", e);
         App.ui.toast("Error enviando mensaje", "error");
-        return; 
+        return;
     }
 
     if (isSupport) {
@@ -1117,9 +1145,9 @@ async function _syncSupportThreadV11(cid, user) {
             avatar: user.avatar || '',
             updatedAt: new Date().toISOString()
         };
-        
+
         await window.F.setDoc(
-            window.F.doc(window.F.db, "communities", cid, "active_threads", user.uid), 
+            window.F.doc(window.F.db, "communities", cid, "active_threads", user.uid),
             threadData,
             { merge: true }
         );
@@ -1148,11 +1176,11 @@ window.App.chat.handleFileSelect = (e) => {
 
 window.App.chat.setupDragAndDrop = () => {
     const zone = document.body, overlay = document.getElementById('drag-overlay');
-    let counter = 0; if(!overlay) return;
-    zone.addEventListener('dragenter', e => { e.preventDefault(); counter++; overlay.classList.remove('hidden'); setTimeout(()=>overlay.classList.remove('opacity-0'),10); });
-    zone.addEventListener('dragleave', e => { e.preventDefault(); counter--; if(counter===0) { overlay.classList.add('opacity-0'); setTimeout(()=>overlay.classList.add('hidden'),300); } });
+    let counter = 0; if (!overlay) return;
+    zone.addEventListener('dragenter', e => { e.preventDefault(); counter++; overlay.classList.remove('hidden'); setTimeout(() => overlay.classList.remove('opacity-0'), 10); });
+    zone.addEventListener('dragleave', e => { e.preventDefault(); counter--; if (counter === 0) { overlay.classList.add('opacity-0'); setTimeout(() => overlay.classList.add('hidden'), 300); } });
     zone.addEventListener('dragover', e => e.preventDefault());
-    zone.addEventListener('drop', e => { e.preventDefault(); counter=0; overlay.classList.add('hidden'); if(e.dataTransfer.files.length) window.App.chat.handleFileSelect({target:{files:e.dataTransfer.files}}); });
+    zone.addEventListener('drop', e => { e.preventDefault(); counter = 0; overlay.classList.add('hidden'); if (e.dataTransfer.files.length) window.App.chat.handleFileSelect({ target: { files: e.dataTransfer.files } }); });
 };
 
 // ============================================================================
@@ -1184,15 +1212,15 @@ window.App.chat.saveSettings = async () => {
         App.ui.toast("Comunidad actualizada", "success");
         App.chat.closeSettings();
         const header = document.querySelector('#chat-sidebar span.font-bold');
-        if(header) header.innerText = updates.name;
-    } catch(e) { App.ui.toast("Error", "error"); }
+        if (header) header.innerText = updates.name;
+    } catch (e) { App.ui.toast("Error", "error"); }
 };
 
 window.App.chat.deleteCommunity = async () => {
     const id = document.getElementById('edit-comm-id').value;
     const name = document.getElementById('edit-comm-name').value;
-    if(prompt(`Escribe "${name}" para confirmar borrado:`) !== name) return App.ui.toast("Cancelado", "info");
-    try { await window.F.deleteDoc(window.F.doc(window.F.db, "communities", id)); window.location.hash = '#feed'; } catch(e) { App.ui.toast("Error eliminando", "error"); }
+    if (prompt(`Escribe "${name}" para confirmar borrado:`) !== name) return App.ui.toast("Cancelado", "info");
+    try { await window.F.deleteDoc(window.F.doc(window.F.db, "communities", id)); window.location.hash = '#feed'; } catch (e) { App.ui.toast("Error eliminando", "error"); }
 };
 
 function _renderSettingsModal() {

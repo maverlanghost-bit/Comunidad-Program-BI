@@ -18,11 +18,11 @@ window.App.ai.state = {
     currentConversationId: null,
     isGenerating: false,
     userScrolledUp: false,
-    modelName: 'Grok 4.1', 
+    modelName: 'Grok 4.1',
     pendingFiles: [],
     modes: { tutor: false, canvas: false },
     isMenuOpen: false,
-    isModelMenuOpen: false, 
+    isModelMenuOpen: false,
     chatToDelete: null
 };
 
@@ -45,7 +45,7 @@ const _dependenciesPromise = new Promise((resolve) => {
     script.src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js";
     script.onload = () => {
         const renderer = new marked.Renderer();
-        renderer.code = function(code, language) {
+        renderer.code = function (code, language) {
             return `
             <div class="my-5 rounded-xl overflow-hidden bg-[#0d1117] border border-white/10 shadow-lg font-mono text-sm relative group/code w-full ring-1 ring-white/5">
                 <div class="flex items-center justify-between px-4 py-2.5 bg-white/5 border-b border-white/5 backdrop-blur-md">
@@ -85,7 +85,7 @@ const _waitForDependencies = async () => {
     let attempts = 0;
     while (attempts < 50) { // 5 segundos máx
         const isReady = window.F && window.F.auth && window.F.auth.currentUser && window.App && window.App.aiService;
-        
+
         if (isReady) {
             return window.F.auth.currentUser;
         }
@@ -98,7 +98,7 @@ const _waitForDependencies = async () => {
 window.App.ai.render = async (container, conversationId = null) => {
     // 1. Verificar Sesión y Dependencias
     const user = await _waitForDependencies();
-    
+
     if (!user) {
         container.innerHTML = `<div class="flex items-center justify-center h-screen bg-slate-50 dark:bg-[#0f172a] text-slate-400 font-medium">Iniciando sesión...</div>`;
         return;
@@ -107,14 +107,14 @@ window.App.ai.render = async (container, conversationId = null) => {
     // 2. Inicializar Estructura Global
     window.App.state = window.App.state || {};
     window.App.state.cache = window.App.state.cache || {};
-    
+
     if (typeof window.App.state.cache.aiConversations === 'undefined') {
         window.App.state.cache.aiConversations = null;
     }
 
     // 3. Loader Visual
     container.innerHTML = `<div class="flex items-center justify-center h-screen bg-white dark:bg-[#0f172a]"><div class="flex flex-col items-center gap-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800 dark:border-white"></div></div></div>`;
-    
+
     await _dependenciesPromise;
 
     // 4. Estado Local
@@ -145,8 +145,8 @@ window.App.ai.render = async (container, conversationId = null) => {
     container.innerHTML = `
     <div class="fixed inset-0 z-0 w-full h-full bg-[#f8f9fa] dark:bg-[#050505] overflow-hidden flex text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 relative group/shell">
         
-        <!-- SIDEBAR (Absolute Overlay) -->
-        <div id="ai-sidebar-wrapper" class="absolute top-0 left-0 h-full z-50 pointer-events-auto">${sidebarHTML}</div>
+        <!-- SIDEBAR (Only visible on desktop, hidden on mobile) -->
+        <div id="ai-sidebar-wrapper" class="absolute top-0 left-0 h-full z-50 pointer-events-auto hidden lg:block">${sidebarHTML}</div>
 
         <!-- MAIN VIEWPORT (Centered) -->
         <main id="ai-viewport" class="w-full h-full flex flex-col relative transition-all duration-300 ml-0">
@@ -174,19 +174,20 @@ window.App.ai.render = async (container, conversationId = null) => {
                 </div>
 
                 <!-- TOP BAR -->
-                <header class="absolute top-0 left-0 w-full h-16 flex items-center justify-between px-6 z-20 pointer-events-auto pl-24 md:pl-6 transition-[padding]">
-                    <div class="flex items-center gap-4">
-                        <button class="md:hidden p-2 text-slate-500 hover:text-indigo-500 transition-colors" onclick="document.getElementById('sidebar').classList.toggle('hidden');">
+                <header class="absolute top-0 left-0 w-full h-14 sm:h-16 flex items-center justify-between px-4 sm:px-6 z-20 pointer-events-auto transition-[padding]">
+                    <div class="flex items-center gap-3 sm:gap-4">
+                        <!-- Mobile menu button to open main sidebar -->
+                        <button class="lg:hidden p-2 text-slate-500 hover:text-indigo-500 transition-colors" onclick="document.body.classList.toggle('mobile-menu-open')">
                             <i class="fas fa-bars text-lg"></i>
                         </button>
                         
-                        <!-- MODEL SELECTOR (MODIFICADO: ONCLICK) -->
+                        <!-- MODEL SELECTOR -->
                         <div class="relative">
-                            <button onclick="App.ai.toggleModelMenu(event)" id="ai-model-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-slate-700 dark:text-slate-200 font-semibold text-sm select-none">
+                            <button onclick="App.ai.toggleModelMenu(event)" id="ai-model-btn" class="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm select-none">
                                 <span>${window.App.ai.state.modelName}</span>
                                 <i class="fas fa-chevron-down text-xs text-slate-400 transition-transform duration-200" id="ai-model-arrow"></i>
                             </button>
-                            <!-- MENU DROPDOWN (SIN HOVER, CLASE HIDDEN CONTROLADA) -->
+                            <!-- MENU DROPDOWN -->
                             <div id="ai-model-menu" class="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-[#1a1f2e] rounded-xl shadow-xl border border-slate-100 dark:border-white/5 py-1 hidden animate-scale-in origin-top-left z-50">
                                 ${AI_MODELS.map(m => `
                                     <div class="px-4 py-2.5 text-xs font-medium flex items-center justify-between ${m.disabled ? 'text-slate-400 cursor-not-allowed opacity-60' : 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 cursor-default'}">
@@ -206,31 +207,31 @@ window.App.ai.render = async (container, conversationId = null) => {
                 </header>
 
                 <!-- SCROLL AREA -->
-                <div id="ai-scroller" class="flex-1 overflow-y-auto custom-scrollbar scroll-smooth pt-20 pb-4 px-4 pointer-events-auto">
+                <div id="ai-scroller" class="flex-1 overflow-y-auto custom-scrollbar scroll-smooth pt-16 sm:pt-20 pb-4 px-3 sm:px-4 pointer-events-auto">
                     <div id="ai-content" class="w-full max-w-3xl mx-auto min-h-full flex flex-col transition-all duration-300 justify-end pb-10">
                         <!-- Content -->
                     </div>
                 </div>
 
                 <!-- INPUT DOCK -->
-                <div class="w-full shrink-0 z-30 pb-6 pt-2 bg-gradient-to-t from-[#f8f9fa] dark:from-[#050505] via-[#f8f9fa] dark:via-[#050505] to-transparent transition-all duration-300 pointer-events-auto">
-                    <div class="w-full max-w-3xl mx-auto px-4 relative group/dock">
+                <div class="w-full shrink-0 z-30 pb-4 sm:pb-6 pt-2 bg-gradient-to-t from-[#f8f9fa] dark:from-[#050505] via-[#f8f9fa] dark:via-[#050505] to-transparent transition-all duration-300 pointer-events-auto">
+                    <div class="w-full max-w-3xl mx-auto px-3 sm:px-4 relative group/dock">
                         
                         <button id="scroll-btn" onclick="App.ai.scrollToBottom(true)" class="absolute -top-16 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 hidden animate-bounce hover:scale-110 transition-transform z-10 cursor-pointer">
                             <i class="fas fa-arrow-down text-xs"></i>
                         </button>
 
-                        <div class="relative flex items-end gap-3">
+                        <div class="relative flex items-end gap-2 sm:gap-3">
                             <!-- GLOW EFFECT -->
                             <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-[2rem] opacity-0 group-focus-within/dock:opacity-20 transition duration-1000 blur-xl -z-10"></div>
 
                             <!-- (+) BTN RETRO -->
                             <div class="relative z-50 shrink-0">
-                                <button onclick="App.ai.togglePlusMenu(event)" class="w-12 h-12 rounded-[1.2rem] bg-white dark:bg-[#151b28] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-white/10 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 group/plus cursor-pointer">
-                                    <i class="fas fa-plus text-lg transition-transform duration-300 group-hover/plus:rotate-90"></i>
+                                <button onclick="App.ai.togglePlusMenu(event)" class="w-10 h-10 sm:w-12 sm:h-12 rounded-[1rem] sm:rounded-[1.2rem] bg-white dark:bg-[#151b28] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-white/10 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 group/plus cursor-pointer">
+                                    <i class="fas fa-plus text-base sm:text-lg transition-transform duration-300 group-hover/plus:rotate-90"></i>
                                 </button>
                                 <!-- MENÚ -->
-                                <div id="ai-plus-menu" class="hidden absolute bottom-full left-0 mb-4 w-72 bg-white dark:bg-[#151b28] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 p-2 transform origin-bottom-left transition-all duration-200 animate-scale-in flex-col gap-1 overflow-hidden ring-1 ring-black/5">
+                                <div id="ai-plus-menu" class="hidden absolute bottom-full left-0 mb-4 w-64 sm:w-72 bg-white dark:bg-[#151b28] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 p-2 transform origin-bottom-left transition-all duration-200 animate-scale-in flex-col gap-1 overflow-hidden ring-1 ring-black/5">
                                     <div onclick="App.ai.toggleMode('tutor', event)" class="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer select-none group/option transition-colors">
                                         <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900/30"><i class="fas fa-graduation-cap"></i></div><div class="flex flex-col"><span class="text-sm font-bold text-slate-700 dark:text-slate-200">Modo Tutor</span><span class="text-[10px] text-slate-400">Explicaciones paso a paso</span></div></div>
                                         <div id="switch-tutor" class="w-10 h-6 bg-slate-200 dark:bg-slate-700 rounded-full relative transition-colors duration-300 shadow-inner"><div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-transform duration-300 shadow-sm"></div></div>
@@ -246,19 +247,19 @@ window.App.ai.render = async (container, conversationId = null) => {
                                 </div>
                             </div>
                             <!-- TEXTBOX -->
-                            <div class="flex-1 relative bg-white dark:bg-[#151b28] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 flex flex-col overflow-hidden transition-all duration-300 group/area ring-1 ring-black/5 dark:ring-white/5">
-                                <div id="file-preview-area" class="hidden px-5 pt-4 pb-2 flex gap-3 overflow-x-auto custom-scrollbar border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20"></div>
+                            <div class="flex-1 relative bg-white dark:bg-[#151b28] rounded-[1.2rem] sm:rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 flex flex-col overflow-hidden transition-all duration-300 group/area ring-1 ring-black/5 dark:ring-white/5">
+                                <div id="file-preview-area" class="hidden px-3 sm:px-5 pt-3 sm:pt-4 pb-2 flex gap-3 overflow-x-auto custom-scrollbar border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20"></div>
                                 <div class="flex items-end pr-2">
-                                    <textarea id="ai-input" rows="1" class="w-full bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 px-5 py-3.5 resize-none max-h-48 custom-scrollbar text-[15px] leading-relaxed placeholder:text-slate-400 dark:placeholder:text-slate-600 font-medium" placeholder="Escribe un mensaje..." onkeydown="App.ai.handleKey(event)" oninput="this.style.height='auto'; this.style.height = Math.min(this.scrollHeight, 192) + 'px'"></textarea>
-                                    <div class="flex items-center gap-2 pb-2.5 shrink-0">
+                                    <textarea id="ai-input" rows="1" class="w-full bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 px-3 sm:px-5 py-3 sm:py-3.5 resize-none max-h-48 custom-scrollbar text-sm sm:text-[15px] leading-relaxed placeholder:text-slate-400 dark:placeholder:text-slate-600 font-medium" placeholder="Escribe un mensaje..." onkeydown="App.ai.handleKey(event)" oninput="this.style.height='auto'; this.style.height = Math.min(this.scrollHeight, 192) + 'px'"></textarea>
+                                    <div class="flex items-center gap-2 pb-2 sm:pb-2.5 shrink-0">
                                         <input type="file" id="ai-file-upload" class="hidden" multiple onchange="App.ai.handleFileSelect(event)">
                                         <span id="ai-counter" class="text-[10px] text-slate-300 dark:text-slate-600 font-mono hidden sm:block opacity-0 transition-opacity w-10 text-right select-none">0/4k</span>
-                                        <button type="submit" id="ai-send-btn" onclick="App.ai.handleSubmit(event)" class="w-9 h-9 flex items-center justify-center bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 disabled:opacity-50 transition-all shadow-sm cursor-pointer ml-1"><i class="fas fa-arrow-up text-xs"></i></button>
+                                        <button type="submit" id="ai-send-btn" onclick="App.ai.handleSubmit(event)" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-black dark:bg-white text-white dark:text-black rounded-xl hover:opacity-90 disabled:opacity-50 transition-all shadow-sm cursor-pointer ml-1"><i class="fas fa-arrow-up text-xs"></i></button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <p class="text-center text-[10px] text-slate-400 dark:text-slate-600 mt-2 font-medium opacity-50 select-none">El asistente puede cometer errores. Verifica la información importante.</p>
+                        <p class="text-center text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-600 mt-2 font-medium opacity-50 select-none">El asistente puede cometer errores. Verifica la información importante.</p>
                     </div>
                 </div>
             </div>
@@ -300,12 +301,12 @@ window.App.ai.toggleModelMenu = (e) => {
 
     if (isOpen) {
         menu.classList.add('hidden');
-        if(arrow) arrow.classList.remove('rotate-180');
+        if (arrow) arrow.classList.remove('rotate-180');
         window.App.ai.state.isModelMenuOpen = false;
         document.removeEventListener('click', _closeModelMenuOnClickOutside);
     } else {
         menu.classList.remove('hidden');
-        if(arrow) arrow.classList.add('rotate-180');
+        if (arrow) arrow.classList.add('rotate-180');
         window.App.ai.state.isModelMenuOpen = true;
         // Delay pequeño para evitar cierre inmediato
         setTimeout(() => document.addEventListener('click', _closeModelMenuOnClickOutside), 10);
@@ -319,7 +320,7 @@ function _closeModelMenuOnClickOutside(e) {
     if (menu && !menu.contains(e.target) && !btn.contains(e.target)) {
         menu.classList.add('hidden');
         const arrow = document.getElementById('ai-model-arrow');
-        if(arrow) arrow.classList.remove('rotate-180');
+        if (arrow) arrow.classList.remove('rotate-180');
         window.App.ai.state.isModelMenuOpen = false;
         document.removeEventListener('click', _closeModelMenuOnClickOutside);
     }
@@ -353,15 +354,15 @@ window.App.ai.toggleMode = (mode, e) => {
     if (e) e.stopPropagation();
     const currentState = window.App.ai.state.modes[mode];
     window.App.ai.state.modes[mode] = !currentState;
-    
+
     const switchEl = document.getElementById(`switch-${mode}`);
     const knobEl = switchEl.querySelector('div');
-    
+
     if (!currentState) {
         switchEl.classList.remove('bg-slate-200', 'dark:bg-slate-700');
         switchEl.classList.add('bg-indigo-500');
         knobEl.classList.add('translate-x-4');
-        if(window.App.ui && window.App.ui.toast) App.ui.toast(`Modo ${mode} activado`, 'success');
+        if (window.App.ui && window.App.ui.toast) App.ui.toast(`Modo ${mode} activado`, 'success');
     } else {
         switchEl.classList.add('bg-slate-200', 'dark:bg-slate-700');
         switchEl.classList.remove('bg-indigo-500');
@@ -398,12 +399,12 @@ window.App.ai.confirmDelete = async () => {
     if (!chatId) return;
     App.ai.closeDeleteModal();
     const user = App.state.currentUser;
-    
+
     try {
-        if(App.aiService && App.aiService.deleteConversation) {
+        if (App.aiService && App.aiService.deleteConversation) {
             // 1. Llamada al Backend (Firestore)
             await App.aiService.deleteConversation(user.uid, chatId);
-            
+
             // 2. [FIX] Actualización Optimista de la Caché Local
             if (window.App.state.cache.aiConversations) {
                 window.App.state.cache.aiConversations = window.App.state.cache.aiConversations.filter(c => c.id !== chatId);
@@ -413,14 +414,14 @@ window.App.ai.confirmDelete = async () => {
             if (window.App.ai.state.currentConversationId === chatId) {
                 App.ai.newChat();
             } else {
-                window.App.ai.triggerSidebarUpdate(); 
+                window.App.ai.triggerSidebarUpdate();
             }
-            
-            if(window.App.ui && window.App.ui.toast) App.ui.toast("Conversación eliminada", "success");
+
+            if (window.App.ui && window.App.ui.toast) App.ui.toast("Conversación eliminada", "success");
         }
     } catch (e) {
         console.error(e);
-        if(window.App.ui && window.App.ui.toast) App.ui.toast("Error al eliminar", "error");
+        if (window.App.ui && window.App.ui.toast) App.ui.toast("Error al eliminar", "error");
     }
 };
 
@@ -438,7 +439,7 @@ window.App.ai.handleKey = (e) => {
 window.App.ai.handleSubmit = async (e) => {
     if (e) e.preventDefault();
     if (window.App.ai.state.isGenerating) {
-        if(App.aiService && App.aiService.stopGeneration) App.aiService.stopGeneration();
+        if (App.aiService && App.aiService.stopGeneration) App.aiService.stopGeneration();
         _setLoadingState(false);
         return;
     }
@@ -461,10 +462,10 @@ window.App.ai.handleSubmit = async (e) => {
 
     input.value = '';
     input.style.height = 'auto';
-    window.App.ai.state.pendingFiles = []; 
-    App.ai.renderFilePreviews(); 
+    window.App.ai.state.pendingFiles = [];
+    App.ai.renderFilePreviews();
     _setLoadingState(true);
-    
+
     container.insertAdjacentHTML('beforeend', _renderMessage('user', text, files));
     App.ai.scrollToBottom(true);
 
@@ -476,11 +477,11 @@ window.App.ai.handleSubmit = async (e) => {
             const title = await App.aiService.generateTitle(text || "Consulta");
             conversationId = await App.aiService.createConversation(userId, title);
             window.App.ai.state.currentConversationId = conversationId; // Actualizar estado global
-            
+
             // TRIGGER UPDATE: Actualización reactiva del sidebar
             window.App.ai.triggerSidebarUpdate();
-            
-            historyForStream = [{ role: 'user', content: text }]; 
+
+            historyForStream = [{ role: 'user', content: text }];
         } else {
             const dbHistory = await App.aiService.getMessages(userId, conversationId);
             historyForStream = dbHistory.map(m => ({ role: m.role, content: m.content }));
@@ -503,7 +504,7 @@ window.App.ai.handleSubmit = async (e) => {
         let fullResponse = "";
 
         await App.aiService.streamMessage(
-            historyForStream, 
+            historyForStream,
             (chunk) => {
                 fullResponse += chunk;
                 if (window.marked) {
@@ -521,7 +522,7 @@ window.App.ai.handleSubmit = async (e) => {
                     // 2. FIX DE PERSISTENCIA: Usar ID capturado y validar guardado
                     // REDUNDANCIA: Si por alguna razón activeConversationId es null (improbable), usar el global.
                     const targetId = activeConversationId || window.App.ai.state.currentConversationId;
-                    
+
                     if (targetId) {
                         try {
                             console.log(`[AI VIEW] Guardando respuesta en chat: ${targetId}`);
@@ -529,10 +530,10 @@ window.App.ai.handleSubmit = async (e) => {
                         } catch (saveErr) {
                             console.error("[AI VIEW] Error crítico guardando respuesta:", saveErr);
                             // Opcional: Mostrar toast de error si falla la BD
-                            if(window.App.ui && window.App.ui.toast) App.ui.toast("Error guardando respuesta", "warning");
+                            if (window.App.ui && window.App.ui.toast) App.ui.toast("Error guardando respuesta", "warning");
                         }
                     } else {
-                         console.error("[AI VIEW] Error Fatal: No hay ID de conversación para guardar.");
+                        console.error("[AI VIEW] Error Fatal: No hay ID de conversación para guardar.");
                     }
                 }
                 _setLoadingState(false);
@@ -541,7 +542,7 @@ window.App.ai.handleSubmit = async (e) => {
     } catch (err) {
         console.error(err);
         _setLoadingState(false);
-        if(window.App.ui && window.App.ui.toast) App.ui.toast("Error de conexión", "error");
+        if (window.App.ui && window.App.ui.toast) App.ui.toast("Error de conexión", "error");
     }
 };
 
@@ -595,7 +596,7 @@ window.App.ai.syncSidebarData = async (userId) => {
 window.App.ai.triggerSidebarUpdate = () => {
     const event = new CustomEvent('ai:state:changed');
     window.dispatchEvent(event);
-    
+
     const wrapper = document.getElementById('ai-sidebar-wrapper');
     if (wrapper && window.App.sidebar && window.App.sidebar.render) {
         wrapper.innerHTML = window.App.sidebar.render('ai');
@@ -628,17 +629,17 @@ function _renderMessage(role, content, files = []) {
     if (files.length > 0) {
         filesHtml = `<div class="flex flex-wrap gap-2 mb-3 ${isUser ? 'justify-end' : ''}">
             ${files.map(f => {
-                const isImg = f.type && f.type.startsWith('image/');
-                const url = f.previewUrl || '#'; 
-                return isImg 
-                    ? `<div class="w-32 h-32 rounded-xl overflow-hidden border border-black/5 dark:border-white/10 shadow-sm relative group cursor-pointer bg-slate-100 dark:bg-white/5">
+            const isImg = f.type && f.type.startsWith('image/');
+            const url = f.previewUrl || '#';
+            return isImg
+                ? `<div class="w-32 h-32 rounded-xl overflow-hidden border border-black/5 dark:border-white/10 shadow-sm relative group cursor-pointer bg-slate-100 dark:bg-white/5">
                         ${url !== '#' ? `<img src="${url}" class="w-full h-full object-cover">` : `<div class="flex items-center justify-center h-full text-slate-400"><i class="fas fa-image"></i></div>`}
                       </div>`
-                    : `<div class="px-4 py-3 bg-white dark:bg-[#1e293b] rounded-xl flex items-center gap-3 text-xs font-mono border border-black/5 dark:border-white/5 shadow-sm text-slate-600 dark:text-slate-300">
+                : `<div class="px-4 py-3 bg-white dark:bg-[#1e293b] rounded-xl flex items-center gap-3 text-xs font-mono border border-black/5 dark:border-white/5 shadow-sm text-slate-600 dark:text-slate-300">
                         <div class="w-8 h-8 rounded bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-500"><i class="fas fa-file-code"></i></div>
                         <span>${f.name}</span>
                        </div>`;
-            }).join('')}
+        }).join('')}
         </div>`;
     }
 
@@ -758,14 +759,14 @@ window.App.ai.handleFileSelect = (e) => {
 window.App.ai.processFiles = (files) => {
     const current = window.App.ai.state.pendingFiles;
     if (current.length + files.length > 5) {
-        if(window.App.ui && window.App.ui.toast) App.ui.toast("Máximo 5 archivos", "warning");
+        if (window.App.ui && window.App.ui.toast) App.ui.toast("Máximo 5 archivos", "warning");
         return;
     }
-    files.forEach(f => window.App.ai.state.pendingFiles.push({ 
-        file: f, 
-        id: Date.now()+Math.random(), 
-        previewUrl: URL.createObjectURL(f), 
-        type: f.type 
+    files.forEach(f => window.App.ai.state.pendingFiles.push({
+        file: f,
+        id: Date.now() + Math.random(),
+        previewUrl: URL.createObjectURL(f),
+        type: f.type
     }));
     App.ai.renderFilePreviews();
 };
@@ -800,28 +801,28 @@ window.App.ai.setupDragAndDrop = () => {
     const zone = document.getElementById('ai-drop-zone');
     const overlay = document.getElementById('ai-drag-overlay');
     let counter = 0;
-    if(!zone || !overlay) return;
+    if (!zone || !overlay) return;
 
-    zone.addEventListener('dragenter', e => { e.preventDefault(); counter++; overlay.classList.remove('hidden'); setTimeout(()=>overlay.classList.remove('opacity-0'),10); });
-    zone.addEventListener('dragleave', e => { e.preventDefault(); counter--; if(counter<=0) { overlay.classList.add('opacity-0'); setTimeout(()=>overlay.classList.add('hidden'),300); counter=0; } });
+    zone.addEventListener('dragenter', e => { e.preventDefault(); counter++; overlay.classList.remove('hidden'); setTimeout(() => overlay.classList.remove('opacity-0'), 10); });
+    zone.addEventListener('dragleave', e => { e.preventDefault(); counter--; if (counter <= 0) { overlay.classList.add('opacity-0'); setTimeout(() => overlay.classList.add('hidden'), 300); counter = 0; } });
     zone.addEventListener('dragover', e => e.preventDefault());
-    zone.addEventListener('drop', e => { 
-        e.preventDefault(); counter=0; overlay.classList.add('opacity-0'); setTimeout(()=>overlay.classList.add('hidden'),300);
-        if(e.dataTransfer.files.length) App.ai.processFiles(Array.from(e.dataTransfer.files));
+    zone.addEventListener('drop', e => {
+        e.preventDefault(); counter = 0; overlay.classList.add('opacity-0'); setTimeout(() => overlay.classList.add('hidden'), 300);
+        if (e.dataTransfer.files.length) App.ai.processFiles(Array.from(e.dataTransfer.files));
     });
 };
 
-window.App.ai.newChat = () => { 
+window.App.ai.newChat = () => {
     window.App.ai.state.currentConversationId = null; // Reiniciar ID para limpiar estado
-    window.location.hash = '#ai'; 
+    window.location.hash = '#ai';
     const root = document.getElementById('ai-root') || document.querySelector('main');
-    if(root) App.ai.render(root); 
+    if (root) App.ai.render(root);
 };
 
-window.App.ai.scrollToBottom = (force) => { 
-    if(window.App.ai.state.userScrolledUp && !force) return; 
-    const s = document.getElementById('ai-scroller'); 
-    if(s) s.scrollTo({top: s.scrollHeight, behavior: 'smooth'}); 
+window.App.ai.scrollToBottom = (force) => {
+    if (window.App.ai.state.userScrolledUp && !force) return;
+    const s = document.getElementById('ai-scroller');
+    if (s) s.scrollTo({ top: s.scrollHeight, behavior: 'smooth' });
 };
 
 window.App.ai.copyCode = (btn) => {
@@ -830,19 +831,19 @@ window.App.ai.copyCode = (btn) => {
         navigator.clipboard.writeText(content);
         const span = btn.querySelector('span');
         const icon = btn.querySelector('i');
-        if(span) span.innerText = 'Copiado!';
+        if (span) span.innerText = 'Copiado!';
         icon.className = 'fas fa-check text-emerald-500';
         setTimeout(() => {
             icon.className = 'far fa-copy';
-            if(span) span.innerText = 'Copiar';
+            if (span) span.innerText = 'Copiar';
         }, 2000);
-    } catch(e) { console.error(e); }
+    } catch (e) { console.error(e); }
 };
 
 window.App.ai.copyText = (btn) => {
     try {
         const text = btn.parentElement.parentElement.querySelector('.prose').innerText;
         navigator.clipboard.writeText(text);
-        if(window.App.ui && window.App.ui.toast) App.ui.toast("Texto copiado", "success");
-    } catch(e) { console.error(e); }
+        if (window.App.ui && window.App.ui.toast) App.ui.toast("Texto copiado", "success");
+    } catch (e) { console.error(e); }
 };
