@@ -24,8 +24,8 @@ if (!window.YT) {
 }
 
 // Estado Local
-window.App.currentFeed = []; 
-window.liveInterval = null; 
+window.App.currentFeed = [];
+window.liveInterval = null;
 window.trialInterval = null;
 window.App.communityState = {
     isEditing: false,
@@ -102,12 +102,12 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
 
     // Trigger Sidebar Context (FIX V61.5)
     if (typeof window.App.renderSidebar === 'function') {
-        await window.App.renderSidebar(cid); 
+        await window.App.renderSidebar(cid);
     }
 
     // 3. Cargar Contenido Específico
     const container = document.getElementById('community-content');
-    if(container) container.scrollTop = 0;
+    if (container) container.scrollTop = 0;
 
     switch (activeTab) {
         case 'inicio':
@@ -115,16 +115,16 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
             container.className = "flex-1 w-full max-w-[1200px] mx-auto animate-fade-in relative z-0 p-6 md:p-8 block";
             await _renderFeedTab(container, community, user);
             break;
-            
+
         case 'clases':
             container.className = "flex-1 w-full flex flex-col animate-fade-in relative z-0 bg-white dark:bg-[#0f172a] min-h-[600px]";
-            container.innerHTML = ''; 
+            container.innerHTML = '';
             if (App.lms) {
                 if (extraParam) {
                     App.lms.renderPlayer(container, community, extraParam, user, user.role === 'admin');
                 } else {
                     const catalogWrapper = document.createElement('div');
-                    catalogWrapper.className = "w-full h-full"; 
+                    catalogWrapper.className = "w-full h-full";
                     container.appendChild(catalogWrapper);
                     App.lms.renderCatalog(catalogWrapper, community, user, user.role === 'admin');
                 }
@@ -132,12 +132,12 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
                 container.innerHTML = `<div class="p-20 text-center text-slate-400">Módulo LMS no cargado.</div>`;
             }
             break;
-            
+
         case 'live':
             container.className = "flex-1 w-full max-w-[1200px] mx-auto animate-fade-in relative z-0 p-6 md:p-8 block";
             await _renderLiveTab(container, community, user);
             break;
-            
+
         default:
             container.className = "flex-1 w-full max-w-[1200px] mx-auto animate-fade-in relative z-0 p-6 md:p-8 block";
             await _renderFeedTab(container, community, user);
@@ -152,66 +152,46 @@ function _renderCommunityHeader(c, activeTab, user) {
     const isMember = (user.joinedCommunities || []).includes(c.id);
     const isAdmin = user.role === 'admin';
 
-    // Estilos Zen para Tabs
-    const tabInactive = "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-6 transition-all text-sm h-full flex items-center";
-    const tabActive = "text-[#1890ff] font-bold border-b-2 border-[#1890ff] px-3 py-6 text-sm h-full flex items-center";
-
-    const getTabClass = (tabName) => {
-        if (activeTab === 'comunidad' && tabName === 'inicio') return tabActive;
-        return activeTab === tabName ? tabActive : tabInactive;
-    };
-
     // Lógica de Identidad Visual
     const hasLogo = !!c.logoUrl;
     const showTitle = c.showTitle !== false; // Default true
 
     return `
-        <div class="max-w-[1200px] w-full mx-auto px-6">
-            <div class="flex items-center justify-between h-[80px]">
-                <!-- GRUPO IZQUIERDA: Identidad + Tabs -->
-                <div class="flex items-center gap-6 h-full overflow-hidden">
-                    
+        <div class="max-w-[1200px] w-full mx-auto px-4 sm:px-6">
+            <div class="flex items-center justify-between h-[60px] sm:h-[80px]">
+                <!-- GRUPO IZQUIERDA: Solo Branding en móvil -->
+                <div class="flex items-center gap-4 overflow-hidden">
                     <!-- BRANDING BLOCK -->
-                    <div class="flex items-center gap-4 shrink-0">
-                        ${hasLogo 
-                            ? `<img src="${c.logoUrl}" class="h-10 w-auto object-contain max-w-[180px] select-none" alt="${c.name}">`
-                            : `<div class="w-10 h-10 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center text-slate-400 text-lg shrink-0">
+                    <div class="flex items-center gap-3 sm:gap-4">
+                        ${hasLogo
+            ? `<img src="${c.logoUrl}" class="h-8 sm:h-10 w-auto object-contain max-w-[140px] sm:max-w-[180px] select-none" alt="${c.name}">`
+            : `<div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center text-slate-400 text-base sm:text-lg shrink-0">
                                 <i class="fas ${c.icon || 'fa-users'}"></i>
                                </div>`
-                        }
+        }
                         
                         ${showTitle ? `
-                        <div class="hidden sm:block">
-                            <h1 class="font-heading font-bold text-lg text-slate-900 dark:text-white leading-tight flex items-center gap-2">
+                        <div>
+                            <h1 class="font-heading font-bold text-base sm:text-lg text-slate-900 dark:text-white leading-tight flex items-center gap-2">
                                 ${c.name}
                                 ${c.isPrivate ? '<i class="fas fa-lock text-[10px] text-slate-400"></i>' : ''}
                             </h1>
                         </div>` : ''}
                     </div>
-
-                    <!-- SEPARADOR VERTICAL -->
-                    <div class="h-6 w-px bg-gray-200 dark:bg-slate-700 hidden sm:block"></div>
-
-                    <!-- TABS (INLINE) -->
-                    <div class="flex items-center gap-2 h-full overflow-x-auto custom-scrollbar -mb-px">
-                        <a href="#comunidades/${c.id}/inicio" class="${getTabClass('inicio')} whitespace-nowrap"><i class="fas fa-stream text-xs mr-2 opacity-70"></i> Muro</a>
-                        <a href="#comunidades/${c.id}/clases" class="${getTabClass('clases')} whitespace-nowrap"><i class="fas fa-graduation-cap text-xs mr-2 opacity-70"></i> Aula</a>
-                        <a href="#comunidades/${c.id}/live" class="${getTabClass('live')} whitespace-nowrap"><i class="fas fa-video text-xs mr-2 ${activeTab === 'live' ? 'text-red-500 animate-pulse' : 'opacity-70'}"></i> Live</a>
-                    </div>
                 </div>
 
                 <!-- GRUPO DERECHA: Acciones -->
-                <div class="flex items-center gap-3 shrink-0 ml-4">
-                    ${!isMember ? 
-                        `<button onclick="App.api.joinCommunity('${c.id}').then(()=>App.renderCommunity('${c.id}'))" class="btn-primary px-4 py-1.5 text-xs shadow-lg">Unirse</button>` : 
-                        `<div class="relative" id="community-settings-wrapper">
+                <div class="flex items-center gap-3 shrink-0">
+                    ${!isMember ?
+            `<button onclick="App.api.joinCommunity('${c.id}').then(()=>App.renderCommunity('${c.id}'))" class="btn-primary px-3 sm:px-4 py-1.5 text-xs shadow-lg">Unirse</button>` :
+            `<div class="relative" id="community-settings-wrapper">
                             <button onclick="App.community.toggleSettings()" class="btn-ghost w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg"><i class="fas fa-ellipsis-v"></i></button>
                             <div id="community-settings-menu" class="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-float border border-gray-100 dark:border-slate-800 hidden animate-slide-up overflow-hidden z-50">
                                 ${isAdmin ? `<button onclick="App.community.openEditCommunityModal()" class="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"><i class="fas fa-pen w-5 text-slate-400"></i> Editar</button>` : ''}
                                 <button onclick="App.community.leave('${c.id}')" class="w-full text-left px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"><i class="fas fa-sign-out-alt w-5"></i> Salir</button>
                             </div>
                         </div>`
-                    }
+        }
                 </div>
             </div>
         </div>
@@ -271,7 +251,7 @@ function _findNextLesson(community, user) {
         if (totalClasses === 0) continue;
 
         // Calcular progreso del curso
-        const courseCompletedCount = (course.classes || []).filter(cls => 
+        const courseCompletedCount = (course.classes || []).filter(cls =>
             completed.includes(`${cid}_${cls.id}`)
         ).length;
 
@@ -292,7 +272,7 @@ function _findNextLesson(community, user) {
         }
     }
     // Si todos están completados, podrías devolver null o un estado de "Todo listo"
-    return null; 
+    return null;
 }
 
 function _renderContinueLearningCard(nextLesson, communityId) {
@@ -303,7 +283,7 @@ function _renderContinueLearningCard(nextLesson, communityId) {
     const headerIcon = isStart ? 'fa-star text-yellow-500' : 'fa-bolt text-yellow-500';
     const actionText = isStart ? 'Empezar Curso' : 'Continuar Clase';
     const link = `#comunidades/${communityId}/clases/${nextLesson.courseId}`;
-    
+
     // Onclick handler para reproducir inmediatamente al hacer clic en el botón principal
     const clickHandler = `onclick="setTimeout(() => { if(window.App.lms) App.lms.playClass('${communityId}', '${nextLesson.courseId}', '${nextLesson.classId}'); }, 100)"`;
 
@@ -340,15 +320,22 @@ function _renderContinueLearningCard(nextLesson, communityId) {
 
 async function _renderFeedTab(container, community, user) {
     const isAdmin = user.role === 'admin';
-    
+
     // Calcular tarjeta de aprendizaje
     const nextLesson = _findNextLesson(community, user);
     const learningCardHTML = _renderContinueLearningCard(nextLesson, community.id);
 
     container.innerHTML = `
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
-        <!-- COLUMNA IZQUIERDA: FEED -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start animate-fade-in">
+        <!-- COLUMNA PRINCIPAL: FEED + Tarjeta móvil -->
         <div class="lg:col-span-8 space-y-6">
+            
+            <!-- Tarjeta de Continuar Curso - Solo visible en móvil -->
+            ${learningCardHTML ? `
+            <div class="lg:hidden">
+                ${learningCardHTML}
+            </div>` : ''}
+            
             ${isAdmin ? `
             <div class="card-zen p-4 flex items-center gap-4 cursor-pointer group" onclick="App.community.openCreatePostModal()">
                 <img src="${user.avatar}" class="w-10 h-10 rounded-full object-cover bg-gray-100">
@@ -379,13 +366,13 @@ async function _renderFeedTab(container, community, user) {
         window.App.currentFeed = feedPosts;
         const postEl = document.getElementById('feed-posts-container');
         if (postEl) {
-            postEl.innerHTML = feedPosts.length === 0 
+            postEl.innerHTML = feedPosts.length === 0
                 ? `<div class="text-center py-12 opacity-60"><i class="fas fa-wind text-3xl mb-2 text-slate-300"></i><p class="text-sm text-slate-500">Aún no hay publicaciones.</p></div>`
                 : feedPosts.map(p => _renderThreadCard(p, user, community)).join('');
         }
     } catch (e) {
         const postEl = document.getElementById('feed-posts-container');
-        if(postEl) postEl.innerHTML = `<div class="text-red-500 text-center text-sm">Error cargando feed.</div>`;
+        if (postEl) postEl.innerHTML = `<div class="text-red-500 text-center text-sm">Error cargando feed.</div>`;
     }
 }
 
@@ -531,8 +518,8 @@ function _renderEmptyLiveHero(isAdmin) {
 
 function _injectModals(community, user) {
     const container = document.getElementById('comm-modals-container');
-    if(!container) return;
-    
+    if (!container) return;
+
     let modalsHtml = `
     <!-- A. Modal Crear Post (Zen) -->
     <div id="create-post-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
@@ -610,14 +597,14 @@ function _injectModals(community, user) {
 // ============================================================================
 
 App.community.openCreatePostModal = (postId = null) => {
-    const m = document.getElementById('create-post-modal'); if(!m) return;
+    const m = document.getElementById('create-post-modal'); if (!m) return;
     window.App.communityState.isEditing = !!postId; window.App.communityState.editingPostId = postId;
     if (postId) {
         const post = window.App.currentFeed.find(p => p.id === postId);
-        if(post) {
+        if (post) {
             document.getElementById('cp-title').value = post.title || ''; document.getElementById('cp-content').value = post.content || ''; document.getElementById('cp-url').value = post.image || '';
             const prev = document.getElementById('cp-preview');
-            if(post.image) { prev.src = post.image; document.getElementById('cp-preview-container').classList.remove('hidden'); } else { document.getElementById('cp-preview-container').classList.add('hidden'); }
+            if (post.image) { prev.src = post.image; document.getElementById('cp-preview-container').classList.remove('hidden'); } else { document.getElementById('cp-preview-container').classList.add('hidden'); }
             document.getElementById('modal-post-title').innerText = 'Editar Publicación'; document.getElementById('btn-submit-post').innerText = 'Guardar Cambios';
         }
     } else {
@@ -667,40 +654,40 @@ App.community.submitPost = async () => {
             await App.api.createPost({ ...postData, communityId: cid, channelId: 'general', authorId: App.state.currentUser.uid, author: App.state.currentUser });
             App.ui.toast("Publicado con éxito", "success");
         }
-        App.community.closeCreatePostModal(); App.renderCommunity(cid, 'inicio'); 
-    } catch(e) { console.error(e); App.ui.toast("Error al procesar", "error"); } finally { btn.disabled = false; btn.innerHTML = window.App.communityState.isEditing ? 'Guardar Cambios' : 'Publicar Ahora'; }
+        App.community.closeCreatePostModal(); App.renderCommunity(cid, 'inicio');
+    } catch (e) { console.error(e); App.ui.toast("Error al procesar", "error"); } finally { btn.disabled = false; btn.innerHTML = window.App.communityState.isEditing ? 'Guardar Cambios' : 'Publicar Ahora'; }
 };
 
 App.community.deletePost = async (pid, cid) => {
-    if(!confirm("¿Estás seguro de eliminar esta publicación?")) return;
+    if (!confirm("¿Estás seguro de eliminar esta publicación?")) return;
     try {
         await window.F.deleteDoc(window.F.doc(window.F.db, "posts", pid));
-        const el = document.getElementById(`post-${pid}`); if(el) { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }
+        const el = document.getElementById(`post-${pid}`); if (el) { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }
         App.ui.toast("Publicación eliminada", "success");
-    } catch(e) { App.ui.toast("Error al eliminar", "error"); }
+    } catch (e) { App.ui.toast("Error al eliminar", "error"); }
 };
 
 App.community.handleLike = async (postId) => {
     const post = window.App.currentFeed.find(p => p.id === postId); if (!post) return;
     const uid = App.state.currentUser.uid;
     const isLiked = (post.likedBy || []).includes(uid);
-    if(isLiked) { post.likes--; post.likedBy = post.likedBy.filter(id => id !== uid); } else { post.likes++; if(!post.likedBy) post.likedBy = []; post.likedBy.push(uid); }
-    
-    const countEl = document.getElementById(`likes-count-${postId}`); if(countEl) countEl.innerText = post.likes;
-    const btn = countEl?.parentElement; if(btn) { btn.classList.toggle('text-red-500', !isLiked); btn.classList.toggle('text-slate-500', isLiked); }
-    try { await window.F.updateDoc(window.F.doc(window.F.db, "posts", postId), { likes: post.likes, likedBy: post.likedBy }); } catch(e) { console.error(e); }
+    if (isLiked) { post.likes--; post.likedBy = post.likedBy.filter(id => id !== uid); } else { post.likes++; if (!post.likedBy) post.likedBy = []; post.likedBy.push(uid); }
+
+    const countEl = document.getElementById(`likes-count-${postId}`); if (countEl) countEl.innerText = post.likes;
+    const btn = countEl?.parentElement; if (btn) { btn.classList.toggle('text-red-500', !isLiked); btn.classList.toggle('text-slate-500', isLiked); }
+    try { await window.F.updateDoc(window.F.doc(window.F.db, "posts", postId), { likes: post.likes, likedBy: post.likedBy }); } catch (e) { console.error(e); }
 };
 
 App.community.toggleComments = (id) => {
-    const el = document.getElementById(`comments-${id}`); if(el) { el.classList.toggle('hidden'); if(!el.classList.contains('hidden')) { setTimeout(() => document.getElementById(`comment-input-${id}`).focus(), 100); } }
+    const el = document.getElementById(`comments-${id}`); if (el) { el.classList.toggle('hidden'); if (!el.classList.contains('hidden')) { setTimeout(() => document.getElementById(`comment-input-${id}`).focus(), 100); } }
 };
 
 App.community.addComment = async (pid) => {
-    const input = document.getElementById(`comment-input-${pid}`); const txt = input.value.trim(); if(!txt) return;
-    const comment = { id: 'cm_'+Date.now(), authorId: App.state.currentUser.uid, authorName: App.state.currentUser.name, authorAvatar: App.state.currentUser.avatar, content: txt, createdAt: new Date().toISOString() };
+    const input = document.getElementById(`comment-input-${pid}`); const txt = input.value.trim(); if (!txt) return;
+    const comment = { id: 'cm_' + Date.now(), authorId: App.state.currentUser.uid, authorName: App.state.currentUser.name, authorAvatar: App.state.currentUser.avatar, content: txt, createdAt: new Date().toISOString() };
     const html = `<div class="flex gap-3 group/comment animate-fade-in"><img src="${comment.authorAvatar}" class="w-7 h-7 rounded-full bg-gray-100 mt-1"><div class="bg-gray-50 dark:bg-slate-800/50 p-3 rounded-2xl rounded-tl-none flex-1"><div class="flex justify-between items-baseline mb-1"><span class="text-xs font-bold text-slate-900 dark:text-white">${comment.authorName}</span><span class="text-[10px] text-slate-400 font-medium">Ahora</span></div><p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">${comment.content}</p></div></div>`;
     const list = document.getElementById(`comments-list-${pid}`); list.insertAdjacentHTML('beforeend', html); list.scrollTop = list.scrollHeight; input.value = '';
-    try { await window.F.updateDoc(window.F.doc(window.F.db, "posts", pid), { comments: window.F.arrayUnion(comment) }); } catch(e) { console.error(e); }
+    try { await window.F.updateDoc(window.F.doc(window.F.db, "posts", pid), { comments: window.F.arrayUnion(comment) }); } catch (e) { console.error(e); }
 };
 
 // Handlers Admin
@@ -721,7 +708,7 @@ App.community.saveLiveConfig = async () => {
             }
         });
         App.ui.toast("Configuración guardada", "success"); App.community.closeLiveModal(); App.renderCommunity(cid, 'live');
-    } catch(e) { App.ui.toast("Error al guardar", "error"); }
+    } catch (e) { App.ui.toast("Error al guardar", "error"); }
 };
 
 App.community.saveCommunityConfig = async () => {
@@ -741,13 +728,13 @@ App.community.saveCommunityConfig = async () => {
 };
 
 function _initLiveCountdown(dateIso) {
-    const el = document.getElementById('live-timer'); if(!el || !dateIso) return;
-    const target = new Date(dateIso).getTime(); if(window.liveInterval) clearInterval(window.liveInterval);
+    const el = document.getElementById('live-timer'); if (!el || !dateIso) return;
+    const target = new Date(dateIso).getTime(); if (window.liveInterval) clearInterval(window.liveInterval);
     const update = () => {
         const now = new Date().getTime(); const diff = target - now;
-        if(diff <= 0) { el.innerHTML = '<div class="text-xl font-bold animate-pulse text-red-500 bg-white/10 p-2 rounded">¡EN VIVO!</div>'; clearInterval(window.liveInterval); return; }
+        if (diff <= 0) { el.innerHTML = '<div class="text-xl font-bold animate-pulse text-red-500 bg-white/10 p-2 rounded">¡EN VIVO!</div>'; clearInterval(window.liveInterval); return; }
         const d = Math.floor(diff / (1000 * 60 * 60 * 24)); const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)); const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const box = (val, label) => `<div class="bg-white/10 backdrop-blur border border-white/20 rounded-xl p-3 text-center"><div class="text-2xl font-bold text-white">${val < 10 ? '0'+val : val}</div><div class="text-[9px] uppercase tracking-widest text-slate-300">${label}</div></div>`;
+        const box = (val, label) => `<div class="bg-white/10 backdrop-blur border border-white/20 rounded-xl p-3 text-center"><div class="text-2xl font-bold text-white">${val < 10 ? '0' + val : val}</div><div class="text-[9px] uppercase tracking-widest text-slate-300">${label}</div></div>`;
         el.innerHTML = box(d, 'Días') + box(h, 'Horas') + box(m, 'Min');
     };
     update(); window.liveInterval = setInterval(update, 1000);

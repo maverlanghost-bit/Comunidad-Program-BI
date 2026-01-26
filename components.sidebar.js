@@ -567,7 +567,8 @@ function _renderCommunityDropdown(c, activeId, isOpen, textClass) {
 }
 
 function _renderSubLink(cid, tab, label, icon, isLive = false) {
-    const isActive = window.location.hash === `#community/${cid}/${tab}` || (tab === 'inicio' && window.location.hash === `#community/${cid}`);
-    const colorClass = isActive ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
-    return `<a href="#comunidades/${cid}/${tab}" onclick="document.body.classList.remove('mobile-menu-open')" class="flex items-center gap-3 py-1.5 rounded-lg text-xs transition-colors ${colorClass}"><i class="fas ${icon} w-3 text-center ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-300'} ${isLive ? 'text-rose-500 animate-pulse' : ''}"></i><span>${label}</span></a>`;
+    const hash = window.location.hash;
+    const isActive = hash.includes(`/${cid}/${tab}`) || (tab === 'inicio' && hash === `#comunidades/${cid}` || hash === `#comunidades/${cid}/inicio`);
+    const colorClass = isActive ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/10' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50';
+    return `<a href="#comunidades/${cid}/${tab}" onclick="document.body.classList.remove('mobile-menu-open')" class="flex items-center gap-3 py-2 px-3 rounded-lg text-xs transition-colors ${colorClass}"><i class="fas ${icon} w-3 text-center ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-300'} ${isLive && !isActive ? 'text-rose-500 animate-pulse' : ''}"></i><span>${label}</span></a>`;
 }
