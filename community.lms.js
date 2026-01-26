@@ -475,18 +475,175 @@ function _initResizer() {
     });
 }
 
-// Helpers Super Clase
-window.App.lms.runCodeMock = () => {
+// Helpers Super Clase - EJECUCIÓN REAL CON PISTON API
+// Piston es una API gratuita para ejecutar código en múltiples lenguajes
+const PISTON_API_URL = 'https://emkc.org/api/v2/piston';
+
+// Mapeo de lenguajes del curso a versiones de Piston
+const PISTON_LANGUAGES = {
+    'python': { language: 'python', version: '3.10.0' },
+    'javascript': { language: 'javascript', version: '18.15.0' },
+    'js': { language: 'javascript', version: '18.15.0' },
+    'typescript': { language: 'typescript', version: '5.0.3' },
+    'java': { language: 'java', version: '15.0.2' },
+    'c': { language: 'c', version: '10.2.0' },
+    'cpp': { language: 'cpp', version: '10.2.0' },
+    'c++': { language: 'cpp', version: '10.2.0' },
+    'csharp': { language: 'csharp', version: '6.12.0' },
+    'go': { language: 'go', version: '1.16.2' },
+    'rust': { language: 'rust', version: '1.68.2' },
+    'ruby': { language: 'ruby', version: '3.0.1' },
+    'php': { language: 'php', version: '8.2.3' },
+    'sql': { language: 'sqlite3', version: '3.36.0' },
+    'bash': { language: 'bash', version: '5.2.0' },
+    'html': { language: 'javascript', version: '18.15.0' } // HTML ejecuta JS
+};
+
+// Variable para guardar el lenguaje actual
+let _currentCodeLanguage = 'javascript';
+
+window.App.lms.runCodeMock = async () => {
     const consoleDiv = document.getElementById('sc-console-output');
+    const runBtn = document.querySelector('[onclick="App.lms.runCodeMock()"]');
+
     if (!consoleDiv || !_editorInstance) return;
 
     const code = _editorInstance.getValue();
     const timestamp = new Date().toLocaleTimeString();
 
-    // Limpiar consola antes de ejecutar
-    consoleDiv.innerHTML = '';
+    // Obtener el lenguaje del curso
+    const hashParts = window.location.hash.split('/');
+    const commId = hashParts[1];
+    const courseId = hashParts[3];
+    const comm = App.state.cache.communities?.[commId];
+    const course = comm?.courses?.find(c => c.id === courseId);
+    const langKey = (course?.codeLanguage || 'javascript').toLowerCase();
 
-    // Capturar console.log personalizado
+    _currentCodeLanguage = langKey;
+
+    // UI: Mostrar estado de carga
+    consoleDiv.innerHTML = `
+        <div class="flex items-center gap-3 text-amber-400 animate-pulse">
+            <i class="fas fa-circle-notch fa-spin"></i>
+            <span>Ejecutando código en sandbox segura...</span>
+        </div>`;
+
+    if (runBtn) {
+        runBtn.disabled = true;
+        runBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="hidden sm:inline">Ejecutando...</span>';
+    }
+
+    const startTime = performance.now();
+
+    try {
+        // Verificar si el lenguaje está soportado por Piston
+        const pistonLang = PISTON_LANGUAGES[langKey];
+
+        if (!pistonLang) {
+            // Si no está soportado, usar JavaScript local como fallback
+            await executeLocalJS(code, consoleDiv, timestamp);
+            return;
+        }
+
+        // Llamar a Piston API
+        const response = await fetch(`${PISTON_API_URL}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                language: pistonLang.language,
+                version: pistonLang.version,
+                files: [{ content: code }],
+                stdin: '',
+                args: [],
+                compile_timeout: 10000,
+                run_timeout: 5000,
+                compile_memory_limit: -1,
+                run_memory_limit: -1
+            })
+        });
+
+        const endTime = performance.now();
+        const execTime = ((endTime - startTime) / 1000).toFixed(2);
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        // Limpiar y mostrar resultado
+        consoleDiv.innerHTML = '';
+
+        // Header de ejecución
+        const hasError = result.run?.stderr || result.compile?.stderr;
+        const headerClass = hasError ? 'text-red-400' : 'text-emerald-400';
+        const headerIcon = hasError ? '✗' : '✓';
+        const langDisplay = pistonLang.language.charAt(0).toUpperCase() + pistonLang.language.slice(1);
+
+        consoleDiv.innerHTML += `
+            <div class="${headerClass} font-bold mb-2 flex items-center justify-between">
+                <span>[${timestamp}] ${headerIcon} ${langDisplay} v${pistonLang.version}</span>
+                <span class="text-xs text-slate-500">${execTime}s</span>
+            </div>`;
+
+        // Errores de compilación
+        if (result.compile?.stderr) {
+            consoleDiv.innerHTML += `<div class="text-red-400 mb-2 border-l-2 border-red-500 pl-2">${escapeHtml(result.compile.stderr)}</div>`;
+        }
+
+        // Output de compilación
+        if (result.compile?.stdout) {
+            consoleDiv.innerHTML += `<div class="text-cyan-400 mb-2">${escapeHtml(result.compile.stdout)}</div>`;
+        }
+
+        // Errores de ejecución
+        if (result.run?.stderr) {
+            consoleDiv.innerHTML += `<div class="text-red-400 border-l-2 border-red-500 pl-2">${escapeHtml(result.run.stderr)}</div>`;
+        }
+
+        // Output principal
+        if (result.run?.stdout) {
+            consoleDiv.innerHTML += `<div class="text-emerald-400">${escapeHtml(result.run.stdout)}</div>`;
+        }
+
+        // Si no hay output
+        if (!result.run?.stdout && !result.run?.stderr && !result.compile?.stdout && !result.compile?.stderr) {
+            consoleDiv.innerHTML += `<div class="text-slate-500 italic">Programa ejecutado sin output</div>`;
+        }
+
+        // Toast de feedback
+        if (App.ui?.toast) {
+            App.ui.toast(hasError ? "Código ejecutado con errores" : "Código ejecutado", hasError ? "warning" : "success");
+        }
+
+    } catch (error) {
+        console.error('Piston API Error:', error);
+
+        // Fallback a ejecución local para JavaScript
+        if (langKey === 'javascript' || langKey === 'js') {
+            consoleDiv.innerHTML = `<div class="text-amber-400 mb-2">[${timestamp}] ⚠ API no disponible, usando ejecución local...</div>`;
+            await executeLocalJS(code, consoleDiv, timestamp);
+        } else {
+            consoleDiv.innerHTML = `
+                <div class="text-red-400 font-bold mb-2">[${timestamp}] ✗ Error de conexión</div>
+                <div class="text-red-300">${error.message}</div>
+                <div class="text-slate-500 mt-2 text-xs">
+                    Tip: Verifica tu conexión a internet. La ejecución de ${langKey.toUpperCase()} requiere conexión al servidor Piston.
+                </div>`;
+            if (App.ui?.toast) App.ui.toast("Error al ejecutar código", "error");
+        }
+    } finally {
+        // Restaurar botón
+        if (runBtn) {
+            runBtn.disabled = false;
+            runBtn.innerHTML = '<i class="fas fa-play"></i> <span class="hidden sm:inline">Ejecutar</span>';
+        }
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+};
+
+// Función auxiliar para ejecutar JavaScript localmente (fallback)
+async function executeLocalJS(code, consoleDiv, timestamp) {
     const logs = [];
     const originalLog = console.log;
     const originalError = console.error;
@@ -494,60 +651,49 @@ window.App.lms.runCodeMock = () => {
 
     console.log = (...args) => {
         logs.push({ type: 'log', msg: args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') });
-        originalLog.apply(console, args);
     };
     console.error = (...args) => {
         logs.push({ type: 'error', msg: args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') });
-        originalError.apply(console, args);
     };
     console.warn = (...args) => {
         logs.push({ type: 'warn', msg: args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') });
-        originalWarn.apply(console, args);
     };
 
     try {
-        // Ejecutar código JavaScript
         const result = eval(code);
-
-        // Si hay un resultado que no sea undefined, mostrarlo
         if (result !== undefined) {
             logs.push({ type: 'result', msg: `→ ${typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result)}` });
         }
-
-        // Mostrar header de éxito
-        consoleDiv.innerHTML = `<div class="text-green-400 font-bold mb-2">[${timestamp}] ✓ Código ejecutado correctamente</div>`;
-
+        consoleDiv.innerHTML += `<div class="text-emerald-400 font-bold mb-2">[${timestamp}] ✓ JavaScript (Local)</div>`;
     } catch (error) {
-        // Mostrar error
-        consoleDiv.innerHTML = `<div class="text-red-400 font-bold mb-2">[${timestamp}] ✗ Error en la ejecución</div>`;
+        consoleDiv.innerHTML += `<div class="text-red-400 font-bold mb-2">[${timestamp}] ✗ Error en la ejecución</div>`;
         logs.push({ type: 'error', msg: `${error.name}: ${error.message}` });
     }
 
-    // Restaurar console original
     console.log = originalLog;
     console.error = originalError;
     console.warn = originalWarn;
 
-    // Renderizar logs en la consola
     logs.forEach(log => {
         const colorClass = log.type === 'error' ? 'text-red-400' :
             log.type === 'warn' ? 'text-yellow-400' :
-                log.type === 'result' ? 'text-cyan-400' :
-                    'text-green-400';
-        consoleDiv.innerHTML += `<div class="${colorClass}">${log.msg}</div>`;
+                log.type === 'result' ? 'text-cyan-400' : 'text-emerald-400';
+        consoleDiv.innerHTML += `<div class="${colorClass}">${escapeHtml(log.msg)}</div>`;
     });
 
     if (logs.length === 0) {
         consoleDiv.innerHTML += `<div class="text-slate-500 italic">Sin output</div>`;
     }
 
-    consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    if (App.ui?.toast) App.ui.toast("Código ejecutado", "success");
+}
 
-    // Toast de feedback
-    if (App.ui && App.ui.toast) {
-        App.ui.toast("Código ejecutado", "success");
-    }
-};
+// Helper para escapar HTML y evitar XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/\n/g, '<br>');
+}
 
 window.App.lms.saveNotes = () => {
     const notes = document.getElementById('sc-notes-area').value;
