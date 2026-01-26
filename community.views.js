@@ -152,31 +152,50 @@ function _renderCommunityHeader(c, activeTab, user) {
     const isMember = (user.joinedCommunities || []).includes(c.id);
     const isAdmin = user.role === 'admin';
 
+    // Estilos para Tabs (Solo visible en desktop)
+    const tabInactive = "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-6 transition-all text-sm h-full flex items-center";
+    const tabActive = "text-[#1890ff] font-bold border-b-2 border-[#1890ff] px-3 py-6 text-sm h-full flex items-center";
+
+    const getTabClass = (tabName) => {
+        if (activeTab === 'comunidad' && tabName === 'inicio') return tabActive;
+        return activeTab === tabName ? tabActive : tabInactive;
+    };
+
     // Lógica de Identidad Visual
     const hasLogo = !!c.logoUrl;
     const showTitle = c.showTitle !== false; // Default true
 
     return `
         <div class="max-w-[1200px] w-full mx-auto px-4 sm:px-6">
-            <div class="flex items-center justify-between h-[60px] sm:h-[80px]">
-                <!-- GRUPO IZQUIERDA: Solo Branding en móvil -->
-                <div class="flex items-center gap-4 overflow-hidden">
+            <div class="flex items-center justify-between h-[60px] lg:h-[80px]">
+                <!-- GRUPO IZQUIERDA: Branding + Tabs (PC) -->
+                <div class="flex items-center gap-4 lg:gap-6 h-full overflow-hidden">
                     <!-- BRANDING BLOCK -->
-                    <div class="flex items-center gap-3 sm:gap-4">
+                    <div class="flex items-center gap-3 sm:gap-4 shrink-0">
                         ${hasLogo
-            ? `<img src="${c.logoUrl}" class="h-8 sm:h-10 w-auto object-contain max-w-[140px] sm:max-w-[180px] select-none" alt="${c.name}">`
-            : `<div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center text-slate-400 text-base sm:text-lg shrink-0">
+            ? `<img src="${c.logoUrl}" class="h-8 lg:h-10 w-auto object-contain max-w-[140px] lg:max-w-[180px] select-none" alt="${c.name}">`
+            : `<div class="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center text-slate-400 text-base lg:text-lg shrink-0">
                                 <i class="fas ${c.icon || 'fa-users'}"></i>
                                </div>`
         }
                         
                         ${showTitle ? `
-                        <div>
-                            <h1 class="font-heading font-bold text-base sm:text-lg text-slate-900 dark:text-white leading-tight flex items-center gap-2">
+                        <div class="hidden sm:block">
+                            <h1 class="font-heading font-bold text-base lg:text-lg text-slate-900 dark:text-white leading-tight flex items-center gap-2">
                                 ${c.name}
                                 ${c.isPrivate ? '<i class="fas fa-lock text-[10px] text-slate-400"></i>' : ''}
                             </h1>
                         </div>` : ''}
+                    </div>
+
+                    <!-- SEPARADOR VERTICAL (Solo Desktop) -->
+                    <div class="h-6 w-px bg-gray-200 dark:bg-slate-700 hidden lg:block"></div>
+
+                    <!-- TABS (Solo Desktop - en móvil usan el sidebar) -->
+                    <div class="hidden lg:flex items-center gap-2 h-full overflow-x-auto custom-scrollbar -mb-px">
+                        <a href="#comunidades/${c.id}/inicio" class="${getTabClass('inicio')} whitespace-nowrap"><i class="fas fa-stream text-xs mr-2 opacity-70"></i> Muro</a>
+                        <a href="#comunidades/${c.id}/clases" class="${getTabClass('clases')} whitespace-nowrap"><i class="fas fa-graduation-cap text-xs mr-2 opacity-70"></i> Aula</a>
+                        <a href="#comunidades/${c.id}/live" class="${getTabClass('live')} whitespace-nowrap"><i class="fas fa-video text-xs mr-2 ${activeTab === 'live' ? 'text-red-500 animate-pulse' : 'opacity-70'}"></i> Live</a>
                     </div>
                 </div>
 
@@ -197,6 +216,7 @@ function _renderCommunityHeader(c, activeTab, user) {
         </div>
     `;
 }
+
 
 // ============================================================================
 // 3. LOGICA DE ACCIONES Y MODALES

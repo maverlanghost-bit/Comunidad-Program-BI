@@ -713,8 +713,7 @@ body.mobile-menu-open .mobile-overlay {
         display: none !important;
     }
 
-    /* CRITICAL: Mobile sidebar wrapper should be positioned fixed */
-    .lg\\:hidden>#sidebar,
+    /* CRITICAL: Mobile sidebar - fixed position, very high z-index above overlay */
     #sidebar {
         position: fixed !important;
         top: 0 !important;
@@ -723,9 +722,11 @@ body.mobile-menu-open .mobile-overlay {
         transform: translateX(-100%);
         width: 280px !important;
         background: var(--bg-surface) !important;
-        z-index: 100 !important;
+        z-index: 200 !important;
+        /* Much higher than overlay (90) */
         transition: transform 0.3s ease !important;
         overflow-y: auto;
+        border-right: 1px solid var(--border-light);
     }
 
     /* Show sidebar when menu is open */
