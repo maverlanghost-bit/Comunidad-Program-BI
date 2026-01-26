@@ -674,7 +674,8 @@ body.dark-mode .toggle-rail {
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
-    z-index: 99;
+    z-index: 90;
+    /* Lower than sidebar (100) so overlay is behind it */
     opacity: 0;
     transition: opacity 0.3s ease;
     pointer-events: none;

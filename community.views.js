@@ -280,7 +280,7 @@ function _renderContinueLearningCard(nextLesson, communityId) {
 
     const isStart = nextLesson.type === 'start';
     const headerTitle = isStart ? 'Comenzar' : 'Continuar';
-    const headerIcon = isStart ? 'fa-star text-yellow-500' : 'fa-bolt text-yellow-500';
+    const headerIcon = isStart ? '' : '<i class="fas fa-bolt text-yellow-500"></i>';
     const actionText = isStart ? 'Empezar Curso' : 'Continuar Clase';
     const link = `#comunidades/${communityId}/clases/${nextLesson.courseId}`;
 
@@ -290,7 +290,7 @@ function _renderContinueLearningCard(nextLesson, communityId) {
     return `
     <div class="card-zen p-5">
         <h3 class="font-bold text-slate-900 dark:text-white mb-4 text-xs uppercase tracking-wider flex items-center gap-2">
-            <i class="fas ${headerIcon}"></i> ${headerTitle}
+            ${headerIcon} ${headerTitle}
         </h3>
         
         <div class="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 border border-gray-100 dark:border-slate-700/50">
