@@ -652,7 +652,7 @@ App.handleRoute = async () => {
                         <p class="text-slate-500 dark:text-slate-400 font-bold text-sm">Conectando Neural Core...</p>
                     </div>
                 </div>
-            `);
+            `, 'ai');
 
             const container = document.getElementById('ai-root');
             const conversationId = args[0] || null;
@@ -695,11 +695,14 @@ App.handleRoute = async () => {
             } catch (e) {
                 console.error("AI Load Error:", e);
                 container.innerHTML = `
-                    <div class="text-center p-10 text-red-500 animate-fade-in">
+                    <div class="text-center p-10 text-red-500 animate-fade-in bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-200 dark:border-red-800 m-4">
                         <i class="fas fa-bug text-4xl mb-4"></i>
-                        <h3 class="font-bold text-lg mb-2">Error de Inicialización</h3>
-                        <p class="text-sm mb-4">No se pudieron cargar los archivos del Asistente.</p>
-                        <button onclick="location.reload()" class="bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded font-bold text-sm hover:bg-slate-200 transition-colors">Recargar Página</button>
+                        <h3 class="font-bold text-lg mb-2">Error de Inicialización Detallado</h3>
+                        <div class="text-left bg-white dark:bg-black/50 p-4 rounded-lg font-mono text-xs overflow-auto max-h-60 mb-4 border border-red-100 dark:border-red-900/50">
+                            <p class="font-bold mb-2">${e.message}</p>
+                            <pre class="whitespace-pre-wrap text-[10px] opacity-75">${e.stack || 'No stack trace'}</pre>
+                        </div>
+                        <button onclick="location.reload()" class="bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-lg font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-sm">Recargar Página</button>
                     </div>`;
             }
             return;

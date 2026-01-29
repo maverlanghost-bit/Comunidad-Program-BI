@@ -1,11 +1,11 @@
 ﻿﻿/**
- * components.sidebar.js (V64.3 - UX POLISH)
- * Componente de Barra Lateral Global con Modales de Configuración Premium.
- * * CAMBIOS V64.3:
- * - FIX UX: El botón Pin ahora se oculta en modo colapsado para no estorbar.
- * - FIX UX: La barra ya no se cierra bruscamente al interactuar con menús.
- * - REFACTOR: Dependencia total de CSS hover para interacciones fluidas.
- */
+* components.sidebar.js (V64.3 - UX POLISH)
+* Componente de Barra Lateral Global con Modales de Configuración Premium.
+* * CAMBIOS V64.3:
+* - FIX UX: El botón Pin ahora se oculta en modo colapsado para no estorbar.
+* - FIX UX: La barra ya no se cierra bruscamente al interactuar con menús.
+* - REFACTOR: Dependencia total de CSS hover para interacciones fluidas.
+*/
 
 window.App = window.App || {};
 window.App.sidebar = window.App.sidebar || {};
@@ -18,7 +18,8 @@ const SidebarManager = {
         openMenus: JSON.parse(localStorage.getItem('sidebar_open_menus') || '[]'),
         isPinned: localStorage.getItem('sidebar_pinned') === 'true',
         isUserMenuOpen: false,
-        tempAvatarFile: null // Para previsualización
+        tempAvatarFile: null, // Para previsualización
+
     },
 
     init() {
@@ -163,8 +164,21 @@ const SidebarManager = {
     refresh() {
         const sidebar = document.getElementById('sidebar');
         if (sidebar && window.App.sidebar.render) {
+            let activeId = 'feed';
             const currentHash = window.location.hash.replace('#', '') || 'feed';
-            const activeId = currentHash.split('/')[0] || 'feed';
+
+            // Lógica robusta para determinar ID activo
+            if (currentHash.includes('comunidades/')) {
+                // Estamos en comunidad
+                if (window.App.chat && window.App.chat.state && window.App.chat.state.activeChannelId) {
+                    activeId = window.App.chat.state.activeChannelId;
+                } else {
+                    activeId = currentHash.split('/')[1]; // Default to community ID
+                }
+            } else {
+                activeId = currentHash.split('/')[0] || 'feed';
+            }
+
             const newContent = window.App.sidebar.render(activeId);
             sidebar.outerHTML = newContent;
             this.applyPinState();
@@ -175,6 +189,8 @@ const SidebarManager = {
         this.state.isPinned = !this.state.isPinned;
         localStorage.setItem('sidebar_pinned', this.state.isPinned);
         this.applyPinState();
+        // No refrescar entero para evitar parpadeos, solo ajustes visuales si fuera necesario, 
+        // pero sidebar.render usa isPinned, así que sí refrescamos.
         this.refresh();
     },
 
@@ -221,6 +237,9 @@ const SidebarManager = {
         }
     },
 
+    // --- LÓGICA DE CANALES (COMUNIDAD) ---
+
+
     attachGlobalListeners() {
         document.addEventListener('click', (e) => {
             const pinBtn = e.target.closest('[data-sidebar-action="pin"]');
@@ -234,6 +253,8 @@ const SidebarManager = {
 
             const userBtn = e.target.closest('[data-sidebar-action="user-menu"]');
             if (userBtn) { e.stopPropagation(); this.toggleUserMenu(); return; }
+
+
         });
     }
 };
@@ -354,6 +375,11 @@ window.App.sidebar.render = (activeId = 'feed') => {
     const pinBtnClass = isPinned
         ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20 opacity-100'
         : 'text-slate-400 opacity-0 group-hover/sidebar:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800';
+
+
+
+    // SI ESTAMOS EN MODO COMUNIDAD, RENDERIZAMOS EL SIDEBAR ESPECÍFICO
+
 
     return `
     <aside id="sidebar" class="fixed top-0 left-0 h-full bg-white dark:bg-[#0f172a] border-r border-slate-100 dark:border-slate-800/60 z-[60] flex flex-col transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${sidebarClasses} group/sidebar shadow-sm font-sans">
@@ -566,9 +592,17 @@ function _renderCommunityDropdown(c, activeId, isOpen, textClass) {
     </div>`;
 }
 
+
+
+
 function _renderSubLink(cid, tab, label, icon, isLive = false) {
-    const hash = window.location.hash;
-    const isActive = hash.includes(`/${cid}/${tab}`) || (tab === 'inicio' && hash === `#comunidades/${cid}` || hash === `#comunidades/${cid}/inicio`);
-    const colorClass = isActive ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/10' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50';
-    return `<a href="#comunidades/${cid}/${tab}" onclick="document.body.classList.remove('mobile-menu-open')" class="flex items-center gap-3 py-2 px-3 rounded-lg text-xs transition-colors ${colorClass}"><i class="fas ${icon} w-3 text-center ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-300'} ${isLive && !isActive ? 'text-rose-500 animate-pulse' : ''}"></i><span>${label}</span></a>`;
+    const hash = `#comunidades/${cid}/${tab}`;
+    const isActive = window.location.hash === hash;
+    const textClass = SidebarManager.state.isPinned ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100';
+
+    return `
+    <a href="${hash}" class="flex items-center gap-3 p-2 rounded-lg transition-colors ${isActive ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}">
+        <div class="w-5 flex justify-center shrink-0 ${isLive ? 'text-rose-500' : ''}"><i class="fas ${icon}"></i></div>
+        <span class="text-xs font-medium whitespace-nowrap transition-opacity duration-200 ${textClass}">${label}</span>
+    </a>`;
 }
