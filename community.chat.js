@@ -191,9 +191,6 @@ function _renderShellHTML(community, channels, user, activeId) {
 
     return `
     <div id="chat-shell" class="flex flex-col h-full w-full overflow-hidden bg-white dark:bg-[#0b1120] relative font-sans text-sm text-slate-900 dark:text-slate-100">
-        <!-- MOBILE OVERLAY -->
-        <div id="mobile-sidebar-overlay" onclick="App.chat.closeMobileSidebar()" class="fixed inset-0 bg-black/50 z-50 hidden lg:hidden backdrop-blur-sm transition-opacity opacity-0"></div>
-
         <div class="flex-1 flex overflow-hidden relative">
             <!-- DRAG OVERLAY -->
             <div id="drag-overlay" class="absolute inset-0 z-[60] bg-indigo-600/90 hidden flex-col items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300 backdrop-blur-sm">
@@ -203,35 +200,51 @@ function _renderShellHTML(community, channels, user, activeId) {
                 </div>
             </div>
 
-            <!-- SIDEBAR -->
-            <aside id="chat-sidebar" class="hidden lg:flex flex-col bg-[#f8fafc] dark:bg-[#0f172a] border-r border-slate-200 dark:border-slate-800 shrink-0 z-40 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${sidebarClasses} group/sidebar absolute lg:relative h-full shadow-lg lg:shadow-none">
+            <!-- MOBILE CHAT SIDEBAR OVERLAY -->
+            <div id="chat-sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 lg:hidden hidden" onclick="App.chat.closeMobileSidebar()"></div>
+
+            <!-- SIDEBAR IZQUIERDO (Hidden on mobile by default, toggleable) -->
+            <div id="chat-sidebar" class="fixed lg:relative top-0 left-0 h-full ${sidebarClasses} bg-[#F8FAFC] dark:bg-[#0f172a] border-r border-gray-200 dark:border-slate-800 flex flex-col shrink-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] z-50 shadow-[1px_0_20px_rgba(0,0,0,0.02)] group/sidebar -translate-x-full lg:translate-x-0">
                 <!-- Header Sidebar -->
                 <div class="h-14 flex items-center justify-between px-4 shrink-0 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151e32]">
-                    <div class="flex items-center gap-3 overflow-hidden opacity-0 group-hover/sidebar:opacity-100 ${!isCollapsed ? 'opacity-100' : ''} transition-opacity duration-200 flex-1 min-w-0">
-                        <button onclick="window.location.hash='#feed'" class="text-slate-400 hover:text-indigo-500 transition-colors shrink-0" title="Volver al Feed"><i class="fas fa-arrow-left"></i></button>
+                    <div class="flex items-center gap-3 overflow-hidden opacity-0 group-hover/sidebar:opacity-100 ${!isCollapsed ? 'opacity-100' : ''} transition-opacity duration-200">
+                        <button onclick="window.location.hash='#feed'" class="text-slate-400 hover:text-indigo-500 transition-colors"><i class="fas fa-arrow-left"></i></button>
                         <span class="font-bold text-xs uppercase tracking-wider truncate text-slate-700 dark:text-slate-300 select-none">${community.name}</span>
                     </div>
-                    <button onclick="App.chat.toggleSidebar()" class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0">
-                        <i class="fas fa-thumbtack text-xs ${!isCollapsed ? 'rotate-45 text-indigo-500' : ''}"></i>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="App.chat.closeMobileSidebar()" class="lg:hidden text-slate-400 hover:text-indigo-500 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700" title="Cerrar">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button onclick="App.chat.toggleSidebar()" class="hidden lg:block text-slate-400 hover:text-indigo-500 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700" title="${isCollapsed ? 'Fijar' : 'Ocultar'}">
+                            <i class="fas ${isCollapsed ? 'fa-thumbtack transform rotate-45' : 'fa-columns'}"></i>
+                        </button>
+                    </div>
                 </div>
-
                 <!-- Channels List -->
-                <div id="sidebar-channels" class="flex-1 overflow-y-auto custom-scrollbar py-3 space-y-1 px-2">
-                    ${_renderChannelsHTML(groupedChannels, activeId, isAdmin, community.id, user, isCollapsed)}
+                <div id="sidebar-channels" class="flex-1 overflow-y-auto custom-scrollbar py-3 space-y-1">
+                    ${_renderChannelsHTML(groupedChannels, activeId, isAdmin, community.id, user)}
                 </div>
-
-                <!-- Footer User -->
+                <!-- User Footer -->
                 <div class="p-3 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-[#151e32]">
-                    ${_renderUserFooter(user, isCollapsed)}
+                    <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer group" title="${user.name}">
+                        <div class="relative shrink-0">
+                            <img src="${user.avatar || 'https://ui-avatars.com/api/?name=' + user.name}" class="w-9 h-9 rounded-full bg-gray-200 object-cover shadow-sm">
+                            <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-[#151e32] rounded-full"></div>
+                        </div>
+                        <div class="flex-1 min-w-0 opacity-0 group-hover/sidebar:opacity-100 ${!isCollapsed ? 'opacity-100' : ''} transition-opacity duration-200">
+                            <div class="font-bold text-xs text-slate-800 dark:text-white truncate">${user.name}</div>
+                            <div class="text-[10px] text-slate-500 truncate font-medium">Online</div>
+                        </div>
+                        ${isAdmin ? `<button onclick="App.chat.openSettings('${community.id}')" class="text-slate-300 hover:text-indigo-500 opacity-0 group-hover/sidebar:opacity-100 transition-opacity"><i class="fas fa-cog"></i></button>` : ''}
+                    </div>
                 </div>
-            </aside>
+            </div>
 
             <!-- MAIN CHAT AREA -->
             <div class="flex-1 flex flex-col min-w-0 bg-[#F1F5F9] dark:bg-[#0b1120] relative z-0 h-full transition-all duration-300" id="main-chat-viewport">
                 <!-- Navbar -->
                 <div class="h-14 border-b border-gray-200 dark:border-slate-800 flex items-center px-4 sm:px-6 shrink-0 justify-between bg-white dark:bg-[#0b1120] z-30 shadow-sm/30 gap-3">
-                     <!-- Mobile Menu Toggle -->
+                    <!-- Mobile Menu Toggle -->
                     <button onclick="App.chat.openMobileSidebar()" class="lg:hidden w-10 h-10 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors shrink-0">
                         <i class="fas fa-bars"></i>
                     </button>
@@ -330,40 +343,36 @@ function _renderAIPanelHTML() {
 // 5. LÓGICA DE UI Y NAVEGACIÓN (SIDEBAR IZQUIERDO)
 // ============================================================================
 
-// Toggle Sidebar Logic Removed (Global Only)
 window.App.chat.toggleSidebar = () => {
     const state = window.App.chat.state;
     state.isSidebarCollapsed = !state.isSidebarCollapsed;
     localStorage.setItem('chat_sidebar_collapsed', state.isSidebarCollapsed);
-    _updateSidebar(state.communityData, state.communityData.channels, state.activeChannelId);
+    const sb = document.getElementById('chat-sidebar');
+    if (sb) {
+        if (state.isSidebarCollapsed) {
+            sb.classList.remove('w-72');
+            sb.classList.add('w-[70px]', 'hover:w-72');
+        } else {
+            sb.classList.remove('w-[70px]', 'hover:w-72');
+            sb.classList.add('w-72');
+        }
+        _updateSidebar(state.communityData, state.communityData.channels, state.activeChannelId);
+    }
 };
 
+// Mobile sidebar controls
 window.App.chat.openMobileSidebar = () => {
-    const sidebar = document.getElementById('chat-sidebar');
-    const overlay = document.getElementById('mobile-sidebar-overlay');
-
-    if (sidebar) {
-        sidebar.classList.remove('hidden');
-        sidebar.classList.add('flex', 'absolute', 'inset-y-0', 'left-0', 'z-50', 'w-[280px]'); // Force mobile styles
-    }
-    if (overlay) {
-        overlay.classList.remove('hidden');
-        setTimeout(() => overlay.classList.remove('opacity-0'), 10);
-    }
+    const sb = document.getElementById('chat-sidebar');
+    const overlay = document.getElementById('chat-sidebar-overlay');
+    if (sb) sb.classList.remove('-translate-x-full');
+    if (overlay) overlay.classList.remove('hidden');
 };
 
 window.App.chat.closeMobileSidebar = () => {
-    const sidebar = document.getElementById('chat-sidebar');
-    const overlay = document.getElementById('mobile-sidebar-overlay');
-
-    if (sidebar) {
-        sidebar.classList.add('hidden');
-        sidebar.classList.remove('flex', 'absolute', 'inset-y-0', 'left-0', 'z-50', 'w-[280px]');
-    }
-    if (overlay) {
-        overlay.classList.add('opacity-0');
-        setTimeout(() => overlay.classList.add('hidden'), 300);
-    }
+    const sb = document.getElementById('chat-sidebar');
+    const overlay = document.getElementById('chat-sidebar-overlay');
+    if (sb) sb.classList.add('-translate-x-full');
+    if (overlay) overlay.classList.add('hidden');
 };
 
 window.App.chat.switchSidebarTab = (tabName) => {
@@ -380,42 +389,6 @@ window.App.chat.toggleCategory = (catName) => {
     _updateSidebar(state.communityData, state.communityData.channels, state.activeChannelId);
 };
 
-// _renderChannelsHTML RESTORED
-function _updateSidebar(community, channels, activeId) {
-    const sidebar = document.getElementById('chat-sidebar');
-    if (!sidebar) return; // Should not happen
-
-    const state = window.App.chat.state;
-    const isCollapsed = state.isSidebarCollapsed;
-    const isAdmin = state.currentUser.role === 'admin';
-    const grouped = _groupChannels(channels);
-
-    // Update Sidebar Classes
-    if (isCollapsed) {
-        sidebar.classList.remove('w-72');
-        sidebar.classList.add('w-[70px]', 'hover:w-72');
-    } else {
-        sidebar.classList.add('w-72');
-        sidebar.classList.remove('w-[70px]', 'hover:w-72');
-    }
-
-    // Render Content
-    const pinIcon = isCollapsed ? '' : 'rotate-45 text-indigo-500';
-    const headerTitle = `<div class="flex items-center gap-3 overflow-hidden opacity-0 group-hover/sidebar:opacity-100 ${!isCollapsed ? 'opacity-100' : ''} transition-opacity duration-200 flex-1 min-w-0">
-                        <button onclick="window.location.hash='#feed'" class="text-slate-400 hover:text-indigo-500 transition-colors shrink-0" title="Volver al Feed"><i class="fas fa-arrow-left"></i></button>
-                        <span class="font-bold text-xs uppercase tracking-wider truncate text-slate-700 dark:text-slate-300 select-none">${community.name}</span>
-                    </div>`;
-
-    sidebar.querySelector('.h-14').innerHTML = `
-        ${headerTitle}
-        <button onclick="App.chat.toggleSidebar()" class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0">
-            <i class="fas fa-thumbtack text-xs ${pinIcon}"></i>
-        </button>`;
-
-    sidebar.querySelector('#sidebar-channels').innerHTML = _renderChannelsHTML(grouped, activeId, isAdmin, community.id, state.currentUser, isCollapsed);
-    sidebar.querySelector('.p-3.border-t').innerHTML = _renderUserFooter(state.currentUser, isCollapsed);
-}
-
 function _groupChannels(channels) {
     return channels.reduce((acc, ch) => {
         const cat = ch.category || 'GENERAL';
@@ -425,97 +398,161 @@ function _groupChannels(channels) {
     }, {});
 }
 
-function _renderChannelsHTML(grouped, activeId, isAdmin, cid, user, isCollapsed) {
+function _renderChannelsHTML(grouped, activeId, isAdmin, cid, user) {
     let html = '';
+    const isCollapsed = window.App.chat.state.isSidebarCollapsed;
     const activeTab = window.App.chat.state.adminSidebarTab;
     const hideOnCollapse = "opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 " + (!isCollapsed ? "opacity-100" : "");
     const showOnCollapse = isCollapsed ? "block group-hover/sidebar:hidden" : "hidden";
 
+    // NOTIFICACIÓN INTELIGENTE
+    const threads = window.App.chat.state.supportThreads || [];
+    const unreadCount = threads.filter(t => !window.App.chat.state.readThreadIds.has(t.uid)).length;
+    const hasUnread = unreadCount > 0;
+
+    const notificationDot = hasUnread ? `<span class="absolute top-0 right-0 w-2.5 h-2.5 bg-purple-600 rounded-full border-2 border-gray-100 dark:border-slate-800 animate-pulse"></span>` : '';
+
     if (isAdmin) {
         html += `
-        <div class="px-1 mb-3">
-             <div class="flex p-1 bg-gray-100 dark:bg-slate-800 rounded-lg ${hideOnCollapse}">
+        <div class="px-2 mb-3">
+            <div class="flex p-1 bg-gray-100 dark:bg-slate-800 rounded-lg ${hideOnCollapse}">
                 <button onclick="App.chat.switchSidebarTab('global')" class="flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === 'global' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}">Global</button>
-                <button onclick="App.chat.switchSidebarTab('students')" class="flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === 'students' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}">Alumnos</button>
-             </div>
-             <div class="${isCollapsed ? 'flex flex-col gap-2 items-center group-hover/sidebar:hidden' : 'hidden'}">
-                 <i class="fas fa-globe text-indigo-500 mb-2"></i>
-             </div>
+                <div class="relative flex-1">
+                    <button onclick="App.chat.switchSidebarTab('students')" class="w-full py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === 'students' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}">Alumnos</button>
+                    ${activeTab !== 'students' && hasUnread ? `<span class="absolute top-1 right-2 w-2 h-2 bg-purple-600 rounded-full"></span>` : ''}
+                </div>
+            </div>
+            <div class="${isCollapsed ? 'flex flex-col gap-2 items-center group-hover/sidebar:hidden' : 'hidden'}">
+                <button onclick="App.chat.switchSidebarTab('global')" class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeTab === 'global' ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400'}"><i class="fas fa-globe"></i></button>
+                <div class="relative">
+                    <button onclick="App.chat.switchSidebarTab('students')" class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeTab === 'students' ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400'}"><i class="fas fa-user-graduate"></i></button>
+                    ${notificationDot}
+                </div>
+            </div>
         </div>`;
+
         if (activeTab === 'students') {
-            const threads = window.App.chat.state.supportThreads || [];
-            if (threads.length === 0) html += `<div class="text-center text-[10px] text-slate-400 italic ${hideOnCollapse}">Sin chats activos</div>`;
-            threads.forEach(t => {
-                const tId = 'support_' + (t.uid || t.id);
-                html += _renderChannelItem(cid, tId, t.name || 'Alumno', 'fa-user', activeId === tId, isCollapsed, true, t.avatar);
+            if (threads.length === 0) {
+                html += `<div class="px-4 py-8 text-center text-slate-400 text-xs italic ${hideOnCollapse}">Bandeja vacía.</div>`;
+            }
+
+            const sortedThreads = [...threads].sort((a, b) => {
+                const da = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+                const db = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
+                return db - da;
+            });
+
+            sortedThreads.forEach(t => {
+                // Validación estricta
+                if (!t) return;
+                // Fallback de seguridad por si t.uid viene vacío de la DB
+                const safeUid = t.uid || 'unknown_uid';
+                const threadId = `${CHAT_CONFIG.SUPPORT_CHANNEL_PREFIX}${safeUid}`;
+                const displayAvatar = (t.avatar && t.avatar.length > 5) ? t.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name || 'Alumno')}&background=random&color=fff&size=64`;
+
+                const isUnread = !window.App.chat.state.readThreadIds.has(safeUid);
+
+                html += _renderChannelItem(cid, threadId, t.name, 'fa-user', activeId === threadId, isCollapsed, true, displayAvatar, '', { isSupport: true, uid: safeUid, isUnread });
             });
             return html;
         }
     } else {
-        const profId = 'support_' + user.uid;
-        const isActive = activeId === profId;
+        const myThreadId = `${CHAT_CONFIG.SUPPORT_CHANNEL_PREFIX}${user.uid}`;
+        const isActive = activeId === myThreadId;
+
         html += `
-        <div class="px-1 mb-4 relative group/prof">
-            <div onclick="App.chat.switchChannel('${cid}', '${profId}')" class="flex items-center gap-3 p-2 rounded-xl border ${isActive ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/10' : 'border-indigo-100 dark:border-slate-700 hover:bg-slate-50'} cursor-pointer transition-all">
-                <img src="https://cdn.shopify.com/s/files/1/0564/3812/8712/files/gempages_519842279402243040-8ae05cd1-dc25-44fb-9a7b-f1a78a0f121a.png" class="w-8 h-8 rounded-full object-cover">
-                <div class="min-w-0 ${hideOnCollapse}">
-                    <div class="text-[9px] font-black uppercase tracking-widest text-indigo-500">Profesor</div>
-                    <div class="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">Manuel Oliva</div>
+        <div class="px-3 mb-6 relative">
+            <div class="${hideOnCollapse} absolute left-3 right-3 top-0 z-10">
+                <button onclick="App.chat.switchChannel('${cid}', '${myThreadId}')" class="w-full flex items-center gap-3 p-3 rounded-xl transition-all border-2 bg-indigo-50 dark:bg-indigo-900/20 ${isActive ? 'border-indigo-500 shadow-md' : 'border-indigo-100 dark:border-indigo-900 hover:border-indigo-300'}">
+                    <img src="${CHAT_CONFIG.PROFESSOR.AVATAR}" class="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-slate-700">
+                    <div class="text-left min-w-0">
+                        <div class="text-[9px] font-black uppercase tracking-widest text-indigo-500 mb-0.5">Profesor</div>
+                        <div class="text-xs font-bold text-slate-800 dark:text-white truncate">${CHAT_CONFIG.PROFESSOR.NAME.split(' ')[1] || 'Manuel'}</div>
+                    </div>
+                </button>
+                <div class="mt-4 px-1 text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono border-b border-gray-200 dark:border-slate-800 pb-2">Canales</div>
+            </div>
+            <div onclick="App.chat.switchChannel('${cid}', '${myThreadId}')" class="${showOnCollapse} relative group flex justify-center cursor-pointer w-full mb-4 z-0">
+                <div class="w-10 h-10 rounded-full p-0.5 transition-all ${isActive ? 'bg-indigo-500 shadow-lg' : 'bg-transparent hover:bg-gray-100'}">
+                    <img src="${CHAT_CONFIG.PROFESSOR.AVATAR}" class="w-full h-full rounded-full object-cover bg-white">
                 </div>
             </div>
-            <div class="${showOnCollapse} absolute left-10 top-2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover/prof:opacity-100 pointer-events-none z-50">Profesor</div>
-        </div>
-        `;
+            <div class="h-24 ${hideOnCollapse} pointer-events-none"></div>
+        </div>`;
     }
 
     Object.entries(grouped).forEach(([cat, chs]) => {
         const isCatCollapsed = window.App.chat.state.collapsedCategories.includes(cat);
-        const arrowClass = isCatCollapsed ? '-rotate-90' : '';
-
         html += `
-        <div class="group/cat mt-2">
-            <div class="px-3 py-1 flex items-center justify-between text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer ${hideOnCollapse}" onclick="App.chat.toggleCategory('${cat}')">
+        <div class="group/cat select-none mt-3 ${hideOnCollapse}">
+            <div class="px-4 py-1 flex items-center justify-between text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer transition-colors" onclick="App.chat.toggleCategory('${cat}')">
                 <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider font-mono">
-                    <i class="fas fa-chevron-down text-[8px] transition-transform ${arrowClass}"></i> ${cat}
+                    <i class="fas fa-chevron-${isCatCollapsed ? 'right' : 'down'} text-[8px] w-2"></i> ${cat}
                 </div>
+                ${isAdmin ? `<div class="opacity-0 group-hover/cat:opacity-100 flex gap-2 transition-opacity" onclick="event.stopPropagation()">
+                    <button onclick="App.chat.createChannelPrompt('${cid}', '${cat}')" class="hover:text-emerald-500"><i class="fas fa-plus text-[10px]"></i></button>
+                    <button onclick="App.chat.renameCategory('${cid}', '${cat}')" class="hover:text-blue-500"><i class="fas fa-pen text-[9px]"></i></button>
+                </div>` : ''}
             </div>
-            
-            ${!isCatCollapsed ? `<div class="space-y-0.5 mt-0.5">
-                ${chs.map(ch => {
-            const icon = ch.type === 'announcement' ? 'fa-bullhorn' : 'fa-hashtag';
-            return _renderChannelItem(cid, ch.id, ch.name, icon, ch.id === activeId, isCollapsed, isAdmin);
-        }).join('')}
-            </div>` : ''}
         </div>`;
+
+        if (!isCatCollapsed || isCollapsed) {
+            html += `<div class="space-y-0.5 mt-1">`;
+            chs.forEach(ch => {
+                const icon = ch.type === 'announcement' ? 'fa-bullhorn' : 'fa-hashtag';
+                html += _renderChannelItem(cid, ch.id, ch.name, icon, ch.id === activeId, isCollapsed, isAdmin, null, '', ch);
+            });
+            html += `</div>`;
+        }
     });
     return html;
 }
 
-function _renderChannelItem(cid, id, name, icon, isActive, isCollapsed, isAdmin, avatar = null) {
+function _renderChannelItem(cid, id, name, icon, isActive, isCollapsed, isAdmin, avatar = null, extraClasses = '', chObj = null) {
     const activeBg = "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border-l-4 border-indigo-500";
     const normalBg = "text-slate-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 border-l-4 border-transparent";
-    const textClass = !isCollapsed ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100 absolute left-10';
-    const containerBase = !isCollapsed ? "" : "justify-center";
+
+    let actionBtn = '';
+    let unreadIndicator = '';
+
+    if (isAdmin && chObj) {
+        if (chObj.isSupport) {
+            // FIX: Envuelto en div con z-index y onclick explícito para evitar propagación
+            actionBtn = `
+            <div onclick="event.stopPropagation(); App.chat.deleteSupportThread('${cid}', '${chObj.uid}')" 
+                 class="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all opacity-0 group-hover:opacity-100 relative z-50 ml-auto pointer-events-auto" 
+                 title="Eliminar Chat">
+                 <i class="fas fa-trash text-[10px]"></i>
+            </div>`;
+
+            if (chObj.isUnread) {
+                unreadIndicator = `<div class="w-2 h-2 bg-purple-600 rounded-full ml-auto mr-2 shrink-0"></div>`;
+            }
+        } else {
+            actionBtn = `<i onclick="event.stopPropagation(); App.chat.openChannelManager('${cid}', '${id}', '${name}', '${chObj.category}')" class="fas fa-cog text-[10px] opacity-0 group-hover:opacity-100 hover:text-slate-800 dark:hover:text-white transition-opacity pointer-events-auto ml-auto"></i>`;
+        }
+    }
 
     return `
-    <div onclick="App.chat.switchChannel('${cid}', '${id}')" 
-         class="group/ch relative cursor-pointer mx-1 rounded-r-lg transition-all ${isActive ? activeBg : normalBg} flex items-center py-2 px-2 ${containerBase}">
-        ${avatar ? `<img src="${avatar}" class="w-5 h-5 rounded-full object-cover shrink-0 z-10">` : `<i class="fas ${icon} text-xs w-5 text-center shrink-0 z-10"></i>`}
-        <span class="truncate text-xs font-bold ml-3 transition-opacity duration-200 ${textClass}">${name}</span>
-        ${isCollapsed ? `<div class="absolute left-full ml-2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover/ch:opacity-100 pointer-events-none z-50 whitespace-nowrap">${name}</div>` : ''}
+    <div onclick="App.chat.switchChannel('${cid}', '${id}')" class="group relative cursor-pointer mx-2 rounded-r-lg transition-all ${isActive ? activeBg : normalBg} ${extraClasses}">
+        <div class="flex items-center px-3 py-2 opacity-0 group-hover/sidebar:opacity-100 ${!isCollapsed ? 'opacity-100' : 'absolute inset-0 pointer-events-none'} transition-opacity duration-200 h-full w-full">
+            <div class="flex items-center gap-3 min-w-0 overflow-hidden flex-1 mr-1">
+                ${avatar ? `<img src="${avatar}" class="w-5 h-5 rounded-full bg-gray-200 object-cover shrink-0">` : `<i class="fas ${icon} text-xs w-5 text-center opacity-70 shrink-0"></i>`}
+                <span class="truncate text-xs font-bold">${name}</span>
+            </div>
+            ${unreadIndicator}
+            ${actionBtn}
+        </div>
+        <div class="flex items-center justify-center py-2 ${isCollapsed ? 'opacity-100 group-hover/sidebar:opacity-0' : 'hidden'} transition-opacity relative">
+             ${avatar ? `<img src="${avatar}" class="w-6 h-6 rounded-full bg-gray-200 object-cover">` : `<i class="fas ${icon} text-sm"></i>`}
+             ${chObj && chObj.isUnread ? `<div class="absolute top-1 right-1 w-2 h-2 bg-purple-600 rounded-full border border-white dark:border-[#0f172a]"></div>` : ''}
+        </div>
     </div>`;
 }
 
-function _renderUserFooter(user, isCollapsed) {
-    const hide = !isCollapsed ? '' : 'hidden group-hover/sidebar:block';
-    return `
-    <div onclick="App.settings.openProfileModal()" class="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer relative">
-        <img src="${user.avatar || 'https://ui-avatars.com/api/?background=random'}" class="w-8 h-8 rounded-full bg-slate-200">
-        <div class="flex-1 min-w-0 ${hide}">
-            <div class="text-xs font-bold text-slate-800 dark:text-gray-200 truncate">${user.name}</div>
-            <div class="text-[10px] text-slate-400 truncate">Online</div>
-        </div>
-    </div>`;
+function _updateSidebar(community, channels, activeId) {
+    const container = document.getElementById('sidebar-channels');
+    if (container) container.innerHTML = _renderChannelsHTML(_groupChannels(channels), activeId, App.chat.state.currentUser.role === 'admin', community.id, App.chat.state.currentUser);
 }
 
 // ============================================================================
@@ -749,18 +786,62 @@ window.App.chat.switchChannel = async (cid, chId, force = false) => {
     await App.chat.loadMessages(cid, chId, App.chat.state.currentUser);
 };
 
-function _renderInputArea(cid, chId, isSupport, community) {
+async function _renderInputArea(cid, chId, isSupport, community) {
     const inputArea = document.getElementById('chat-input-area');
-    const isAdmin = App.chat.state.currentUser.role === 'admin';
+    const user = App.chat.state.currentUser;
+    const isAdmin = user.role === 'admin';
     let canWrite = true;
+
     if (!isSupport && !isAdmin) {
         const channel = (community.channels || []).find(c => c.id === chId);
         if (channel && channel.type === 'announcement') canWrite = false;
         if (community.allowStudentPosts === false) canWrite = false;
     }
 
+    // VERIFICACIÓN DE LÍMITE DE MENSAJES CON PROFESOR (Solo para chat de soporte de estudiantes)
+    let msgLimitInfo = null;
+    if (isSupport && !isAdmin && window.App.permissions) {
+        msgLimitInfo = await window.App.permissions.canSendProfessorMessage(user, community);
+        if (!msgLimitInfo.allowed) {
+            canWrite = false;
+        }
+    }
+
+    // Si tiene límite pero aún puede escribir, mostrar contador
+    let msgCounterHtml = '';
+    if (msgLimitInfo && msgLimitInfo.limit !== -1 && msgLimitInfo.allowed) {
+        msgCounterHtml = `
+        <div class="flex items-center justify-between px-1 mb-2">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                <i class="far fa-comment-dots mr-1"></i>Chat con Profesor
+            </span>
+            <span class="text-[10px] font-bold ${msgLimitInfo.remaining <= 2 ? 'text-amber-600' : 'text-slate-400'} bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                ${msgLimitInfo.remaining}/${msgLimitInfo.limit} mensajes restantes
+            </span>
+        </div>`;
+    }
+
+    if (!canWrite && msgLimitInfo && !msgLimitInfo.allowed) {
+        // Límite de mensajes alcanzado
+        inputArea.innerHTML = `
+        <div class="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800 text-center">
+            <div class="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <i class="fas fa-comments text-amber-600 dark:text-amber-400 text-lg"></i>
+            </div>
+            <p class="text-sm font-bold text-amber-800 dark:text-amber-200 mb-1">Límite de mensajes alcanzado</p>
+            <p class="text-xs text-amber-600 dark:text-amber-400 mb-4">Has usado tus ${msgLimitInfo.limit} mensajes mensuales con el profesor.</p>
+            <button onclick="App.permissions.showUpgradeModal('messages', 'Mejora tu plan para chatear sin límites con tu profesor.', '${cid}')" 
+                    class="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors shadow-md flex items-center gap-2 mx-auto">
+                <i class="fas fa-crown"></i> Desbloquear Mensajes Ilimitados
+            </button>
+            <p class="text-[10px] text-amber-500 mt-3">Se renueva el primer día de cada mes</p>
+        </div>`;
+        return;
+    }
+
     inputArea.innerHTML = canWrite ? `
         <div class="flex flex-col transition-all">
+            ${msgCounterHtml}
             <div id="attachments-preview" class="hidden px-2 pb-3 gap-2 overflow-x-auto custom-scrollbar"></div>
             <form onsubmit="App.chat.handleSendMessage(event, '${cid}', '${chId}', ${isSupport})" class="flex items-end gap-2 bg-white dark:bg-[#151e32] rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-2 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
                 <button type="button" onclick="document.getElementById('file-input').click()" class="w-10 h-10 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center shrink-0"><i class="fas fa-paperclip text-lg"></i></button>
@@ -1057,15 +1138,24 @@ window.App.chat.handleSendMessage = async (e, cid, chid, isSupport) => {
     const input = document.getElementById('chat-input');
     const txt = input.value.trim();
     const atts = window.App.chat.state.pendingAttachments;
+    const user = App.state.currentUser;
 
     if (!txt && atts.length === 0) return;
+
+    // VERIFICACIÓN DE LÍMITE (DOBLE CHECK)
+    if (isSupport && user.role !== 'admin' && window.App.permissions) {
+        const commData = App.chat.state.communityData;
+        const check = await window.App.permissions.canSendProfessorMessage(user, commData);
+        if (!check.allowed) {
+            App.ui.toast("Límite de mensajes alcanzado", "error");
+            return;
+        }
+    }
 
     input.value = '';
     window.App.chat.state.pendingAttachments = [];
     document.getElementById('attachments-preview').innerHTML = '';
     document.getElementById('attachments-preview').classList.add('hidden');
-
-    const user = App.state.currentUser;
 
     try {
         const uploaded = atts.map(a => ({ type: a.type, url: a.preview, name: a.file.name, size: a.file.size }));
@@ -1086,6 +1176,13 @@ window.App.chat.handleSendMessage = async (e, cid, chid, isSupport) => {
             author: cleanAuthor,
             createdAt: new Date().toISOString()
         });
+
+        // INCREMENTAR CONTADOR (Solo Soporte y No Admin)
+        if (isSupport && user.role !== 'admin' && window.App.permissions) {
+            await window.App.permissions.incrementMessageCount(user, cid);
+            // Recargar UI localmente para actualizar contador (opcional, pero buena UX)
+            _renderInputArea(cid, chid, isSupport, App.chat.state.communityData);
+        }
 
         App.chat.loadMessages(cid, chid, user);
 

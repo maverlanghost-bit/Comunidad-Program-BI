@@ -1,11 +1,11 @@
 ﻿﻿/**
-* components.sidebar.js (V64.3 - UX POLISH)
-* Componente de Barra Lateral Global con Modales de Configuración Premium.
-* * CAMBIOS V64.3:
-* - FIX UX: El botón Pin ahora se oculta en modo colapsado para no estorbar.
-* - FIX UX: La barra ya no se cierra bruscamente al interactuar con menús.
-* - REFACTOR: Dependencia total de CSS hover para interacciones fluidas.
-*/
+ * components.sidebar.js (V64.3 - UX POLISH)
+ * Componente de Barra Lateral Global con Modales de Configuración Premium.
+ * * CAMBIOS V64.3:
+ * - FIX UX: El botón Pin ahora se oculta en modo colapsado para no estorbar.
+ * - FIX UX: La barra ya no se cierra bruscamente al interactuar con menús.
+ * - REFACTOR: Dependencia total de CSS hover para interacciones fluidas.
+ */
 
 window.App = window.App || {};
 window.App.sidebar = window.App.sidebar || {};
@@ -18,8 +18,7 @@ const SidebarManager = {
         openMenus: JSON.parse(localStorage.getItem('sidebar_open_menus') || '[]'),
         isPinned: localStorage.getItem('sidebar_pinned') === 'true',
         isUserMenuOpen: false,
-        tempAvatarFile: null, // Para previsualización
-
+        tempAvatarFile: null // Para previsualización
     },
 
     init() {
@@ -164,21 +163,8 @@ const SidebarManager = {
     refresh() {
         const sidebar = document.getElementById('sidebar');
         if (sidebar && window.App.sidebar.render) {
-            let activeId = 'feed';
             const currentHash = window.location.hash.replace('#', '') || 'feed';
-
-            // Lógica robusta para determinar ID activo
-            if (currentHash.includes('comunidades/')) {
-                // Estamos en comunidad
-                if (window.App.chat && window.App.chat.state && window.App.chat.state.activeChannelId) {
-                    activeId = window.App.chat.state.activeChannelId;
-                } else {
-                    activeId = currentHash.split('/')[1]; // Default to community ID
-                }
-            } else {
-                activeId = currentHash.split('/')[0] || 'feed';
-            }
-
+            const activeId = currentHash.split('/')[0] || 'feed';
             const newContent = window.App.sidebar.render(activeId);
             sidebar.outerHTML = newContent;
             this.applyPinState();
@@ -189,8 +175,6 @@ const SidebarManager = {
         this.state.isPinned = !this.state.isPinned;
         localStorage.setItem('sidebar_pinned', this.state.isPinned);
         this.applyPinState();
-        // No refrescar entero para evitar parpadeos, solo ajustes visuales si fuera necesario, 
-        // pero sidebar.render usa isPinned, así que sí refrescamos.
         this.refresh();
     },
 
@@ -237,9 +221,6 @@ const SidebarManager = {
         }
     },
 
-    // --- LÓGICA DE CANALES (COMUNIDAD) ---
-
-
     attachGlobalListeners() {
         document.addEventListener('click', (e) => {
             const pinBtn = e.target.closest('[data-sidebar-action="pin"]');
@@ -253,8 +234,6 @@ const SidebarManager = {
 
             const userBtn = e.target.closest('[data-sidebar-action="user-menu"]');
             if (userBtn) { e.stopPropagation(); this.toggleUserMenu(); return; }
-
-
         });
     }
 };
@@ -358,70 +337,53 @@ window.App.sidebar.render = (activeId = 'feed') => {
     if (!App.state || !App.state.currentUser) return '';
     const user = App.state.currentUser;
 
-    // FIX: La clase width ahora solo depende de 'isPinned'.
-    // Si no está pinned, es 'hover:w-[280px]', lo que permite que el mouse mantenga abierto el menú.
+    // El sidebar ahora SOLO se usa para la vista de AI
+    // Por lo tanto solo renderizamos el historial de conversaciones AI
     const isPinned = SidebarManager.state.isPinned;
     const sidebarClasses = isPinned ? 'w-[280px]' : 'w-[80px] hover:w-[280px]';
 
-    const isAIMode = activeId === 'ai' || activeId.startsWith('ai/');
     const isDark = App.state.theme === 'dark';
     const themeLabelText = isDark ? 'Modo Noche' : 'Modo Día';
 
-    // FIX: Visibilidad de texto. Si está pinned, siempre visible. Si no, solo en hover.
     const textVisibilityClass = isPinned ? 'opacity-100 delay-0' : 'opacity-0 group-hover/sidebar:opacity-100 delay-75';
 
-    // FIX: El botón de pin se oculta por defecto (opacity-0) para no molestar en 80px,
-    // y aparece en hover o si está pinned.
     const pinBtnClass = isPinned
         ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20 opacity-100'
         : 'text-slate-400 opacity-0 group-hover/sidebar:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800';
 
-
-
-    // SI ESTAMOS EN MODO COMUNIDAD, RENDERIZAMOS EL SIDEBAR ESPECÍFICO
-
-
     return `
-    <aside id="sidebar" class="fixed top-0 left-0 h-full bg-white dark:bg-[#0f172a] border-r border-slate-100 dark:border-slate-800/60 z-[60] flex flex-col transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${sidebarClasses} group/sidebar shadow-sm font-sans">
+    <aside id="sidebar" class="fixed lg:relative top-0 left-0 h-full bg-white dark:bg-[#0f172a] border-r border-slate-100 dark:border-slate-800/60 z-[60] flex flex-col transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${sidebarClasses} group/sidebar shadow-sm font-sans">
         
-        <!-- HEADER -->
-        <div class="h-[80px] flex items-center px-5 shrink-0 relative justify-between overflow-hidden">
-            <div class="flex items-center gap-4 cursor-pointer group/logo" onclick="window.location.hash='#feed'">
-                <div class="w-10 h-10 bg-blue-600/10 dark:bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 text-xl transition-transform group-hover/logo:scale-105 shrink-0 relative z-10">
-                    <i class="fas fa-code"></i>
-                </div>
+        <!-- HEADER CON BACK BUTTON -->
+        <div class="h-[70px] flex items-center px-4 shrink-0 relative justify-between overflow-hidden border-b border-slate-100 dark:border-slate-800">
+            <div class="flex items-center gap-3">
+                <!-- BACK TO COMMUNITY BUTTON -->
+                <a href="#feed" class="w-10 h-10 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-400 transition-all shrink-0" title="Volver">
+                    <i class="fas fa-arrow-left text-sm"></i>
+                </a>
                 <div class="flex flex-col transition-opacity duration-300 ${textVisibilityClass}">
-                    <span class="font-bold text-lg text-slate-800 dark:text-white leading-tight tracking-tight">
-                        ProgramBI
+                    <span class="font-bold text-base text-slate-800 dark:text-white leading-tight flex items-center gap-2">
+                        <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 text-purple-500">
+                            <path d="M12 3C12 3 14 9 16 11C18 13 22 13 22 13C22 13 18 13 16 15C14 17 12 23 12 23C12 23 10 17 8 15C6 13 2 13 2 13C2 13 6 13 8 11C10 9 12 3 12 3Z" />
+                        </svg> Asistente AI
                     </span>
-                    <span class="text-[10px] text-slate-400 font-medium tracking-wide uppercase">Academy</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Historial de conversaciones</span>
                 </div>
             </div>
             
-            <!-- FIX: Botón Pin con visibilidad controlada -->
-            <button data-sidebar-action="pin" id="pin-btn" class="w-8 h-8 rounded-full flex items-center justify-center transition-all absolute right-4 z-20 ${pinBtnClass}" title="Fijar menú">
-                <i class="fas fa-bars text-sm"></i>
+            <!-- Botón Pin -->
+            <button data-sidebar-action="pin" id="pin-btn" class="w-8 h-8 rounded-full flex items-center justify-center transition-all ${pinBtnClass}" title="Fijar menú">
+                <i class="fas fa-thumbtack text-xs"></i>
             </button>
         </div>
 
-        <!-- CONTENIDO SCROLLEABLE -->
-        <nav class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar py-4 flex flex-col gap-2 px-4">
-            ${_renderNavItem('feed', 'Mi Feed', 'fa-home', activeId === 'feed', 'text-slate-400 group-hover/item:text-blue-500', textVisibilityClass)}
-            ${_renderNavItem('chat', 'Comunidad', 'fa-users', activeId === 'chat', 'text-slate-400 group-hover/item:text-emerald-500', textVisibilityClass)} 
-            ${_renderNavItemAI(isAIMode, textVisibilityClass)}
-            ${_renderNavItem('discovery', 'Explorar', 'fa-compass', activeId === 'discovery', 'text-slate-400 group-hover/item:text-amber-500', textVisibilityClass)}
-
-            ${user.role === 'admin' ? `
-                <div class="my-2 h-px bg-slate-100 dark:bg-slate-800 mx-2"></div>
-                ${_renderNavItem('admin', 'Admin Panel', 'fa-shield-alt', activeId === 'admin', 'text-slate-400 group-hover/item:text-rose-500', textVisibilityClass)}
-            ` : ''}
-
-            <div class="my-4 h-px bg-slate-100 dark:bg-slate-800 mx-2"></div>
-            ${isAIMode ? _renderAIHistorySection(user, textVisibilityClass) : _renderCommunitiesSection(user, activeId, textVisibilityClass)}
+        <!-- CONTENIDO: SOLO HISTORIAL AI -->
+        <nav class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar py-4 flex flex-col gap-2 px-4 bg-white dark:bg-[#0f172a]">
+            ${_renderAIHistorySection(user, textVisibilityClass)}
         </nav>
 
         <!-- FOOTER: PERFIL DE USUARIO & CONFIG -->
-        <div class="p-4 shrink-0 bg-white dark:bg-[#0f172a] relative">
+        <div class="p-4 shrink-0 bg-white dark:bg-[#0f172a] relative border-t border-slate-100 dark:border-slate-800">
             
             <!-- POP-UP MENU DE USUARIO -->
             <div id="user-popup-menu" class="hidden absolute bottom-[115%] left-3 right-3 bg-white/90 dark:bg-[#1e293b]/90 backdrop-blur-xl rounded-2xl shadow-2xl shadow-indigo-500/10 border border-white/20 dark:border-white/5 p-3 transform transition-all duration-300 ease-out z-50 origin-bottom scale-95 opacity-0 translate-y-4">
@@ -473,7 +435,7 @@ window.App.sidebar.render = (activeId = 'feed') => {
                 </div>
             </button>
         </div>
-    </aside>`;
+    </aside>`
 };
 
 // ============================================================================
@@ -528,7 +490,7 @@ function _renderAIHistorySection(user, textClass = '') {
         <div class="w-6 flex justify-center shrink-0"><i class="fas fa-plus"></i></div>
         <span class="font-bold text-xs whitespace-nowrap transition-opacity duration-200 ${textClass}">Nueva Conversación</span>
     </button>
-    <div class="space-y-1 overflow-y-auto max-h-[300px] custom-scrollbar px-1">
+    <div class="space-y-1 overflow-y-auto overflow-x-hidden flex-1 custom-scrollbar px-1 min-h-0">
         ${isLoading ? `<div class="p-2 space-y-3 transition-opacity ${textClass}"><div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-3/4 animate-pulse"></div><div class="h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-1/2 animate-pulse"></div></div>`
             : (history.length === 0 ? `<div class="text-center p-4 transition-opacity ${textClass}"><p class="text-[11px] text-slate-400">Tu historial aparecerá aquí</p></div>`
                 : history.map(chat => `
@@ -592,17 +554,9 @@ function _renderCommunityDropdown(c, activeId, isOpen, textClass) {
     </div>`;
 }
 
-
-
-
 function _renderSubLink(cid, tab, label, icon, isLive = false) {
-    const hash = `#comunidades/${cid}/${tab}`;
-    const isActive = window.location.hash === hash;
-    const textClass = SidebarManager.state.isPinned ? 'opacity-100' : 'opacity-0 group-hover/sidebar:opacity-100';
-
-    return `
-    <a href="${hash}" class="flex items-center gap-3 p-2 rounded-lg transition-colors ${isActive ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}">
-        <div class="w-5 flex justify-center shrink-0 ${isLive ? 'text-rose-500' : ''}"><i class="fas ${icon}"></i></div>
-        <span class="text-xs font-medium whitespace-nowrap transition-opacity duration-200 ${textClass}">${label}</span>
-    </a>`;
+    const hash = window.location.hash;
+    const isActive = hash.includes(`/${cid}/${tab}`) || (tab === 'inicio' && hash === `#comunidades/${cid}` || hash === `#comunidades/${cid}/inicio`);
+    const colorClass = isActive ? 'text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/10' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50';
+    return `<a href="#comunidades/${cid}/${tab}" onclick="document.body.classList.remove('mobile-menu-open')" class="flex items-center gap-3 py-2 px-3 rounded-lg text-xs transition-colors ${colorClass}"><i class="fas ${icon} w-3 text-center ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-300'} ${isLive && !isActive ? 'text-rose-500 animate-pulse' : ''}"></i><span>${label}</span></a>`;
 }

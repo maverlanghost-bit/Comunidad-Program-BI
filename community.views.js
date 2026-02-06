@@ -119,17 +119,23 @@ window.App.renderCommunity = async (communityId, activeTab = 'inicio', extraPara
         case 'clases':
             container.className = "flex-1 w-full flex flex-col animate-fade-in relative z-0 bg-white dark:bg-[#0f172a] min-h-[600px]";
             container.innerHTML = '';
-            if (App.lms) {
+            // Verificación robusta del módulo LMS
+            if (window.App && window.App.lms && window.App.lms.renderCatalog) {
                 if (extraParam) {
-                    App.lms.renderPlayer(container, community, extraParam, user, user.role === 'admin');
+                    window.App.lms.renderPlayer(container, community, extraParam, user, user.role === 'admin');
                 } else {
                     const catalogWrapper = document.createElement('div');
                     catalogWrapper.className = "w-full h-full";
                     container.appendChild(catalogWrapper);
-                    App.lms.renderCatalog(catalogWrapper, community, user, user.role === 'admin');
+                    window.App.lms.renderCatalog(catalogWrapper, community, user, user.role === 'admin');
                 }
             } else {
-                container.innerHTML = `<div class="p-20 text-center text-slate-400">Módulo LMS no cargado.</div>`;
+                console.error('[LMS] Módulo no cargado. Verifique que community.lms.js esté incluido.');
+                container.innerHTML = `<div class="p-20 text-center text-slate-400">
+                    <i class="fas fa-exclamation-triangle text-4xl mb-4 text-amber-500"></i>
+                    <p class="font-bold">Módulo LMS no cargado.</p>
+                    <p class="text-sm mt-2">Intenta recargar la página (F5)</p>
+                </div>`;
             }
             break;
 
@@ -152,9 +158,9 @@ function _renderCommunityHeader(c, activeTab, user) {
     const isMember = (user.joinedCommunities || []).includes(c.id);
     const isAdmin = user.role === 'admin';
 
-    // Estilos para Tabs (Solo visible en desktop)
-    const tabInactive = "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-6 transition-all text-sm h-full flex items-center";
-    const tabActive = "text-[#1890ff] font-bold border-b-2 border-[#1890ff] px-3 py-6 text-sm h-full flex items-center";
+    // Estilos para Tabs - TODOS uniformes con iconos grises
+    const tabInactive = "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-5 transition-all text-sm h-full flex items-center gap-2 whitespace-nowrap";
+    const tabActive = "text-[#1890ff] font-bold border-b-2 border-[#1890ff] px-3 py-5 text-sm h-full flex items-center gap-2 whitespace-nowrap";
 
     const getTabClass = (tabName) => {
         if (activeTab === 'comunidad' && tabName === 'inicio') return tabActive;
@@ -163,55 +169,89 @@ function _renderCommunityHeader(c, activeTab, user) {
 
     // Lógica de Identidad Visual
     const hasLogo = !!c.logoUrl;
-    const showTitle = c.showTitle !== false; // Default true
+    const showTitle = c.showTitle !== false;
 
     return `
-        <div class="max-w-[1200px] w-full mx-auto px-4 sm:px-6">
-            <div class="flex items-center justify-between h-[60px] lg:h-[80px]">
-                <!-- GRUPO IZQUIERDA: Branding + Tabs (PC) -->
-                <div class="flex items-center gap-4 lg:gap-6 h-full overflow-hidden">
-                    <!-- BRANDING BLOCK -->
-                    <div class="flex items-center gap-3 sm:gap-4 shrink-0">
-                        ${hasLogo
-            ? `<img src="${c.logoUrl}" class="h-8 lg:h-10 w-auto object-contain max-w-[140px] lg:max-w-[180px] select-none" alt="${c.name}">`
-            : `<div class="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center text-slate-400 text-base lg:text-lg shrink-0">
-                                <i class="fas ${c.icon || 'fa-users'}"></i>
-                               </div>`
+        <div class="max-w-[1400px] w-full mx-auto px-4 sm:px-6">
+            <div class="flex items-center h-[60px] lg:h-[65px] gap-4 lg:gap-6">
+                <!-- BRANDING -->
+                <div class="flex items-center gap-3 shrink-0">
+                    ${hasLogo
+            ? `<img src="${c.logoUrl}" class="h-8 lg:h-9 w-auto object-contain max-w-[100px] lg:max-w-[120px] select-none" alt="${c.name}">`
+            : `<div class="w-8 h-8 lg:w-9 lg:h-9 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center text-slate-400 text-base shrink-0">
+                            <i class="fas ${c.icon || 'fa-users'}"></i>
+                           </div>`
         }
-                        
-                        ${showTitle ? `
-                        <div class="hidden sm:block">
-                            <h1 class="font-heading font-bold text-base lg:text-lg text-slate-900 dark:text-white leading-tight flex items-center gap-2">
-                                ${c.name}
-                                ${c.isPrivate ? '<i class="fas fa-lock text-[10px] text-slate-400"></i>' : ''}
-                            </h1>
-                        </div>` : ''}
-                    </div>
-
-                    <!-- SEPARADOR VERTICAL (Solo Desktop) -->
-                    <div class="h-6 w-px bg-gray-200 dark:bg-slate-700 hidden lg:block"></div>
-
-                    <!-- TABS (Solo Desktop - en móvil usan el sidebar) -->
-                    <div class="hidden lg:flex items-center gap-2 h-full overflow-x-auto custom-scrollbar -mb-px">
-                        <a href="#comunidades/${c.id}/inicio" class="${getTabClass('inicio')} whitespace-nowrap"><i class="fas fa-stream text-xs mr-2 opacity-70"></i> Muro</a>
-                        <a href="#comunidades/${c.id}/clases" class="${getTabClass('clases')} whitespace-nowrap"><i class="fas fa-graduation-cap text-xs mr-2 opacity-70"></i> Aula</a>
-                        <a href="#comunidades/${c.id}/live" class="${getTabClass('live')} whitespace-nowrap"><i class="fas fa-video text-xs mr-2 ${activeTab === 'live' ? 'text-red-500 animate-pulse' : 'opacity-70'}"></i> Live</a>
-                    </div>
+                    ${showTitle ? `<span class="hidden sm:block font-bold text-sm text-slate-900 dark:text-white">${c.name}</span>` : ''}
                 </div>
 
-                <!-- GRUPO DERECHA: Acciones -->
-                <div class="flex items-center gap-3 shrink-0">
-                    ${!isMember ?
-            `<button onclick="App.api.joinCommunity('${c.id}').then(()=>App.renderCommunity('${c.id}'))" class="btn-primary px-3 sm:px-4 py-1.5 text-xs shadow-lg">Unirse</button>` :
+                <!-- SEPARADOR -->
+                <div class="h-5 w-px bg-slate-200 dark:bg-slate-700 hidden lg:block shrink-0"></div>
+
+                <!-- TABS (Desktop) - Todos uniformes, sin separador entre Live y Comunidad -->
+                <div class="hidden lg:flex items-center h-full overflow-x-auto custom-scrollbar -mb-px">
+                    <a href="#comunidades/${c.id}/inicio" class="${getTabClass('inicio')}"><i class="fas fa-stream text-xs opacity-70"></i> Muro</a>
+                    <a href="#comunidades/${c.id}/clases" class="${getTabClass('clases')}"><i class="fas fa-graduation-cap text-xs opacity-70"></i> Aula</a>
+                    <a href="#comunidades/${c.id}/live" class="${getTabClass('live')}"><i class="fas fa-video text-xs opacity-70"></i> Live</a>
+                    <a href="#chat" class="${tabInactive}"><i class="fas fa-comments text-xs opacity-70"></i> Comunidad</a>
+                    <a href="#ai" class="${tabInactive}"><i class="fas fa-sparkles text-xs opacity-70"></i> Asistente AI</a>
+                </div>
+
+                <!-- SPACER -->
+                <div class="flex-1"></div>
+
+                <!-- GRUPO DERECHA: Search + Admin + Settings -->
+                <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+                    
+                    <!-- SEARCH BAR (Desktop) -->
+                    <div class="relative hidden md:block group">
+                        <input 
+                            type="text" 
+                            id="header-search-input"
+                            placeholder="Buscar cursos, clases..." 
+                            class="w-52 lg:w-64 pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1890ff]/40 focus:border-[#1890ff] group-hover:border-slate-300 dark:group-hover:border-slate-600 transition-all shadow-sm"
+                            oninput="App.search.handleInput(event)"
+                            onfocus="this.parentElement.classList.add('focused')"
+                            onblur="setTimeout(() => this.parentElement.classList.remove('focused'), 200)"
+                        >
+                        <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-[.focused]:text-[#1890ff] transition-colors"></i>
+                        <kbd class="hidden lg:flex absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600">⌘K</kbd>
+                        <div id="global-search-results" class="hidden absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 max-h-[400px] overflow-hidden z-50"></div>
+                    </div>
+
+                    <!-- MOBILE SEARCH -->
+                    <button onclick="App.community.toggleMobileSearch()" class="md:hidden w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-all">
+                        <i class="fas fa-search text-sm"></i>
+                    </button>
+
+                    <!-- ADMIN (Solo admins) -->
+                    ${isAdmin ? `<a href="#admin" class="${tabInactive} hidden lg:flex !border-0 !py-2"><i class="fas fa-shield-alt text-xs opacity-70"></i> Admin</a>` : ''}
+
+                    <!-- SETTINGS -->
+                    ${isMember ?
             `<div class="relative" id="community-settings-wrapper">
-                            <button onclick="App.community.toggleSettings()" class="btn-ghost w-8 h-8 flex items-center justify-center text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg"><i class="fas fa-ellipsis-v"></i></button>
+                            <button onclick="App.community.toggleSettings()" class="btn-ghost w-9 h-9 flex items-center justify-center text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-all"><i class="fas fa-ellipsis-v"></i></button>
                             <div id="community-settings-menu" class="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-float border border-gray-100 dark:border-slate-800 hidden animate-slide-up overflow-hidden z-50">
                                 ${isAdmin ? `<button onclick="App.community.openEditCommunityModal()" class="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"><i class="fas fa-pen w-5 text-slate-400"></i> Editar</button>` : ''}
+                                <a href="#chat" class="lg:hidden w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors flex items-center"><i class="fas fa-comments w-5 text-slate-400"></i> Comunidad</a>
+                                <a href="#ai" class="lg:hidden w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors flex items-center"><i class="fas fa-sparkles w-5 text-slate-400"></i> Asistente AI</a>
+                                ${isAdmin ? `<a href="#admin" class="lg:hidden w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center"><i class="fas fa-shield-alt w-5 text-slate-400"></i> Admin</a>` : ''}
                                 <button onclick="App.community.leave('${c.id}')" class="w-full text-left px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"><i class="fas fa-sign-out-alt w-5"></i> Salir</button>
                             </div>
-                        </div>`
+                        </div>` :
+            `<button onclick="App.api.joinCommunity('${c.id}').then(()=>App.renderCommunity('${c.id}'))" class="btn-primary px-3 sm:px-4 py-1.5 text-xs shadow-lg">Unirse</button>`
         }
                 </div>
+            </div>
+            
+            <!-- MOBILE TABS BAR -->
+            <div class="lg:hidden flex items-center border-t border-gray-100 dark:border-slate-800 -mx-4 sm:-mx-6 px-2 sm:px-4 overflow-x-auto custom-scrollbar">
+                <a href="#comunidades/${c.id}/inicio" class="${getTabClass('inicio')} text-xs py-3"><i class="fas fa-stream text-xs opacity-70"></i> Muro</a>
+                <a href="#comunidades/${c.id}/clases" class="${getTabClass('clases')} text-xs py-3"><i class="fas fa-graduation-cap text-xs opacity-70"></i> Aula</a>
+                <a href="#comunidades/${c.id}/live" class="${getTabClass('live')} text-xs py-3"><i class="fas fa-video text-xs opacity-70"></i> Live</a>
+                <a href="#chat" class="${tabInactive} text-xs py-3"><i class="fas fa-comments text-xs opacity-70"></i> Chat</a>
+                <a href="#ai" class="${tabInactive} text-xs py-3"><i class="fas fa-sparkles text-xs opacity-70"></i> AI</a>
+                ${isAdmin ? `<a href="#admin" class="${tabInactive} text-xs py-3"><i class="fas fa-shield-alt text-xs opacity-70"></i> Admin</a>` : ''}
             </div>
         </div>
     `;
@@ -232,6 +272,39 @@ App.community.toggleSettings = () => {
         }
     };
     setTimeout(() => document.addEventListener('click', closeFn), 0);
+};
+
+// Toggle Mobile Search (Muestra un campo de búsqueda en móvil)
+App.community.toggleMobileSearch = () => {
+    // Por ahora, redirigimos al feed donde hay búsqueda global
+    // En el futuro se puede implementar un overlay de búsqueda
+    const existingSearch = document.getElementById('mobile-search-overlay');
+    if (existingSearch) {
+        existingSearch.remove();
+        return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'mobile-search-overlay';
+    overlay.className = 'fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-start justify-center pt-20 px-4 animate-fade-in';
+    overlay.innerHTML = `
+        <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-slate-100 dark:border-slate-800">
+                <div class="relative">
+                    <input type="text" id="mobile-search-input" placeholder="Buscar comunidades..." 
+                           class="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1890ff]"
+                           oninput="App.search.handleInput(event)" autofocus>
+                    <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                </div>
+            </div>
+            <div id="global-search-results" class="max-h-80 overflow-y-auto"></div>
+        </div>
+    `;
+    overlay.onclick = (e) => {
+        if (e.target === overlay) overlay.remove();
+    };
+    document.body.appendChild(overlay);
+    setTimeout(() => document.getElementById('mobile-search-input')?.focus(), 100);
 };
 
 App.community.leave = async (cid) => {
@@ -286,6 +359,7 @@ function _findNextLesson(community, user) {
                     classId: nextClass.id,
                     classTitle: nextClass.title,
                     image: course.image,
+                    videoUrl: nextClass.videoUrl, // Para obtener miniatura de YouTube
                     progress: Math.round((courseCompletedCount / totalClasses) * 100)
                 };
             }
@@ -307,6 +381,15 @@ function _renderContinueLearningCard(nextLesson, communityId) {
     // Onclick handler para reproducir inmediatamente al hacer clic en el botón principal
     const clickHandler = `onclick="setTimeout(() => { if(window.App.lms) App.lms.playClass('${communityId}', '${nextLesson.courseId}', '${nextLesson.classId}'); }, 100)"`;
 
+    // Extraer ID de YouTube y generar thumbnail
+    let thumbnailUrl = nextLesson.image || 'https://via.placeholder.com/400x200?text=Curso';
+    if (nextLesson.videoUrl) {
+        const ytMatch = nextLesson.videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        if (ytMatch && ytMatch[1]) {
+            thumbnailUrl = `https://img.youtube.com/vi/${ytMatch[1]}/maxresdefault.jpg`;
+        }
+    }
+
     // Gradient colors based on state
     const buttonGradient = isStart
         ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/30'
@@ -322,35 +405,31 @@ function _renderContinueLearningCard(nextLesson, communityId) {
         </div>
         
         <div class="p-5">
-            <!-- Thumbnail con overlay mejorado -->
-            <div class="relative aspect-video rounded-2xl overflow-hidden mb-4 group cursor-pointer shadow-lg ring-1 ring-black/5 dark:ring-white/5" onclick="window.location.hash='${link}'">
-                <img src="${nextLesson.image || 'https://via.placeholder.com/400x200?text=Curso'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
+            <!-- Thumbnail sin overlay oscuro -->
+            <a href="${link}" ${clickHandler} class="relative aspect-video rounded-2xl overflow-hidden mb-4 group block cursor-pointer shadow-lg ring-1 ring-black/5 dark:ring-white/5">
+                <img src="${thumbnailUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='${nextLesson.image || 'https://via.placeholder.com/400x200?text=Curso'}'">
                 
-                <!-- Overlay con gradiente -->
-                <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center group-hover:from-black/50 transition-all">
-                    <div class="w-14 h-14 bg-white/95 backdrop-blur-sm rounded-full flex items-center justify-center text-[#1890ff] shadow-2xl scale-90 group-hover:scale-100 transition-all duration-300 ring-4 ring-white/30">
-                        <i class="fas fa-play text-xl ml-1"></i>
+                <!-- Botón play sutil (solo en hover) -->
+                <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div class="w-16 h-16 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-[#1890ff] shadow-2xl scale-90 group-hover:scale-100 transition-all duration-300">
+                        <i class="fas fa-play text-2xl ml-1"></i>
                     </div>
                 </div>
                 
                 <!-- Barra de progreso -->
                 ${!isStart ? `
-                <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-black/30">
-                    <div class="h-full bg-gradient-to-r from-[#1890ff] to-indigo-500 shadow-[0_0_10px_rgba(24,144,255,0.8)]" style="width: ${nextLesson.progress}%"></div>
+                <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-black/20">
+                    <div class="h-full bg-gradient-to-r from-[#1890ff] to-indigo-500" style="width: ${nextLesson.progress}%"></div>
                 </div>
                 ` : ''}
                 
-                <!-- Badge de progreso -->
+                <!-- Badge de progreso (solo si hay progreso) -->
                 ${!isStart ? `
                 <div class="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-full text-[10px] font-bold">
                     ${nextLesson.progress}% completado
                 </div>
-                ` : `
-                <div class="absolute top-3 right-3 bg-emerald-500 text-white px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
-                    <i class="fas fa-star text-[8px]"></i> Nuevo
-                </div>
-                `}
-            </div>
+                ` : ''}
+            </a>
             
             <!-- Info -->
             <div class="mb-4">
@@ -393,14 +472,23 @@ async function _renderFeedTab(container, community, user) {
                 ${learningCardHTML}
             </div>` : ''}
             
+            
             ${isAdmin ? `
-            <div class="card-zen p-4 flex items-center gap-4 cursor-pointer group" onclick="App.community.openCreatePostModal()">
+            <div class="card-zen p-4 flex items-center gap-4">
                 <img src="${user.avatar}" class="w-10 h-10 rounded-full object-cover bg-gray-100">
-                <div class="flex-1 bg-gray-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-slate-400 text-sm font-medium group-hover:bg-gray-100 dark:group-hover:bg-slate-700 transition-colors flex justify-between items-center">
-                    <span>Escribe un anuncio o post...</span>
-                    <i class="fas fa-pen text-xs"></i>
+                <div class="flex-1 flex gap-3">
+                    <div onclick="App.community.openCreatePostModal()" class="flex-1 bg-gray-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-slate-400 text-sm font-medium hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex justify-between items-center cursor-pointer group">
+                        <span>Escribe un anuncio o post...</span>
+                        <i class="fas fa-pen text-xs"></i>
+                    </div>
+                    ${user.role === 'admin' ? `
+                    <button onclick="App.community.openChallengeModal()" class="px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl transition-colors font-bold text-sm flex items-center gap-2 whitespace-nowrap" title="Crear Desafío">
+                        <i class="fas fa-trophy"></i>
+                        <span class="hidden sm:inline">Desafío</span>
+                    </button>` : ''}
                 </div>
             </div>` : ''}
+
 
             <div id="feed-posts-container" class="space-y-6 min-h-[300px]">
                 ${[1, 2].map(() => App.ui.skeleton()).join('')}
@@ -423,11 +511,26 @@ async function _renderFeedTab(container, community, user) {
         window.App.currentFeed = feedPosts;
         const postEl = document.getElementById('feed-posts-container');
         if (postEl) {
-            postEl.innerHTML = feedPosts.length === 0
+            // Check for active challenge
+            let challengeHTML = '';
+            const activeChallenge = community.activeChallenge;
+            if (activeChallenge && !activeChallenge.archived && _isChallengeActive(activeChallenge)) {
+                challengeHTML = _renderChallengeCard(activeChallenge, user, community.id);
+            }
+
+            const postsHTML = feedPosts.length === 0
                 ? `<div class="text-center py-12 opacity-60"><i class="fas fa-wind text-3xl mb-2 text-slate-300"></i><p class="text-sm text-slate-500">Aún no hay publicaciones.</p></div>`
                 : feedPosts.map(p => _renderThreadCard(p, user, community)).join('');
+
+            postEl.innerHTML = challengeHTML + postsHTML;
+
+            // Init timer if challenge exists
+            if (activeChallenge && !activeChallenge.archived && _isChallengeActive(activeChallenge)) {
+                _initChallengeTimer(activeChallenge.expiresAt, activeChallenge.id);
+            }
         }
     } catch (e) {
+        console.error(e);
         const postEl = document.getElementById('feed-posts-container');
         if (postEl) postEl.innerHTML = `<div class="text-red-500 text-center text-sm">Error cargando feed.</div>`;
     }
@@ -462,7 +565,8 @@ function _renderThreadCard(post, user, community) {
         </div>
 
         <div class="pl-0 md:pl-[52px]">
-            ${post.title ? `<h3 class="font-bold text-slate-900 dark:text-white mb-2 text-lg leading-snug">${post.title}</h3>` : ''}
+            ${post.title ? `<h3 class="font-bold text-slate-900 dark:text-white mb-2 text-lg leading-snug flex items-center gap-2">${isQuestion ? '<i class="fas fa-question-circle text-indigo-500"></i>' : ''}${post.title}</h3>` : ''}
+            ${isQuestion && post.tags && post.tags.length > 0 ? `<div class="flex gap-2 mb-3">${post.tags.map(tag => `<span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded text-[10px] font-medium">${tag}</span>`).join('')}</div>` : ''}
             <div class="text-slate-600 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap mb-4 font-medium">${post.content}</div>
             
             ${post.image ? `
@@ -598,6 +702,78 @@ function _injectModals(community, user) {
                 <div class="flex items-center gap-2 pt-1"><input type="checkbox" id="cp-allow-comments" class="accent-[#1890ff] cursor-pointer" checked> <label for="cp-allow-comments" class="text-xs font-bold text-slate-500 cursor-pointer">Permitir Comentarios</label></div>
             </div>
             <div class="p-5 border-t border-gray-100 dark:border-slate-800 flex justify-end"><button onclick="App.community.submitPost()" id="btn-submit-post" class="btn-primary px-8 py-2.5 text-sm shadow-lg">Publicar</button></div>
+        </div>
+    </div>`;
+
+    // B. Modal Crear Desafío (Solo Admins)
+    modalsHtml += `
+    <div id="create-challenge-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="App.community.closeChallengeModal()"></div>
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl relative z-10 flex flex-col overflow-hidden max-h-[90vh]">
+            <div class="bg-gradient-to-r from-amber-500 to-orange-500 p-5 text-white flex justify-between items-center">
+                <h3 class="font-heading font-bold text-lg flex items-center gap-2" id="modal-challenge-title"><i class="fas fa-trophy text-yellow-200"></i> Crear Desafío</h3>
+                <button onclick="App.community.closeChallengeModal()" class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"><i class="fas fa-times text-sm"></i></button>
+            </div>
+            <div class="p-6 space-y-5 bg-gray-50 dark:bg-slate-900/50 overflow-y-auto custom-scrollbar">
+                <input type="hidden" id="ch-is-edit" value="false">
+                <input type="hidden" id="ch-id" value="">
+                <input type="hidden" id="ch-cid" value="${community.id}">
+                
+                <div>
+                    <label class="text-[10px] font-bold uppercase text-slate-500 mb-1 block ml-1">Tema (Color)</label>
+                    <select id="ch-topic" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white text-sm font-bold shadow-sm outline-none">
+                        <option value="General">General (Azul)</option>
+                        <option value="Python">Python (Amarillo)</option>
+                        <option value="SQL">SQL Server (Rojo)</option>
+                        <option value="Power BI">Power BI (Naranja)</option>
+                        <option value="Excel">Excel (Verde)</option>
+                        <option value="Machine Learning">IA / ML (Violeta)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-bold uppercase text-slate-500 mb-1 block ml-1">Pregunta del Desafío</label>
+                    <input type="text" id="ch-question" class="w-full p-3 rounded-xl border border-gray-200 dark:border-slate-700 font-bold text-sm bg-white dark:bg-slate-900 dark:text-white" placeholder="Ej: ¿Qué comando filtra filas en SQL?">
+                </div>
+                
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold uppercase text-slate-500 mb-1 block ml-1">Opciones de Respuesta</label>
+                    <div class="flex gap-2"><span class="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold dark:text-slate-400">A</span><input type="text" id="ch-opt1" class="flex-1 p-2 rounded-lg border border-gray-200 bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white text-sm" placeholder="Opción A"></div>
+                    <div class="flex gap-2"><span class="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold dark:text-slate-400">B</span><input type="text" id="ch-opt2" class="flex-1 p-2 rounded-lg border border-gray-200 bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white text-sm" placeholder="Opción B"></div>
+                    <div class="flex gap-2"><span class="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold dark:text-slate-400">C</span><input type="text" id="ch-opt3" class="flex-1 p-2 rounded-lg border border-gray-200 bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white text-sm" placeholder="(Opcional)"></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-bold uppercase text-slate-500 mb-1 block ml-1">Respuesta Correcta</label>
+                        <select id="ch-correct" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white text-sm font-bold shadow-sm outline-none">
+                            <option value="0">Opción A</option>
+                            <option value="1">Opción B</option>
+                            <option value="2">Opción C</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold uppercase text-slate-500 mb-1 block ml-1">Duración</label>
+                        <select id="ch-duration" class="w-full p-2.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white text-sm font-bold shadow-sm outline-none">
+                            <option value="1">1 hora</option>
+                            <option value="6">6 horas</option>
+                            <option value="12">12 horas</option>
+                            <option value="24" selected>24 horas</option>
+                            <option value="48">48 horas</option>
+                            <option value="72">72 horas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-bold uppercase text-slate-500 mb-1 block ml-1">Explicación (se muestra al terminar)</label>
+                    <textarea id="ch-explanation" rows="2" class="w-full p-2.5 rounded-lg border border-gray-200 bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white text-sm resize-none" placeholder="¿Por qué es esa la respuesta correcta?"></textarea>
+                </div>
+            </div>
+            <div class="p-5 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-3 bg-white dark:bg-slate-900">
+                <button onclick="App.community.closeChallengeModal()" class="btn-ghost px-6 py-2.5 text-sm">Cancelar</button>
+                <button onclick="App.community.saveChallenge()" id="btn-save-challenge" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-sm shadow-lg hover:shadow-xl transition-all">Lanzar Desafío</button>
+            </div>
         </div>
     </div>`;
 
@@ -747,11 +923,192 @@ App.community.addComment = async (pid) => {
     try { await window.F.updateDoc(window.F.doc(window.F.db, "posts", pid), { comments: window.F.arrayUnion(comment) }); } catch (e) { console.error(e); }
 };
 
+
 // Handlers Admin
 App.community.openLiveConfigModal = () => document.getElementById('live-modal').classList.remove('hidden');
 App.community.closeLiveModal = () => document.getElementById('live-modal').classList.add('hidden');
 App.community.openEditCommunityModal = () => { document.getElementById('edit-community-modal').classList.remove('hidden'); App.community.toggleSettings(); };
 App.community.closeEditCommunityModal = () => document.getElementById('edit-community-modal').classList.add('hidden');
+
+// Challenge Modal Handlers
+App.community.openChallengeModal = () => {
+    const modal = document.getElementById('create-challenge-modal');
+    if (modal) {
+        // Reset form
+        document.getElementById('ch-is-edit').value = 'false';
+        document.getElementById('ch-id').value = '';
+        document.getElementById('ch-question').value = '';
+        document.getElementById('ch-opt1').value = '';
+        document.getElementById('ch-opt2').value = '';
+        document.getElementById('ch-opt3').value = '';
+        document.getElementById('ch-explanation').value = '';
+        document.getElementById('ch-topic').value = 'General';
+        document.getElementById('ch-correct').value = '0';
+        document.getElementById('ch-duration').value = '24';
+        document.getElementById('modal-challenge-title').innerHTML = '<i class="fas fa-trophy text-yellow-200"></i> Crear Desafío';
+        document.getElementById('btn-save-challenge').innerText = 'Lanzar Desafío';
+        modal.classList.remove('hidden');
+    }
+};
+
+App.community.closeChallengeModal = () => {
+    const modal = document.getElementById('create-challenge-modal');
+    if (modal) modal.classList.add('hidden');
+};
+
+App.community.saveChallenge = async () => {
+    const cid = document.getElementById('ch-cid').value;
+    const question = document.getElementById('ch-question').value.trim();
+    const topic = document.getElementById('ch-topic').value;
+    const durationHours = parseInt(document.getElementById('ch-duration').value);
+    const btn = document.getElementById('btn-save-challenge');
+
+    if (!question) return App.ui.toast("La pregunta es requerida", "warning");
+
+    const opts = [
+        document.getElementById('ch-opt1').value.trim(),
+        document.getElementById('ch-opt2').value.trim(),
+        document.getElementById('ch-opt3').value.trim()
+    ].filter(Boolean);
+
+    if (opts.length < 2) return App.ui.toast("Mínimo 2 opciones requeridas", "warning");
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Guardando...';
+
+    try {
+        const isEdit = document.getElementById('ch-is-edit').value === 'true';
+        const challengeId = isEdit ? document.getElementById('ch-id').value : 'ch_' + Date.now();
+        const expiresAt = new Date(Date.now() + durationHours * 36e5).toISOString();
+
+        const newChallenge = {
+            id: challengeId,
+            question,
+            topic,
+            options: opts,
+            correctIndex: parseInt(document.getElementById('ch-correct').value),
+            explanation: document.getElementById('ch-explanation').value.trim(),
+            expiresAt,
+            votes: {},
+            stats: new Array(opts.length).fill(0),
+            totalVotes: 0,
+            archived: false,
+            createdAt: new Date().toISOString()
+        };
+
+        await window.F.updateDoc(window.F.doc(window.F.db, "communities", cid), { activeChallenge: newChallenge });
+
+        // Update cache
+        if (!App.state.cache.communities[cid]) App.state.cache.communities[cid] = {};
+        App.state.cache.communities[cid].activeChallenge = newChallenge;
+
+        App.ui.toast(isEdit ? "Desafío actualizado" : "¡Desafío lanzado!", "success");
+        App.community.closeChallengeModal();
+
+        // Reload community to show new challenge
+        const hash = window.location.hash.split('/');
+        const tab = hash[2] || 'inicio';
+        App.renderCommunity(cid, tab);
+
+    } catch (e) {
+        console.error(e);
+        App.ui.toast("Error al guardar desafío", "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Lanzar Desafío';
+    }
+};
+
+App.community.voteChallenge = async (cid, chId, optionIndex) => {
+    const user = App.state.currentUser;
+    if (!user) return App.ui.toast("Inicia sesión para votar", "error");
+
+    try {
+        // Optimistic UI update
+        const card = document.getElementById(`challenge-${chId}`);
+        if (card) {
+            card.style.opacity = '0.7';
+            card.style.pointerEvents = 'none';
+        }
+
+        // Get fresh data from Firestore
+        const docRef = window.F.doc(window.F.db, "communities", cid);
+        const snap = await window.F.getDoc(docRef);
+
+        if (!snap.exists()) throw new Error("Comunidad no encontrada");
+
+        const data = snap.data();
+        const challenge = data.activeChallenge;
+
+        if (!challenge || challenge.id !== chId) {
+            App.ui.toast("El desafío ha cambiado", "info");
+            const hash = window.location.hash.split('/');
+            App.renderCommunity(cid, hash[2] || 'inicio');
+            return;
+        }
+
+        // Check if already voted
+        if (challenge.votes && challenge.votes[user.uid] !== undefined) {
+            App.ui.toast("Ya habías votado", "info");
+            const hash = window.location.hash.split('/');
+            App.renderCommunity(cid, hash[2] || 'inicio');
+            return;
+        }
+
+        // Prepare vote data
+        const currentStats = challenge.stats || new Array(challenge.options?.length || 3).fill(0);
+        const newStats = [...currentStats];
+        newStats[optionIndex] = (newStats[optionIndex] || 0) + 1;
+        const newTotal = (challenge.totalVotes || 0) + 1;
+
+        // Write to Firestore
+        await window.F.updateDoc(docRef, {
+            [`activeChallenge.votes.${user.uid}`]: optionIndex,
+            [`activeChallenge.stats`]: newStats,
+            [`activeChallenge.totalVotes`]: newTotal
+        });
+
+        // Update local cache
+        if (App.state.cache.communities[cid] && App.state.cache.communities[cid].activeChallenge) {
+            App.state.cache.communities[cid].activeChallenge.votes[user.uid] = optionIndex;
+            App.state.cache.communities[cid].activeChallenge.stats = newStats;
+            App.state.cache.communities[cid].activeChallenge.totalVotes = newTotal;
+        }
+
+        App.ui.toast("¡Voto registrado!", "success");
+
+        // Reload to show results
+        const hash = window.location.hash.split('/');
+        App.renderCommunity(cid, hash[2] || 'inicio');
+
+    } catch (e) {
+        console.error("Error al votar:", e);
+        App.ui.toast("No se pudo registrar el voto", "error");
+        const hash = window.location.hash.split('/');
+        App.renderCommunity(cid, hash[2] || 'inicio');
+    }
+};
+
+App.community.archiveChallenge = async (cid) => {
+    if (!confirm("¿Archivar este desafío?")) return;
+    try {
+        const docRef = window.F.doc(window.F.db, "communities", cid);
+        const snap = await window.F.getDoc(docRef);
+        if (snap.exists() && snap.data().activeChallenge) {
+            const ch = snap.data().activeChallenge;
+            ch.archived = true;
+            await window.F.updateDoc(docRef, { activeChallenge: ch });
+
+            if (App.state.cache.communities[cid]) App.state.cache.communities[cid].activeChallenge = ch;
+            App.ui.toast("Desafío archivado", "success");
+            const hash = window.location.hash.split('/');
+            App.renderCommunity(cid, hash[2] || 'inicio');
+        }
+    } catch (e) {
+        console.error(e);
+        App.ui.toast("Error al archivar", "error");
+    }
+};
 
 App.community.saveLiveConfig = async () => {
     const cid = document.getElementById('live-cid').value;
@@ -815,4 +1172,164 @@ function _initTrialCountdown(endIso) {
     };
     update();
     window.trialInterval = setInterval(update, 1000);
+}
+
+// ============================================================================
+// CHALLENGE HELPERS
+// ============================================================================
+
+window.App.community.timers = window.App.community.timers || {};
+
+function _isChallengeActive(ch) {
+    if (!ch || ch.archived) return false;
+    const expiry = new Date(ch.expiresAt);
+    const now = new Date();
+    if (isNaN(expiry.getTime())) return false;
+    // Activo si no ha expirado O si expiró hace menos de 24 horas (para ver resultados)
+    const diffHours = (now - expiry) / 36e5;
+    return expiry > now || diffHours < 24;
+}
+
+function _initChallengeTimer(expiresAt, chId) {
+    const elId = `timer-${chId}`;
+    if (!expiresAt) return;
+
+    if (window.App.community.timers[chId]) clearInterval(window.App.community.timers[chId]);
+
+    const update = () => {
+        const timerEl = document.getElementById(elId);
+        if (!timerEl) {
+            clearInterval(window.App.community.timers[chId]);
+            return;
+        }
+
+        const expiry = new Date(expiresAt).getTime();
+        const diff = expiry - Date.now();
+
+        if (diff <= 0) {
+            timerEl.innerText = "FIN";
+            clearInterval(window.App.community.timers[chId]);
+            return;
+        }
+
+        const h = Math.floor(diff / 36e5);
+        const m = Math.floor((diff % 36e5) / 6e4);
+        const s = Math.floor((diff % 6e4) / 1e3);
+        timerEl.innerText = `${h}h ${m}m ${s}s`;
+    };
+
+    update();
+    window.App.community.timers[chId] = setInterval(update, 1000);
+}
+
+function _renderChallengeCard(challenge, user, cid) {
+    const t = (challenge.topic || '').toLowerCase();
+    let theme = { gradient: 'from-[#1890ff] via-blue-600 to-indigo-600', icon: 'fa-code', text: 'text-white' };
+
+    if (t.includes('sql')) theme = { gradient: 'from-red-500 via-red-600 to-rose-600', icon: 'fa-database', text: 'text-white' };
+    else if (t.includes('python')) theme = { gradient: 'from-amber-400 via-amber-500 to-yellow-500', icon: 'fa-brands fa-python', text: 'text-slate-900' };
+    else if (t.includes('excel')) theme = { gradient: 'from-emerald-500 via-green-600 to-teal-600', icon: 'fa-file-excel', text: 'text-white' };
+    else if (t.includes('bi')) theme = { gradient: 'from-yellow-500 via-orange-500 to-orange-600', icon: 'fa-chart-bar', text: 'text-white' };
+    else if (t.includes('ai') || t.includes('ml') || t.includes('machine')) theme = { gradient: 'from-violet-500 via-purple-600 to-indigo-600', icon: 'fa-brain', text: 'text-white' };
+
+    let hasVoted = false;
+    let userVoteIdx = -1;
+    if (challenge.votes && challenge.votes[user.uid] !== undefined) {
+        hasVoted = true;
+        userVoteIdx = challenge.votes[user.uid];
+    }
+
+    const isExpired = new Date() > new Date(challenge.expiresAt);
+    const totalVotes = challenge.totalVotes || 0;
+    const isAdmin = user.role === 'admin';
+    const textColor = theme.text;
+
+    return `
+    <div class="relative bg-white dark:bg-[#0f172a] rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden group animate-slide-up mb-6 challenge-card" id="challenge-${challenge.id}">
+        <!-- Header -->
+        <div class="bg-gradient-to-r ${theme.gradient} p-5 relative overflow-hidden">
+            <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+            <div class="flex justify-between items-start relative z-10">
+                <div class="flex gap-4 items-center">
+                    <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-white/20 ${textColor}">
+                        <i class="fas ${theme.icon}"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 mb-0.5">
+                            <span class="bg-black/20 backdrop-blur px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border border-white/10 ${textColor}">
+                                ${challenge.topic || 'Desafío'}
+                            </span>
+                        </div>
+                        <h2 class="font-heading font-bold text-lg leading-tight ${textColor} text-shadow-sm">
+                            ${isExpired ? 'Resultados Finales' : 'Desafío en Curso'}
+                        </h2>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    ${isAdmin && !isExpired ? `<button onclick="App.community.archiveChallenge('${cid}')" class="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-red-500/50 transition-colors" title="Archivar"><i class="fas fa-times ${textColor} text-sm"></i></button>` : ''}
+                    <div class="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 flex flex-col items-center min-w-[70px]">
+                        <span class="text-[8px] uppercase tracking-widest ${textColor} opacity-80 mb-0.5 font-bold">Tiempo</span>
+                        <span id="timer-${challenge.id}" class="font-mono font-bold text-sm leading-none tracking-tight ${textColor}">${isExpired ? 'FIN' : '...'}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6">
+            <h3 class="text-xl font-heading font-bold text-slate-900 dark:text-white mb-6 leading-snug">
+                ${challenge.question}
+            </h3>
+
+            <div class="space-y-3">
+                ${(challenge.options || []).map((opt, idx) => {
+        const showResult = hasVoted || isExpired;
+        const percent = totalVotes > 0 ? Math.round((challenge.stats[idx] / totalVotes) * 100) : 0;
+        const isCorrect = idx === challenge.correctIndex;
+        const isUserVote = hasVoted && userVoteIdx === idx;
+
+        if (!showResult) {
+            return `
+                        <button onclick="App.community.voteChallenge('${cid}', '${challenge.id}', ${idx})" 
+                            class="w-full text-left p-4 rounded-xl border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-[#1890ff] dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all group/opt relative overflow-hidden shadow-sm active:scale-[0.99]">
+                            <span class="relative z-10 font-bold text-slate-700 dark:text-slate-200 text-sm pl-2 border-l-4 border-transparent group-hover/opt:border-[#1890ff] block transition-colors">${opt}</span>
+                        </button>`;
+        } else {
+            const barColor = isCorrect
+                ? 'bg-emerald-500'
+                : (isUserVote && !isCorrect ? 'bg-red-400' : 'bg-slate-200 dark:bg-slate-700');
+            const borderColor = isCorrect
+                ? 'border-emerald-500'
+                : (isUserVote ? 'border-blue-500' : 'border-slate-100 dark:border-slate-800');
+
+            return `
+                        <div class="w-full p-4 rounded-xl border-2 ${borderColor} bg-white dark:bg-slate-900 relative overflow-hidden">
+                            <div class="absolute inset-0 ${barColor} opacity-20" style="width: ${percent}%"></div>
+                            <div class="relative z-10 flex justify-between items-center">
+                                <span class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                                    ${opt}
+                                    ${isCorrect ? '<i class="fas fa-check-circle text-emerald-500"></i>' : ''}
+                                    ${isUserVote ? '<span class="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold">TU VOTO</span>' : ''}
+                                </span>
+                                <span class="font-bold text-sm ${isCorrect ? 'text-emerald-600' : 'text-slate-500'}">${percent}%</span>
+                            </div>
+                        </div>`;
+        }
+    }).join('')}
+            </div>
+
+            ${(hasVoted || isExpired) && challenge.explanation ? `
+            <div class="mt-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                <p class="text-sm text-emerald-800 dark:text-emerald-200 font-medium">
+                    <i class="fas fa-lightbulb mr-2"></i>${challenge.explanation}
+                </p>
+            </div>` : ''}
+
+            <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-xs text-slate-500">
+                <span><i class="fas fa-users mr-1"></i>${totalVotes} voto${totalVotes !== 1 ? 's' : ''}</span>
+                ${isExpired ? '<span class="text-amber-600 font-bold">Desafío finalizado</span>' : ''}
+            </div>
+        </div>
+    </div>`;
 }

@@ -9,7 +9,6 @@
 
 window.App = window.App || {};
 window.App.ai = window.App.ai || {};
-console.log("DEBUG: ai.views.js START execution");
 
 // ============================================================================
 // 0. ESTADO & CONFIGURACIÓN
@@ -116,30 +115,25 @@ window.App.ai.render = async (container, conversationId = null) => {
     // Usar App.state.currentUser que tiene el role de Firestore, no el Firebase Auth user
     const firestoreUser = window.App.state?.currentUser || user;
     const community = window.App.state?.activeCommunity;
-
-    try {
-        if (window.App.permissions && typeof window.App.permissions.canAccessAI === 'function') {
-            const canAccess = window.App.permissions.canAccessAI(firestoreUser, community);
-            if (!canAccess.allowed) {
-                container.innerHTML = `
-                <div class="h-full flex flex-col items-center justify-center text-center p-8 bg-slate-50 dark:bg-[#0f172a]">
-                    <div class="w-24 h-24 bg-white dark:bg-slate-800 rounded-3xl shadow-xl flex items-center justify-center mb-6 animate-scale-in">
-                        <i class="fas fa-lock text-5xl text-amber-500 shadow-sm"></i>
-                    </div>
-                    <h2 class="text-2xl font-bold text-slate-800 dark:text-white mb-2">Acceso Restringido</h2>
-                    <p class="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8 leading-relaxed">${canAccess.reason}</p>
-                    <div class="flex gap-4">
-                        <button onclick="window.history.back()" class="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">Volver</button>
-                        ${community ? `<button onclick="window.location.hash='#community/${community.id}/pricing'" class="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold shadow-lg shadow-amber-500/30 hover:-translate-y-1 transition-transform flex items-center gap-2">
-                            <i class="fas fa-crown"></i> Ver Planes
-                        </button>` : ''}
-                    </div>
-                </div>`;
-                return;
-            }
+    if (window.App.permissions) {
+        const canAccess = window.App.permissions.canAccessAI(firestoreUser, community);
+        if (!canAccess.allowed) {
+            container.innerHTML = `
+            <div class="h-full flex flex-col items-center justify-center text-center p-8 bg-slate-50 dark:bg-[#0f172a]">
+                <div class="w-24 h-24 bg-white dark:bg-slate-800 rounded-3xl shadow-xl flex items-center justify-center mb-6 animate-scale-in">
+                    <i class="fas fa-lock text-5xl text-amber-500 shadow-sm"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 dark:text-white mb-2">Acceso Restringido</h2>
+                <p class="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8 leading-relaxed">${canAccess.reason}</p>
+                <div class="flex gap-4">
+                    <button onclick="window.history.back()" class="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">Volver</button>
+                    ${community ? `<button onclick="window.location.hash='#community/${community.id}/pricing'" class="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold shadow-lg shadow-amber-500/30 hover:-translate-y-1 transition-transform flex items-center gap-2">
+                        <i class="fas fa-crown"></i> Ver Planes
+                    </button>` : ''}
+                </div>
+            </div>`;
+            return;
         }
-    } catch (permError) {
-        console.warn("Error verificando permisos AI, permitiendo acceso por defecto:", permError);
     }
 
     // 2. Inicializar Estructura Global
@@ -176,19 +170,132 @@ window.App.ai.render = async (container, conversationId = null) => {
         window.App.state.cache.aiConversations = [];
     }
 
-    // 5. Render Sidebar (GLOBAL managed by core.js now)
-    // No rendering needed here - avoiding double sidebar
+    // 5. Sidebar ya es provisto por core.js, no necesitamos renderizarlo aquí
 
-    // 6. Construcción del DOM
+    // 6. Construcción del DOM - Sin sidebar ni header duplicados (ya los provee core.js)
     container.innerHTML = `
-    <div class="fixed inset-0 z-0 w-full h-full bg-[#f8f9fa] dark:bg-[#050505] overflow-hidden flex text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 relative group/shell">
+    <div class="relative w-full h-full bg-[#f8f9fa] dark:bg-[#050505] overflow-hidden flex flex-col text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
         
-        <!-- SIDEBAR is now Global (Fixed z-60 from Shell) -->
-
-        <!-- MAIN VIEWPORT (Centered) -->
-        <main id="ai-viewport" class="w-full h-full flex flex-col relative z-0 transition-all duration-300 ml-0 lg:pl-[80px]">
+        <!-- MAIN VIEWPORT -->
+        <main id="ai-viewport" class="w-full h-full flex flex-col relative transition-all duration-300">
             
-            <!-- MODAL DELETE -->
+            <!-- NAVIGATION HEADER (Replicado de community.views.js) -->
+            <div class="w-full bg-white dark:bg-[#0f172a] border-b border-gray-100 dark:border-slate-800">
+                <div class="max-w-[1400px] w-full mx-auto px-4 sm:px-6">
+                    <div class="flex items-center h-[60px] lg:h-[65px] gap-4 lg:gap-6">
+                        <!-- BRANDING -->
+                        <div class="flex items-center gap-3 shrink-0">
+                            <svg viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8 lg:w-9 lg:h-9 text-purple-500">
+                                <path d="M12 3C12 3 14 9 16 11C18 13 22 13 22 13C22 13 18 13 16 15C14 17 12 23 12 23C12 23 10 17 8 15C6 13 2 13 2 13C2 13 6 13 8 11C10 9 12 3 12 3Z" />
+                            </svg>
+                            <span class="hidden sm:block font-bold text-sm text-slate-900 dark:text-white">Asistente AI</span>
+                        </div>
+
+                        <!-- SEPARADOR -->
+                        <div class="h-5 w-px bg-slate-200 dark:bg-slate-700 hidden lg:block shrink-0"></div>
+
+                        <!-- TABS (Desktop) -->
+                        <div class="hidden lg:flex items-center h-full overflow-x-auto custom-scrollbar -mb-px">
+                            <a href="#feed" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-5 transition-all text-sm h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-stream text-xs opacity-70"></i> Muro</a>
+                            <a href="#comunidades" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-5 transition-all text-sm h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-graduation-cap text-xs opacity-70"></i> Aula</a>
+                            <a href="#feed" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-5 transition-all text-sm h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-video text-xs opacity-70"></i> Live</a>
+                            <a href="#chat" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-5 transition-all text-sm h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-comments text-xs opacity-70"></i> Comunidad</a>
+                            <a href="#ai" class="text-[#1890ff] font-bold border-b-2 border-[#1890ff] px-3 py-5 text-sm h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-sparkles text-xs opacity-70"></i> Asistente AI</a>
+                        </div>
+
+                        <!-- SPACER -->
+                        <div class="flex-1"></div>
+
+                        <!-- MOBILE TABS BAR -->
+                        <div class="lg:hidden flex items-center border-t border-gray-100 dark:border-slate-800 -mx-4 sm:-mx-6 px-2 sm:px-4 overflow-x-auto custom-scrollbar">
+                            <a href="#feed" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-5 transition-all text-xs py-3 h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-stream text-xs opacity-70"></i> Muro</a>
+                            <a href="#comunidades" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-5 transition-all text-xs py-3 h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-graduation-cap text-xs opacity-70"></i> Aula</a>
+                            <a href="#feed" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-5 transition-all text-xs py-3 h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-video text-xs opacity-70"></i> Live</a>
+                            <a href="#chat" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium border-b-2 border-transparent px-3 py-5 transition-all text-xs py-3 h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-comments text-xs opacity-70"></i> Chat</a>
+                            <a href="#ai" class="text-[#1890ff] font-bold border-b-2 border-[#1890ff] px-3 py-5 text-xs py-3 h-full flex items-center gap-2 whitespace-nowrap"><i class="fas fa-sparkles text-xs opacity-70"></i> AI</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- FLOATING ACTION BAR WITH LEFT/RIGHT LAYOUT -->
+            <div class="absolute top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-none w-full max-w-4xl px-4">
+                <div class="pointer-events-auto flex items-center justify-between gap-4">
+                    <!-- LEFT: MODEL SELECTOR -->
+                    <div class="relative">
+                        <button onclick="App.ai.toggleModelMenu(event)" id="ai-model-btn" class="flex items-center gap-2 px-3 py-2 rounded-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-white/10 shadow-xl hover:shadow-2xl transition-all text-slate-700 dark:text-slate-200 font-semibold text-xs select-none cursor-pointer">
+                            <img src="${window.App.ai.state.currentModelLogo}" id="ai-model-logo" class="w-4 h-4 object-contain rounded-full shadow-sm bg-white p-0.5" onerror="this.src='https://cdn.shopify.com/s/files/1/0564/3812/8712/files/grok-ai-icon.webp?v=1768942289'">
+                            <span id="ai-model-name" class="hidden sm:inline">${window.App.ai.state.modelName}</span>
+                            <i class="fas fa-chevron-down text-[8px] text-slate-400 transition-transform duration-200" id="ai-model-arrow"></i>
+                        </button>
+                        <div id="ai-model-menu" class="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-[#1a1f2e] rounded-xl shadow-xl border border-slate-100 dark:border-white/5 py-1 hidden animate-scale-in origin-top-left z-[100]">
+${(() => {
+            const user = window.App.state.currentUser;
+            const community = window.App.state.activeCommunity;
+            let availableModels = [];
+            if (window.App.permissions && window.App.permissions.getAvailableAIModels) {
+                availableModels = window.App.permissions.getAvailableAIModels(user, community);
+            } else {
+                availableModels = [{ name: 'Grok 4.1 Fast', modelId: 'x-ai/grok-4.1-fast', tier: 'free', available: true, logo: 'https://cdn.shopify.com/s/files/1/0564/3812/8712/files/grok-ai-icon.webp?v=1768942289' }];
+            }
+            return availableModels.map(m => {
+                const isSelected = window.App.ai.state.modelName === m.name;
+                const action = m.available ? `App.ai.selectModel('${m.name}', '${m.modelId}', '${m.logo}')` : `App.permissions.showUpgradeModal('ai', 'El modelo ${m.name} requiere plan ${m.tier || 'superior'}', '${community?.id || ''}')`;
+                return `<div onclick="${action}" class="px-4 py-3 text-xs font-medium flex items-center justify-between cursor-pointer transition-colors border-b border-gray-50 dark:border-white/5 last:border-0 hover:bg-slate-50 dark:hover:bg-white/5"><div class="flex items-center gap-3 ${!m.available ? 'opacity-50' : ''}"><div class="w-6 h-6 rounded-md flex items-center justify-center bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 shadow-sm overflow-hidden"><img src="${m.logo}" class="w-4 h-4 object-contain ${!m.available ? 'grayscale' : ''}"></div><span class="${isSelected ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-700 dark:text-slate-300'}">${m.name}</span></div>${isSelected ? '<i class="fas fa-check text-indigo-500"></i>' : (m.available ? '' : '<i class="fas fa-lock text-amber-500 text-[10px]"></i>')}</div>`;
+            }).join('');
+        })()}
+                        </div>
+                    </div>
+                    
+                    <!-- RIGHT: FILES + SNIPPETS BUTTONS -->
+                    <div class="flex items-center gap-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/50 dark:border-white/10 shadow-xl rounded-full px-2 py-1.5">
+                        <!-- FILES BUTTON -->
+                        <div class="relative">
+                            <button onclick="App.ai.toggleFilesMenu(event)" id="ai-files-btn" class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center transition-all cursor-pointer relative" title="Archivos">
+                                <i class="fas fa-paperclip text-sm"></i>
+                                <span id="ai-files-badge" class="hidden absolute -top-1 -right-1 bg-indigo-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow">0</span>
+                            </button>
+                            <div id="ai-files-menu" class="hidden absolute top-full right-0 mt-2 w-72 max-h-80 overflow-y-auto bg-white dark:bg-[#1e293b] rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 z-[100] animate-scale-in origin-top-right custom-scrollbar">
+                                <div class="px-3 py-2 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Archivos</span>
+                                    <button onclick="document.getElementById('ai-file-upload').click(); App.ai.toggleFilesMenu()" class="text-[10px] text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1"><i class="fas fa-plus"></i> Adjuntar</button>
+                                </div>
+                                <div id="ai-files-list" class="divide-y divide-gray-100 dark:divide-slate-700/50">
+                                    <p class="px-4 py-3 text-xs text-slate-400 text-center">No hay archivos adjuntos</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- SNIPPETS BUTTON -->
+                        <div class="relative">
+                            <button onclick="App.ai.toggleTopSnippetsMenu(event)" id="ai-top-snippets-btn" class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center transition-all relative cursor-pointer" title="Código">
+                                <i class="fas fa-code text-sm"></i>
+                                <span id="ai-top-snippets-badge" class="hidden absolute -top-1 -right-1 bg-indigo-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow">0</span>
+                            </button>
+                            <div id="ai-top-snippets-menu" class="hidden absolute top-full right-0 mt-2 w-72 max-h-80 overflow-y-auto bg-white dark:bg-[#1e293b] rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 z-[100] animate-scale-in origin-top-right custom-scrollbar">
+                                <div class="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
+                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Código Generado</span>
+                                </div>
+                                <div id="ai-top-snippets-list" class="divide-y divide-gray-100 dark:divide-slate-700/50">
+                                    <p class="px-4 py-3 text-xs text-slate-400 text-center">No hay código generado aún</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- DROP ZONE (solo para drag overlay y modal) -->
+            <div id="ai-drop-zone" class="absolute inset-0 z-40 flex flex-col h-full pointer-events-none">
+                
+                <div id="ai-drag-overlay" class="absolute inset-0 z-50 bg-indigo-600/90 hidden flex-col items-center justify-center backdrop-blur-md transition-opacity opacity-0 pointer-events-auto">
+                    <div class="bg-white p-10 rounded-[2.5rem] shadow-2xl animate-bounce-short text-center transform scale-110">
+                        <i class="fas fa-cloud-upload-alt text-6xl text-indigo-600 mb-6 block mx-auto"></i>
+                        <h3 class="text-3xl font-black text-gray-900 tracking-tight">Suelta tus archivos</h3>
+                    </div>
+                </div>
+
+                <!-- MODAL DELETE -->
                 <div id="ai-delete-modal" class="absolute inset-0 z-[60] bg-black/50 backdrop-blur-sm hidden flex-col items-center justify-center pointer-events-auto transition-opacity opacity-0">
                     <div class="bg-white dark:bg-[#1e293b] p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 border border-slate-200 dark:border-slate-700 transform scale-95 transition-transform duration-200" id="ai-delete-modal-content">
                         <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">¿Eliminar conversación?</h3>
@@ -199,117 +306,36 @@ window.App.ai.render = async (container, conversationId = null) => {
                         </div>
                     </div>
                 </div>
+            </div>
 
                 <!-- SPLIT VIEW -->
-                <!-- [FIX STACKING] z-0 crea contexto de apilamiento para que los hijos z-60 funcionen relativamente -->
-                <div id="ai-split-view" class="flex-1 flex flex-row overflow-hidden relative w-full h-full z-0">
-                    
-                    <!-- LEFT COLUMN (CHAT) -->
-                    <div id="ai-left-column" class="flex-1 flex flex-col min-w-0 h-full relative z-10">
-                        
-                        <!-- TOP BAR (MOVED HERE) -->
-                        <header class="absolute top-0 left-0 w-full flex items-center justify-between px-4 sm:px-6 py-3 z-40 pointer-events-none">
-                            <!-- LEFT: Model Selector -->
-                            <div class="flex items-center gap-3 pointer-events-auto">
-                                <!-- Mobile menu button -->
-                                <button class="lg:hidden p-2 text-slate-500 hover:text-indigo-500 transition-colors rounded-lg hover:bg-white/50 dark:hover:bg-black/30 backdrop-blur-sm" onclick="document.body.classList.toggle('mobile-menu-open')">
-                                    <i class="fas fa-bars text-lg"></i>
-                                </button>
-                                
-                                <!-- MODEL SELECTOR (Floating Pill) -->
-                                <div class="relative">
-                                    <button onclick="App.ai.toggleModelMenu(event)" id="ai-model-btn" class="flex items-center gap-2 px-3 py-2 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/50 dark:border-white/10 shadow-lg hover:shadow-xl transition-all text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm select-none">
-                                        <img src="${window.App.ai.state.currentModelLogo}" id="ai-model-logo" class="w-5 h-5 object-contain rounded-full shadow-sm bg-white p-0.5" onerror="this.src='https://cdn.shopify.com/s/files/1/0564/3812/8712/files/grok-ai-icon.webp?v=1768942289'">
-                                        <span id="ai-model-name" class="hidden sm:inline">${window.App.ai.state.modelName}</span>
-                                        <i class="fas fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200" id="ai-model-arrow"></i>
-                                    </button>
-                                    <!-- MENU DROPDOWN -->
-                                    <div id="ai-model-menu" class="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-[#1a1f2e] rounded-xl shadow-xl border border-slate-100 dark:border-white/5 py-1 hidden animate-scale-in origin-top-left z-50">
-                                        ${(() => {
-            const user = window.App.state.currentUser;
-            const community = window.App.state.activeCommunity;
-            let availableModels = [];
-            if (window.App.permissions && window.App.permissions.getAvailableAIModels) {
-                availableModels = window.App.permissions.getAvailableAIModels(user, community);
-            } else {
-                availableModels = (typeof AI_MODELS !== 'undefined' ? AI_MODELS : [
-                    { name: 'Grok 4.1 Fast', modelId: 'x-ai/grok-4.1-fast', tier: 'free', available: true, logo: 'https://cdn.shopify.com/s/files/1/0564/3812/8712/files/grok-ai-icon.webp?v=1768942289' },
-                    { name: 'Claude 3.5 Sonnet', disabled: true, logo: 'https://anthropic.com/favicon.ico' },
-                    { name: 'Chat GPT 5.2', disabled: true, logo: 'https://openai.com/favicon.ico' }
-                ]).map(m => ({
-                    ...m,
-                    modelId: m.modelId || m.name.toLowerCase().replace(/ /g, '-'),
-                    available: !m.disabled,
-                    logo: m.logo || 'https://cdn.shopify.com/s/files/1/0564/3812/8712/files/grok-ai-icon.webp?v=1768942289'
-                }));
-            }
-            return availableModels.map(m => {
-                const isSelected = window.App.ai.state.modelName === m.name;
-                const action = m.available
-                    ? `App.ai.selectModel('${m.name}', '${m.modelId}', '${m.logo}')`
-                    : `App.permissions.showUpgradeModal('ai', 'El modelo ${m.name} requiere plan ${m.tier || 'superior'}', '${community?.id || ''}')`;
-                return `
-                    <div onclick="${action}" 
-                         class="px-4 py-3 text-xs font-medium flex items-center justify-between cursor-pointer transition-colors border-b border-gray-50 dark:border-white/5 last:border-0 hover:bg-slate-50 dark:hover:bg-white/5 group">
-                        <div class="flex items-center gap-3 ${!m.available ? 'opacity-50' : ''}">
-                            <div class="w-6 h-6 rounded-md flex items-center justify-center bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 shadow-sm overflow-hidden">
-                                <img src="${m.logo}" class="w-4 h-4 object-contain ${!m.available ? 'grayscale' : ''}">
-                            </div>
-                            <span class="${isSelected ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-700 dark:text-slate-300'}">${m.name}</span>
-                        </div>
-                        ${isSelected ? '<i class="fas fa-check text-indigo-500"></i>' : (m.available ? '' : '<i class="fas fa-lock text-amber-500 text-[10px]"></i>')}
-                    </div>`;
-            }).join('');
-        })()}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- RIGHT: Action Buttons (Floating Pills) -->
-                            <div class="flex items-center gap-2 pointer-events-auto">
-                                <button onclick="document.getElementById('ai-file-upload').click()" class="w-9 h-9 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/50 dark:border-white/10 shadow-lg hover:shadow-xl text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center transition-all" title="Adjuntar Archivos"><i class="fas fa-paperclip text-sm"></i></button>
-                                
-                                <div class="relative">
-                                    <button onclick="App.ai.toggleTopSnippetsMenu(event)" id="ai-top-snippets-btn" class="w-9 h-9 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/50 dark:border-white/10 shadow-lg hover:shadow-xl text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center transition-all relative" title="Códigos Generados">
-                                        <i class="fas fa-code text-sm"></i>
-                                        <span id="ai-top-snippets-badge" class="hidden absolute -top-1 -right-1 bg-indigo-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow">0</span>
-                                    </button>
-                                    <div id="ai-top-snippets-menu" class="hidden absolute top-full right-0 mt-2 w-72 max-h-80 overflow-y-auto bg-white dark:bg-[#1e293b] rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 z-[100] animate-scale-in origin-top-right custom-scrollbar">
-                                        <div class="px-3 py-2 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                                            <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Códigos Generados</span>
-                                            <span class="text-[10px] text-slate-400" id="ai-top-snippets-count-label">0 snippets</span>
-                                        </div>
-                                        <div id="ai-top-snippets-list" class="divide-y divide-gray-100 dark:divide-slate-700/50">
-                                            <p class="px-4 py-3 text-xs text-slate-400 text-center">No hay código generado aún</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <button onclick="App.ai.newChat()" class="w-9 h-9 rounded-full bg-emerald-500 hover:bg-emerald-600 shadow-lg hover:shadow-emerald-500/30 text-white flex items-center justify-center transition-all" title="Nuevo Chat"><i class="fas fa-plus text-sm"></i></button>
-                                
-                                <button id="switch-canvas" onclick="App.ai.toggleCanvasPanel(!window.App.ai.state.modes.canvas)" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-200 dark:bg-slate-700 transition-colors">
-                                    <span class="text-[10px] font-bold text-slate-500 dark:text-slate-300">CANVAS</span>
-                                    <div class="w-8 h-4 bg-black/10 dark:bg-white/10 rounded-full relative transition-all">
-                                        <div class="w-4 h-4 bg-white rounded-full shadow-sm absolute top-0 left-0 transition-transform"></div>
-                                    </div>
-                                </button>
-                            </div>
-                        </header>
-
+                <div id="ai-split-view" class="flex-1 flex flex-row overflow-hidden relative w-full h-full">
+                    <div id="ai-left-column" class="flex-1 flex flex-col min-w-0 h-full relative">
                         <!-- SCROLL AREA -->
-                        <div id="ai-scroller" class="flex-1 overflow-y-auto custom-scrollbar scroll-smooth px-3 sm:px-4 pointer-events-auto pb-4 pt-16">
-                            <div id="ai-content" class="w-full max-w-3xl mx-auto min-h-full flex flex-col transition-all duration-300 justify-end pb-10"></div>
+                        <div id="ai-scroller" class="flex-1 overflow-y-auto custom-scrollbar scroll-smooth px-3 sm:px-4 pb-4">
+                            <div id="ai-content" class="w-full max-w-3xl mx-auto min-h-full flex flex-col transition-all duration-300 justify-end pb-10">
+                                <!-- Content -->
+                            </div>
                         </div>
 
                         <!-- INPUT DOCK -->
                         <div class="w-full shrink-0 z-30 pb-4 sm:pb-6 pt-2 bg-gradient-to-t from-[#f8f9fa] dark:from-[#050505] via-[#f8f9fa] dark:via-[#050505] to-transparent transition-all duration-300 pointer-events-auto">
                             <div class="w-full max-w-3xl mx-auto px-3 sm:px-4 relative group/dock">
-                                <button id="scroll-btn" onclick="App.ai.scrollToBottom(true)" class="absolute -top-16 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 hidden animate-bounce hover:scale-110 transition-transform z-10 cursor-pointer"><i class="fas fa-arrow-down text-xs"></i></button>
+                                
+                                <button id="scroll-btn" onclick="App.ai.scrollToBottom(true)" class="absolute -top-16 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 hidden animate-bounce hover:scale-110 transition-transform z-10 cursor-pointer">
+                                    <i class="fas fa-arrow-down text-xs"></i>
+                                </button>
+
                                 <div class="relative flex items-end gap-2 sm:gap-3">
+                                    <!-- GLOW EFFECT -->
                                     <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-[2rem] opacity-0 group-focus-within/dock:opacity-20 transition duration-1000 blur-xl -z-10"></div>
+
+                                    <!-- (+) BTN RETRO -->
                                     <div class="relative z-50 shrink-0">
                                         <button onclick="App.ai.togglePlusMenu(event)" class="w-10 h-10 sm:w-12 sm:h-12 rounded-[1rem] sm:rounded-[1.2rem] bg-white dark:bg-[#151b28] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-white/10 shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 group/plus cursor-pointer">
                                             <i class="fas fa-plus text-base sm:text-lg transition-transform duration-300 group-hover/plus:rotate-90"></i>
                                         </button>
+                                        <!-- MENÚ -->
                                         <div id="ai-plus-menu" class="hidden absolute bottom-full left-0 mb-4 w-64 sm:w-72 bg-white dark:bg-[#151b28] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 p-2 transform origin-bottom-left transition-all duration-200 animate-scale-in flex-col gap-1 overflow-hidden ring-1 ring-black/5">
                                             <div onclick="App.ai.toggleMode('tutor', event)" class="flex items-center justify-between p-3 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer select-none group/option transition-colors">
                                                 <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900/30"><i class="fas fa-graduation-cap"></i></div><div class="flex flex-col"><span class="text-sm font-bold text-slate-700 dark:text-slate-200">Modo Tutor</span><span class="text-[10px] text-slate-400">Explicaciones paso a paso</span></div></div>
@@ -325,6 +351,8 @@ window.App.ai.render = async (container, conversationId = null) => {
                                             </button>
                                         </div>
                                     </div>
+                                    
+                                    <!-- TEXTBOX -->
                                     <div class="flex-1 relative bg-white dark:bg-[#151b28] rounded-[1.2rem] sm:rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 flex flex-col overflow-hidden transition-all duration-300 group/area ring-1 ring-black/5 dark:ring-white/5">
                                         <div id="file-preview-area" class="hidden px-3 sm:px-5 pt-3 sm:pt-4 pb-2 flex gap-3 overflow-x-auto custom-scrollbar border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/20"></div>
                                         <div class="flex items-end pr-2">
@@ -340,28 +368,51 @@ window.App.ai.render = async (container, conversationId = null) => {
                                 <p class="text-center text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-600 mt-2 font-medium opacity-50 select-none">El asistente puede cometer errores. Verifica la información importante.</p>
                             </div>
                         </div>
-                    </div>
+                    </div> <!-- Close Left Col -->
 
                     <!-- RESIZABLE DIVIDER -->
-                    <div id="ai-canvas-divider" class="hidden w-4 h-full bg-transparent hover:bg-indigo-500/10 cursor-col-resize transition-colors z-[60] flex items-center justify-center group/divider shrink-0 relative -ml-2" onmousedown="App.ai.startCanvasResize(event)">
-                        <div class="w-1 h-12 bg-gray-300 dark:bg-slate-600 group-hover/divider:bg-indigo-400 rounded-full transition-colors pointer-events-none"></div>
+                    <div id="ai-canvas-divider" class="hidden w-1.5 h-full bg-transparent hover:bg-indigo-400 dark:hover:bg-indigo-500 cursor-col-resize transition-colors z-[60] flex items-center justify-center group/divider shrink-0 relative"
+                         onmousedown="App.ai.startCanvasResize(event)">
+                        <div class="w-0.5 h-12 bg-gray-300 dark:bg-slate-600 group-hover/divider:bg-white rounded-full transition-colors pointer-events-none"></div>
                     </div>
 
                     <!-- CANVAS PANEL -->
-                    <div id="ai-canvas-panel" class="hidden h-full bg-[#0d1117] flex flex-col transition-all duration-200 z-[60] relative border-l border-slate-800" style="width: 45%;">
+                    <!-- [FIX] z-index alto para estar sobre el header transparente si es necesario, border-l para separar -->
+                    <div id="ai-canvas-panel" class="hidden h-full bg-[#0d1117] flex flex-col transition-all duration-200 z-50 relative border-l border-slate-800" style="width: 45%;">
+                         <!-- TABS HEADER -->
                          <div class="h-10 bg-[#161b22] border-b border-slate-700/50 flex items-center justify-between px-2 shrink-0 select-none">
+                            <!-- TABS -->
                             <div class="flex items-center gap-1 mt-1">
-                                <button onclick="App.ai.switchCanvasTab('code')" id="ai-tab-code" class="px-4 py-2 text-xs font-bold rounded-t-lg transition-all text-white bg-[#0d1117] border-t border-x border-slate-700/50 -mb-px relative z-10"><i class="fas fa-code mr-1.5"></i>Código</button>
-                                <button onclick="App.ai.switchCanvasTab('preview')" id="ai-tab-preview" class="px-4 py-2 text-xs font-medium rounded-t-lg transition-all text-slate-400 hover:text-slate-200 border-t border-x border-transparent"><i class="fas fa-eye mr-1.5"></i>Preview</button>
+                                <button onclick="App.ai.switchCanvasTab('code')" id="ai-tab-code" class="px-4 py-2 text-xs font-bold rounded-t-lg transition-all text-white bg-[#0d1117] border-t border-x border-slate-700/50 -mb-px relative z-10">
+                                    <i class="fas fa-code mr-1.5"></i>Código
+                                </button>
+                                <button onclick="App.ai.switchCanvasTab('preview')" id="ai-tab-preview" class="px-4 py-2 text-xs font-medium rounded-t-lg transition-all text-slate-400 hover:text-slate-200 border-t border-x border-transparent">
+                                    <i class="fas fa-eye mr-1.5"></i>Preview
+                                </button>
                             </div>
+                            <!-- ACTIONS -->
                             <div class="flex items-center gap-2">
-                                 <button onclick="App.ai.extractCanvasToNewTab()" class="text-slate-500 hover:text-indigo-400 transition-colors p-1" title="Abrir en nueva pestaña"><i class="fas fa-external-link-alt text-xs"></i></button>
-                                 <button onclick="App.ai.runCanvasCode()" class="h-6 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 rounded transition-colors font-bold uppercase tracking-wider flex items-center gap-1.5"><i class="fas fa-play"></i> Run</button>
-                                 <button onclick="App.ai.toggleCanvasPanel(false)" class="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-red-400 rounded-md transition-colors cursor-pointer z-50 relative"><i class="fas fa-times"></i></button>
+                                 <button onclick="App.ai.extractCanvasToNewTab()" class="text-slate-500 hover:text-indigo-400 transition-colors p-1" title="Abrir en nueva pestaña">
+                                    <i class="fas fa-external-link-alt text-xs"></i>
+                                 </button>
+                                 <button onclick="App.ai.runCanvasCode()" class="h-6 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 rounded transition-colors font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                    <i class="fas fa-play"></i> Run
+                                 </button>
+                                 <button onclick="App.ai.toggleCanvasPanel(false)" class="w-6 h-6 flex items-center justify-center text-slate-500 hover:text-red-400 rounded-md transition-colors">
+                                    <i class="fas fa-times"></i>
+                                 </button>
                             </div>
                          </div>
-                         <div id="ai-canvas-code-view" class="flex-1 min-h-0 overflow-hidden relative"><div id="ai-monaco-container" class="absolute inset-0 bg-[#0d1117]"></div></div>
-                         <div id="ai-canvas-preview-view" class="hidden flex-1 min-h-0 overflow-hidden bg-white relative"><iframe id="ai-canvas-preview" class="absolute inset-0 w-full h-full border-0" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe></div>
+                         
+                         <!-- CODE VIEW (Monaco) -->
+                         <div id="ai-canvas-code-view" class="flex-1 min-h-0 overflow-hidden relative">
+                             <div id="ai-monaco-container" class="absolute inset-0 bg-[#0d1117]"></div>
+                         </div>
+                         
+                         <!-- PREVIEW VIEW -->
+                         <div id="ai-canvas-preview-view" class="hidden flex-1 min-h-0 overflow-hidden bg-white relative">
+                             <iframe id="ai-canvas-preview" class="absolute inset-0 w-full h-full border-0" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe>
+                         </div>
                     </div>
                 </div> <!-- Close Split View -->
             </div>
@@ -380,12 +431,14 @@ window.App.ai.render = async (container, conversationId = null) => {
 
     App.ai.setupDragAndDrop();
     const scroller = document.getElementById('ai-scroller');
-    scroller.addEventListener('scroll', () => {
-        const isBottom = scroller.scrollHeight - scroller.scrollTop <= scroller.clientHeight + 150;
-        window.App.ai.state.userScrolledUp = !isBottom;
-        const btn = document.getElementById('scroll-btn');
-        if (btn) btn.classList.toggle('hidden', isBottom);
-    });
+    if (scroller) {
+        scroller.addEventListener('scroll', () => {
+            const isBottom = scroller.scrollHeight - scroller.scrollTop <= scroller.clientHeight + 150;
+            window.App.ai.state.userScrolledUp = !isBottom;
+            const btn = document.getElementById('scroll-btn');
+            if (btn) btn.classList.toggle('hidden', isBottom);
+        });
+    }
 
     await App.ai.loadConversation(user.uid, conversationId);
 };
@@ -539,6 +592,98 @@ window.App.ai.toggleMode = (mode, e) => {
     }
 };
 
+// [NEW] Files Menu Toggle
+window.App.ai.toggleFilesMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('ai-files-menu');
+    const isOpen = !menu.classList.contains('hidden');
+
+    if (isOpen) {
+        menu.classList.add('hidden');
+        document.removeEventListener('click', _closeFilesMenuOnClickOutside);
+    } else {
+        // Update list before showing
+        _updateFilesMenuList();
+        menu.classList.remove('hidden');
+        setTimeout(() => document.addEventListener('click', _closeFilesMenuOnClickOutside), 10);
+    }
+};
+
+function _closeFilesMenuOnClickOutside(e) {
+    const menu = document.getElementById('ai-files-menu');
+    const btn = document.getElementById('ai-files-btn');
+    if (menu && !menu.contains(e.target) && btn && !btn.contains(e.target)) {
+        menu.classList.add('hidden');
+        document.removeEventListener('click', _closeFilesMenuOnClickOutside);
+    }
+}
+
+function _updateFilesMenuList() {
+    const list = document.getElementById('ai-files-list');
+    const badge = document.getElementById('ai-files-badge');
+    const files = window.App.ai.state.pendingFiles || [];
+
+    // Update badge
+    if (files.length > 0) {
+        badge.classList.remove('hidden');
+        badge.textContent = files.length;
+    } else {
+        badge.classList.add('hidden');
+    }
+
+    // Update list
+    if (files.length === 0) {
+        list.innerHTML = '<p class="px-4 py-3 text-xs text-slate-400 text-center">No hay archivos adjuntos</p>';
+    } else {
+        list.innerHTML = files.map((f, idx) => `
+            <div class="px-4 py-2.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <i class="fas fa-file text-slate-400 text-xs"></i>
+                    <span class="text-xs text-slate-700 dark:text-slate-300 truncate">${f.file ? f.file.name : 'Archivo'}</span>
+                </div>
+                <button onclick="App.ai.removeFileFromList(${idx})" class="text-red-500 hover:text-red-600 p-1 transition-colors">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+}
+
+window.App.ai.removeFileFromList = (index) => {
+    if (window.App.ai.state.pendingFiles && window.App.ai.state.pendingFiles[index]) {
+        window.App.ai.state.pendingFiles.splice(index, 1);
+        _updateFilesMenuList();
+        // Also update the file preview area
+        if (window.App.ai.renderFilePreviews) {
+            window.App.ai.renderFilePreviews();
+        }
+    }
+};
+
+// [NEW] Top Snippets Menu Toggle
+window.App.ai.toggleTopSnippetsMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('ai-top-snippets-menu');
+    const isOpen = !menu.classList.contains('hidden');
+
+    if (isOpen) {
+        menu.classList.add('hidden');
+        document.removeEventListener('click', _closeTopSnippetsMenuOnClickOutside);
+    } else {
+        menu.classList.remove('hidden');
+        setTimeout(() => document.addEventListener('click', _closeTopSnippetsMenuOnClickOutside), 10);
+    }
+};
+
+function _closeTopSnippetsMenuOnClickOutside(e) {
+    const menu = document.getElementById('ai-top-snippets-menu');
+    const btn = document.getElementById('ai-top-snippets-btn');
+    if (menu && !menu.contains(e.target) && btn && !btn.contains(e.target)) {
+        menu.classList.add('hidden');
+        document.removeEventListener('click', _closeTopSnippetsMenuOnClickOutside);
+    }
+}
+
 window.App.ai.requestDelete = (e, chatId) => {
     e.stopPropagation();
     e.preventDefault();
@@ -566,47 +711,6 @@ window.App.ai.startCanvasResize = (e) => {
 
     document.addEventListener('mousemove', App.ai._handleCanvasResize);
     document.addEventListener('mouseup', App.ai._stopCanvasResize);
-};
-
-window.App.ai._handleCanvasResize = (e) => {
-    if (!window.App.ai._isResizing) return;
-    const splitView = document.getElementById('ai-split-view');
-    if (!splitView) return;
-
-    const totalWidth = splitView.clientWidth;
-    const leftOffset = splitView.getBoundingClientRect().left;
-    const relativeX = e.clientX - leftOffset;
-
-    // Panel derecho: Ancho = Total - MouseX
-    let newWidth = totalWidth - relativeX;
-    let percentage = (newWidth / totalWidth) * 100;
-
-    // Límites (Min 20%, Max 80%)
-    percentage = Math.max(20, Math.min(80, percentage));
-
-    const panel = document.getElementById('ai-canvas-panel');
-    if (panel) {
-        panel.style.width = `${percentage}%`;
-        window.App.ai.state.canvasWidthPercent = percentage;
-    }
-};
-
-window.App.ai._stopCanvasResize = (e) => {
-    window.App.ai._isResizing = false;
-    const splitView = document.getElementById('ai-split-view');
-    if (splitView) splitView.style.userSelect = '';
-
-    // [FIX] Restaurar pointer-events en iframes para permitir interacción
-    const iframes = document.querySelectorAll('iframe');
-    iframes.forEach(iframe => iframe.style.pointerEvents = '');
-
-    document.removeEventListener('mousemove', App.ai._handleCanvasResize);
-    document.removeEventListener('mouseup', App.ai._stopCanvasResize);
-
-    // Relayout Monaco si existe
-    if (typeof _aiCanvasEditorInstance !== 'undefined' && _aiCanvasEditorInstance) {
-        _aiCanvasEditorInstance.layout();
-    }
 };
 
 window.App.ai.closeDeleteModal = () => {
@@ -797,24 +901,6 @@ window.App.ai.loadConversation = async (userId, conversationId) => {
         console.log(`[AI VIEW] Cargando historias de ${conversationId}...`);
         const messages = await App.aiService.getMessages(userId, conversationId);
 
-        // [NUEVO] Cargar Snippets
-        if (App.aiService.getSnippets) {
-            const snippets = await App.aiService.getSnippets(userId, conversationId);
-            window.App.ai.state.codeSnippets = snippets || [];
-
-            // Si hay snippets, actualizar UI
-            if (window.App.ai.state.codeSnippets.length > 0) {
-                const count = window.App.ai.state.codeSnippets.length;
-                const countEl = document.getElementById('ai-snippets-count');
-                const topBadge = document.getElementById('ai-top-snippets-badge');
-
-                if (countEl) { countEl.textContent = count; countEl.classList.remove('hidden'); }
-                if (topBadge) { topBadge.textContent = count; topBadge.classList.remove('hidden'); }
-            }
-        } else {
-            window.App.ai.state.codeSnippets = [];
-        }
-
         if (messages.length === 0) {
             console.warn(`[AI VIEW] Chat vacío o no encontrado: ${conversationId}`);
             _setWelcomeLayout(container);
@@ -935,11 +1021,9 @@ window.App.ai.runCanvasCode = () => {
 
 // [NOTE] setCanvasCode está definido en la sección 7 al final del archivo
 
-// [NOTE] setCanvasCode está definido en la sección 7 al final del archivo
-
-function _renderMessage(role, content, files = [], id = null) {
+function _renderMessage(role, content, files = []) {
     const isUser = role === 'user';
-    const msgId = id || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     let htmlContent = window.marked ? window.marked.parse(content || '') : content.replace(/\n/g, '<br>');
 
     let filesHtml = '';
@@ -971,7 +1055,7 @@ function _renderMessage(role, content, files = [], id = null) {
         // [NUEVO] Botones de Acción para Usuario (Copiar / Editar)
         const encodedContent = encodeURIComponent(content);
         return `
-        <div class="flex flex-col items-end group/msg relative w-full mb-6 pl-10" id="${msgId}">
+        <div class="flex flex-col items-end group/msg relative w-full mb-6 pl-10" id="${id}">
             <div class="bg-[#f4f6f8] dark:bg-[#21262d] text-slate-800 dark:text-slate-200 rounded-[1.3rem] rounded-tr-sm px-5 py-3.5 max-w-full text-[15px] leading-relaxed shadow-sm border border-transparent dark:border-white/5 selection:bg-indigo-500/30 break-words relative z-10 transition-colors">
                 ${filesHtml}
                 <div class="whitespace-pre-wrap">${htmlContent}</div>
@@ -989,7 +1073,7 @@ function _renderMessage(role, content, files = [], id = null) {
         </div>`;
     } else {
         return `
-        <div class="flex items-start gap-4 mb-6 group/ai w-full" id="${msgId}">
+        <div class="flex items-start gap-4 mb-6 group/ai w-full" id="${id}">
             ${grokLogo}
             <div class="flex-1 min-w-0 max-w-full space-y-2 pt-1.5">
                 <div class="prose prose-slate dark:prose-invert max-w-none prose-p:leading-relaxed prose-code:font-mono prose-code:text-sm prose-pre:bg-[#0d1117] prose-pre:rounded-xl prose-pre:border prose-pre:border-white/10 selection:bg-indigo-500/30 text-[15px] text-slate-700 dark:text-slate-300">
@@ -1241,30 +1325,16 @@ window.App.ai.toggleCanvasPanel = async (show) => {
     const panel = document.getElementById('ai-canvas-panel');
     const divider = document.getElementById('ai-canvas-divider');
     const leftCol = document.getElementById('ai-left-column');
-    const switchEl = document.getElementById('switch-canvas');
 
     if (!panel) return;
-
-    window.App.ai.state.modes.canvas = show;
 
     if (show) {
         panel.classList.remove('hidden');
         if (divider) divider.classList.remove('hidden');
 
-        // Check defaults
-        if (!window.App.ai.state.canvasWidthPercent) window.App.ai.state.canvasWidthPercent = 45;
-
         // Ajustar layout
         panel.style.width = `${window.App.ai.state.canvasWidthPercent}%`;
         if (leftCol) leftCol.style.flex = `1 1 ${100 - window.App.ai.state.canvasWidthPercent}%`;
-
-        // Update UI Switch (ON)
-        if (switchEl) {
-            switchEl.classList.remove('bg-slate-200', 'dark:bg-slate-700');
-            switchEl.classList.add('bg-indigo-500');
-            const knob = switchEl.querySelector('div');
-            if (knob) knob.classList.add('translate-x-4');
-        }
 
         // Inicializar Monaco si no existe
         setTimeout(async () => {
@@ -1274,9 +1344,11 @@ window.App.ai.toggleCanvasPanel = async (show) => {
     } else {
         panel.classList.add('hidden');
         if (divider) divider.classList.add('hidden');
-        if (leftCol) leftCol.style.flex = ''; // Reset flex to allow full width
+        if (leftCol) leftCol.style.flex = '';
+        window.App.ai.state.modes.canvas = false;
 
-        // Update UI Switch (OFF)
+        // Sincronizar UI Switch
+        const switchEl = document.getElementById('switch-canvas');
         if (switchEl) {
             switchEl.classList.add('bg-slate-200', 'dark:bg-slate-700');
             switchEl.classList.remove('bg-indigo-500');
@@ -1428,38 +1500,17 @@ window.App.ai.loadSnippet = (index) => {
 
 // Agregar snippet al historial
 window.App.ai.addCodeSnippet = (code, lang = 'javascript') => {
-    // [MEJORA] Intentar extraer nombre de archivo del código (primera línea o comentario)
-    // Patrones: // filename.js, <!-- index.html -->, # script.py
-    let fileName = null;
-    const firstLines = code.split('\n').slice(0, 5).join('\n');
-    const nameMatch = firstLines.match(/(?:\/\/|<!--|#)\s*(?:filename:\s*)?([\w./-]+\.(?:js|html|css|py|sql|json|jsx|tsx|vue|ts|txt|md))/i);
-
-    if (nameMatch) {
-        fileName = nameMatch[1];
-    } else {
-        // Fallback: Nombre genérico con hora
-        fileName = `snippet_${new Date().toLocaleTimeString([], { hour12: false }).replace(/:/g, '')}.${lang === 'python' ? 'py' : lang === 'javascript' ? 'js' : lang}`;
-    }
-
     const snippet = {
         id: Date.now(),
         code: code,
         lang: lang,
-        fileName: fileName,
-        conversationId: window.App.ai.state.currentConversationId, // [FIX] Scope
         timestamp: Date.now()
     };
 
-    // Mantener máximo 10 snippets EN MEMORIA (pero guardar en BD)
+    // Mantener máximo 10 snippets
     window.App.ai.state.codeSnippets.unshift(snippet);
     if (window.App.ai.state.codeSnippets.length > 10) {
         window.App.ai.state.codeSnippets.pop();
-    }
-
-    // [PERSISTENCIA] Guardar en Backend
-    const userId = window.App.state?.currentUser?.uid;
-    if (userId && snippet.conversationId && App.aiService && App.aiService.saveSnippet) {
-        App.aiService.saveSnippet(userId, snippet.conversationId, snippet);
     }
 
     const count = window.App.ai.state.codeSnippets.length;
@@ -1517,9 +1568,7 @@ window.App.ai.setCanvasCode = async (code, lang = 'javascript') => {
 window.App.ai._renderTopSnippetsList = () => {
     const list = document.getElementById('ai-top-snippets-list');
     const countLabel = document.getElementById('ai-top-snippets-count-label');
-    // [FIX] Filtrar por conversación actual
-    const currentId = window.App.ai.state.currentConversationId;
-    const snippets = (window.App.ai.state.codeSnippets || []).filter(s => s.conversationId === currentId);
+    const snippets = window.App.ai.state.codeSnippets || [];
 
     if (!list) return;
 
@@ -1612,31 +1661,6 @@ window.App.ai.loadSnippetFromTop = (index) => {
     if (window.App.ui && window.App.ui.toast) App.ui.toast("Código cargado en Canvas", "success");
 };
 
-// [NUEVO] Toggle Top Snippets Menu
-window.App.ai.toggleTopSnippetsMenu = (e) => {
-    if (e) e.stopPropagation();
-    const menu = document.getElementById('ai-top-snippets-menu');
-    if (!menu) return;
-
-    const isOpen = !menu.classList.contains('hidden');
-    if (isOpen) {
-        menu.classList.add('hidden');
-    } else {
-        // Actualizar lista antes de mostrar
-        if (window.App.ai._renderTopSnippetsList) window.App.ai._renderTopSnippetsList();
-        menu.classList.remove('hidden');
-
-        // Auto close handler
-        const closeHandler = (ev) => {
-            if (!ev.target.closest('#ai-top-snippets-menu') && !ev.target.closest('#ai-top-snippets-btn')) {
-                menu.classList.add('hidden');
-                document.removeEventListener('click', closeHandler);
-            }
-        };
-        setTimeout(() => document.addEventListener('click', closeHandler), 10);
-    }
-};
-
 // ============================================================================
 // 8. CANVAS TABS - CODE/PREVIEW SWITCHING
 // ============================================================================
@@ -1685,41 +1709,24 @@ window.App.ai.switchCanvasTab = (tab) => {
 
 // Actualizar Canvas desde Streaming (Live)
 window.App.ai.updateCanvasFromStream = (fullText) => {
-    // Buscar bloques de código
+    if (!window.App.ai.state.modes.canvas) return;
+
+    // Buscar el último bloque de código completo o parcial
+    // Regex matches: ```lang? [content] (``` or end)
     const matches = [...fullText.matchAll(/```(\w+)?\n([\s\S]*?)(```|$)/g)];
     if (matches.length > 0) {
         const lastMatch = matches[matches.length - 1];
         const lang = lastMatch[1] || 'javascript';
         const code = lastMatch[2];
 
-        // Validar que haya contenido sustancial antes de abrir
-        if (code && code.trim().length > 5) {
+        // Si hay código, actualizar
+        if (code && _aiCanvasEditorInstance) {
+            const model = _aiCanvasEditorInstance.getModel();
+            if (model && model.getValue() !== code) {
+                model.setValue(code);
 
-            // [AUTO-OPEN] Si el canvas está oculto, abrirlo automáticamente
-            const panel = document.getElementById('ai-canvas-panel');
-            if (panel && panel.classList.contains('hidden')) {
-                window.App.ai.state.modes.canvas = true;
-
-                // Actualizar switch UI visualmente
-                const switchEl = document.getElementById('switch-canvas');
-                if (switchEl) {
-                    switchEl.classList.remove('bg-slate-200', 'dark:bg-slate-700');
-                    switchEl.classList.add('bg-indigo-500');
-                    const knob = switchEl.querySelector('div');
-                    if (knob) knob.classList.add('translate-x-4');
-                }
-
-                if (window.App.ai.toggleCanvasPanel) window.App.ai.toggleCanvasPanel(true);
-            }
-
-            // Actualizar contenido del editor en tiempo real
-            if (_aiCanvasEditorInstance) {
-                const model = _aiCanvasEditorInstance.getModel();
-                if (model && model.getValue() !== code) {
-                    model.setValue(code);
-                    // Opcional: Hacer scroll al final si es muy largo
-                    // _aiCanvasEditorInstance.revealLine(model.getLineCount());
-                }
+                // Scroll al final si estamos abajo
+                // Opcional: _aiCanvasEditorInstance.revealLine(model.getLineCount());
             }
         }
     }

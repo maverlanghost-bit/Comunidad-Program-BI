@@ -37,7 +37,7 @@ if (App.state.theme === 'dark') {
 document.body.style.overflow = 'hidden';
 
 // =============================================================================
-// 2. RENDERIZADOR (SHELL LAYOUT ENGINE)
+// 2. RENDERIZADOR (SHELL LAYOUT ENGINE - V70 RESTRUCTURED)
 // =============================================================================
 App.render = (htmlContent) => {
     return new Promise((resolve) => {
@@ -57,66 +57,70 @@ App.render = (htmlContent) => {
             const hash = window.location.hash;
 
             // Definición de Rutas Internas (App Mode)
-            // Estas rutas activan la interfaz con Sidebar y Header
             const internalSections = ['/inicio', '/clases', '/live', '/miembros'];
             const isInternalSection = internalSections.some(sec => hash.includes(sec));
             const isAppMode = hash.includes('/app') || isInternalSection || hash === '#feed' || hash.startsWith('#chat') || hash.startsWith('#ai') || hash.startsWith('#admin') || hash.startsWith('#perfil') || hash.startsWith('#discovery');
 
+            // Detectar rutas especiales
+            const isAIRoute = hash.startsWith('#ai');
+            const isAdminRoute = hash.startsWith('#admin');
+
             if (App.state.currentUser && isAppMode) {
                 document.body.classList.add('app-mode');
 
-                // Determinar contexto para el Sidebar Activo
-                let activeId = 'feed';
-                if (hash.includes('#comunidades/')) activeId = hash.split('/')[1];
-                else if (hash.startsWith('#chat')) activeId = 'chat';
-                else if (hash.startsWith('#ai')) activeId = 'ai';
-                else if (hash.startsWith('#admin')) activeId = 'admin';
-                else if (hash.startsWith('#discovery')) activeId = 'discovery';
+                if (isAIRoute) {
+                    // =====================================================
+                    // LAYOUT AI: Con sidebar lateral (sin header, lo provee ai.views.js)
+                    // =====================================================
+                    const sidebarHTML = App.sidebar.render('ai');
 
-                // Renderizar Sidebar (Delegado al componente Sidebar)
-                const sidebarHTML = App.sidebar.render(activeId);
-
-                // ESTRUCTURA MAESTRA (SHELL)
-                appRoot.innerHTML = `
-                    <div class="flex flex-col h-screen w-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300">
-                        
-                        <!-- Mobile Header Bar (Fixed top) -->
-                        <div class="mobile-header-bar lg:hidden flex items-center gap-3 px-4 h-14 bg-white dark:bg-[#0f172a] border-b border-gray-200 dark:border-slate-800 shrink-0 z-50">
-                            <button 
-                                class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300"
-                                onclick="document.body.classList.toggle('mobile-menu-open')"
-                                aria-label="Toggle Menu">
-                                <i class="fas fa-bars text-lg"></i>
-                            </button>
-                            <a href="#feed" class="flex items-center gap-2">
-                                <div class="w-8 h-8 bg-blue-600/10 dark:bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 text-sm">
-                                    <i class="fas fa-code"></i>
+                    appRoot.innerHTML = `
+                        <div class="flex h-screen w-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300">
+                            <!-- AI Sidebar -->
+                            ${sidebarHTML}
+                            
+                            <!-- Main Area sin header (ai.views.js lo provee) -->
+                            <div id="main-scroll-wrapper" class="flex-1 h-full overflow-hidden relative">
+                                ${htmlContent}
+                            </div>
+                        </div>
+                    `;
+                } else if (isAdminRoute) {
+                    // =====================================================
+                    // LAYOUT ADMIN: Sin sidebar, con header de volver
+                    // =====================================================
+                    appRoot.innerHTML = `
+                        <div class="flex flex-col h-screen w-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300">
+                            <!-- Admin Header con botón volver -->
+                            <header class="h-14 bg-white dark:bg-[#0f172a] border-b border-slate-100 dark:border-slate-800 flex items-center px-4 shrink-0 z-50">
+                                <a href="#feed" class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-all mr-4" title="Volver">
+                                    <i class="fas fa-arrow-left text-sm"></i>
+                                </a>
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-shield-alt text-amber-500"></i>
+                                    <h1 class="text-sm font-bold text-slate-800 dark:text-white">Panel de Administración</h1>
                                 </div>
-                                <span class="font-bold text-slate-800 dark:text-white text-sm">ProgramBI</span>
-                            </a>
-                        </div>
-                        
-                        <!-- Mobile Overlay -->
-                        <div 
-                            class="mobile-overlay" 
-                            onclick="document.body.classList.remove('mobile-menu-open')">
-                        </div>
-                        
-                        <!-- Sidebar (Single render - positioned by CSS for mobile/desktop) -->
-                        ${sidebarHTML}
-                        
-                        <!-- Main Content Area -->
-                        <div class="flex flex-1 overflow-hidden">
-                            <!-- Desktop Sidebar Spacer (takes up space in flex layout) -->
-                            <div id="shell-sidebar" class="hidden lg:block w-[72px] h-full shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"></div>
+                            </header>
                             
                             <!-- Main Content -->
                             <div id="main-scroll-wrapper" class="flex-1 h-full overflow-y-auto overflow-x-hidden relative scroll-smooth custom-scrollbar">
                                 ${htmlContent}
                             </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    // =====================================================
+                    // LAYOUT COMUNIDAD/DASHBOARD: Sin sidebar, solo header superior
+                    // =====================================================
+                    appRoot.innerHTML = `
+                        <div class="flex flex-col h-screen w-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300">
+                            <!-- Main Content (Full width) -->
+                            <div id="main-scroll-wrapper" class="flex-1 h-full overflow-y-auto overflow-x-hidden relative scroll-smooth custom-scrollbar">
+                                ${htmlContent}
+                            </div>
+                        </div>
+                    `;
+                }
             } else {
                 // Layout Landing / Public (Scroll normal o delegado)
                 document.body.classList.remove('app-mode');
@@ -491,32 +495,195 @@ App.search = {
     handleInput: (e) => {
         const term = e.target.value.toLowerCase().trim();
         if (App.search.timeout) clearTimeout(App.search.timeout);
-        if (term.length < 2) { document.getElementById('global-search-results')?.classList.add('hidden'); return; }
+        if (term.length < 2) { App.search.hideResults(); return; }
         App.search.timeout = setTimeout(() => { const results = App.search.execute(term); App.search.renderResults(results); }, 300);
     },
     execute: (term) => {
         const results = [];
+
+        // Buscar comunidades
         Object.values(App.state.cache.communities || {}).forEach(c => {
-            if (c.name.toLowerCase().includes(term)) { results.push({ type: 'community', id: c.id, title: c.name, icon: c.icon, subtitle: `${c.membersCount || 0} miembros` }); }
+            if (c.name.toLowerCase().includes(term) || (c.description && c.description.toLowerCase().includes(term))) {
+                results.push({
+                    type: 'community',
+                    id: c.id,
+                    title: c.name,
+                    icon: c.icon,
+                    logoUrl: c.logoUrl,
+                    subtitle: `${c.membersCount || 0} miembros`,
+                    href: `#comunidades/${c.id}/inicio`
+                });
+            }
+
+            // Buscar cursos dentro de esta comunidad
+            if (c.courses && Array.isArray(c.courses)) {
+                c.courses.forEach(course => {
+                    if (course.title && course.title.toLowerCase().includes(term)) {
+                        results.push({
+                            type: 'course',
+                            id: course.id,
+                            title: course.title,
+                            thumbnail: course.image || course.thumbnail || course.coverUrl,
+                            subtitle: c.name,
+                            communityId: c.id,
+                            classCount: course.classes?.length || 0,
+                            href: `#comunidades/${c.id}/clases/${course.id}`
+                        });
+                    }
+
+                    // Buscar clases dentro de este curso
+                    if (course.classes && Array.isArray(course.classes)) {
+                        course.classes.forEach(cls => {
+                            if (cls.title && cls.title.toLowerCase().includes(term)) {
+                                results.push({
+                                    type: 'class',
+                                    id: cls.id,
+                                    title: cls.title,
+                                    thumbnail: course.image || course.thumbnail || course.coverUrl, // Siempre usar imagen del curso
+                                    courseName: course.title,
+                                    courseId: course.id,
+                                    communityId: c.id,
+                                    communityName: c.name,
+                                    duration: cls.duration,
+                                    href: `#comunidades/${c.id}/clases/${course.id}` // URL del curso (sin lesson param)
+                                });
+                            }
+                        });
+                    }
+                });
+            }
         });
-        return results.slice(0, 6);
+
+        return results.slice(0, 12);
     },
     renderResults: (results) => {
         const container = document.getElementById('global-search-results');
         if (!container) return;
         container.classList.remove('hidden');
-        if (results.length === 0) { container.innerHTML = `<div class="p-4 text-xs text-slate-500 italic text-center">No encontramos coincidencias.</div>`; return; }
-        container.innerHTML = results.map(r => `
-            <div onclick="window.location.hash='#comunidades/${r.id}/app'; document.getElementById('global-search-results').classList.add('hidden')" 
-                 class="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-50 dark:border-slate-700 transition-colors group">
-                <div class="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-[#1890ff] flex items-center justify-center shrink-0">
-                    <i class="fas ${r.icon || 'fa-users'}"></i>
-                </div>
-                <div class="min-w-0">
-                    <p class="text-sm font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-[#1890ff]">${r.title}</p>
-                    <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide truncate">${r.subtitle}</p>
-                </div>
-            </div>`).join('');
+
+        // Agregar listener para cerrar al hacer clic fuera
+        setTimeout(() => {
+            document.addEventListener('click', App.search.handleClickOutside, { once: true });
+        }, 10);
+
+        if (results.length === 0) {
+            container.innerHTML = `
+                <div class="p-8 text-center">
+                    <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                        <i class="fas fa-search text-slate-300 dark:text-slate-600 text-lg"></i>
+                    </div>
+                    <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Sin resultados</p>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Intenta con otra búsqueda</p>
+                </div>`;
+            return;
+        }
+
+        // Agrupar por tipo
+        const communities = results.filter(r => r.type === 'community');
+        const courses = results.filter(r => r.type === 'course');
+        const classes = results.filter(r => r.type === 'class');
+
+        let html = '<div class="max-h-[380px] overflow-y-auto custom-scrollbar">';
+
+        // Cursos - Mostrar primero con tarjetas grandes
+        if (courses.length > 0) {
+            html += `<div class="px-4 py-2 bg-gradient-to-r from-emerald-50 to-transparent dark:from-emerald-900/20 dark:to-transparent border-b border-slate-100 dark:border-slate-800">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <i class="fas fa-book"></i> Cursos
+                </span>
+            </div>`;
+            html += courses.map(r => `
+                <div onclick="App.search.selectResult('${r.href}')" class="flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-all group">
+                    ${r.thumbnail
+                    ? `<img src="${r.thumbnail}" class="w-20 h-12 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0 shadow-sm group-hover:shadow-md transition-shadow">`
+                    : `<div class="w-20 h-12 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shrink-0 shadow-sm">
+                        <i class="fas fa-book text-white text-lg"></i>
+                       </div>`
+                }
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">${r.title}</p>
+                        <p class="text-xs text-slate-400 font-medium truncate mt-0.5 flex items-center gap-2">
+                            <span class="flex items-center gap-1"><i class="fas fa-users text-[9px]"></i>${r.subtitle}</span>
+                            ${r.classCount ? `<span class="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">${r.classCount} clases</span>` : ''}
+                        </p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs text-slate-300 group-hover:text-emerald-500 transition-colors"></i>
+                </div>`).join('');
+        }
+
+        // Clases - Con info del curso
+        if (classes.length > 0) {
+            html += `<div class="px-4 py-2 bg-gradient-to-r from-violet-50 to-transparent dark:from-violet-900/20 dark:to-transparent border-b border-slate-100 dark:border-slate-800">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400 flex items-center gap-1.5">
+                    <i class="fas fa-play-circle"></i> Clases
+                </span>
+            </div>`;
+            html += classes.map(r => `
+                <div onclick="App.search.selectResult('${r.href}')" class="flex items-center gap-4 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-all group">
+                    <div class="relative shrink-0">
+                        ${r.thumbnail
+                    ? `<img src="${r.thumbnail}" class="w-20 h-12 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shadow-sm group-hover:shadow-md transition-shadow">`
+                    : `<div class="w-20 h-12 rounded-lg bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center shadow-sm">
+                            <i class="fas fa-play text-white"></i>
+                           </div>`
+                }
+                        <div class="absolute inset-0 bg-black/20 rounded-lg opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                            <i class="fas fa-play text-white text-xs"></i>
+                        </div>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">${r.title}</p>
+                        <p class="text-xs text-slate-400 font-medium truncate mt-0.5 flex items-center gap-2">
+                            <span class="flex items-center gap-1"><i class="fas fa-book text-[9px]"></i>${r.courseName || 'Curso'}</span>
+                            ${r.duration ? `<span class="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">${r.duration}</span>` : ''}
+                        </p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs text-slate-300 group-hover:text-violet-500 transition-colors"></i>
+                </div>`).join('');
+        }
+
+        // Comunidades
+        if (communities.length > 0) {
+            html += `<div class="px-4 py-2 bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/20 dark:to-transparent border-b border-slate-100 dark:border-slate-800">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                    <i class="fas fa-users"></i> Comunidades
+                </span>
+            </div>`;
+            html += communities.map(r => `
+                <div onclick="App.search.selectResult('${r.href}')" class="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-all group">
+                    ${r.logoUrl
+                    ? `<img src="${r.logoUrl}" class="w-10 h-10 rounded-xl object-contain bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shrink-0">`
+                    : `<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 text-white flex items-center justify-center shrink-0">
+                        <i class="fas ${r.icon || 'fa-users'}"></i>
+                       </div>`
+                }
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-[#1890ff] transition-colors">${r.title}</p>
+                        <p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide truncate">${r.subtitle}</p>
+                    </div>
+                    <i class="fas fa-chevron-right text-xs text-slate-300 group-hover:text-[#1890ff] transition-colors"></i>
+                </div>`).join('');
+        }
+
+        html += '</div>';
+        container.innerHTML = html;
+    },
+    selectResult: (href) => {
+        App.search.hideResults();
+        const input = document.getElementById('header-search-input') || document.getElementById('mobile-search-input');
+        if (input) input.value = '';
+        const overlay = document.getElementById('mobile-search-overlay');
+        if (overlay) overlay.remove();
+        window.location.hash = href;
+    },
+    hideResults: () => {
+        const container = document.getElementById('global-search-results');
+        if (container) container.classList.add('hidden');
+    },
+    handleClickOutside: (e) => {
+        if (!e.target.closest('#header-search-input') && !e.target.closest('#global-search-results') && !e.target.closest('#mobile-search-input')) {
+            App.search.hideResults();
+        }
     }
 };
 
@@ -652,7 +819,7 @@ App.handleRoute = async () => {
                         <p class="text-slate-500 dark:text-slate-400 font-bold text-sm">Conectando Neural Core...</p>
                     </div>
                 </div>
-            `, 'ai');
+            `);
 
             const container = document.getElementById('ai-root');
             const conversationId = args[0] || null;
@@ -695,14 +862,11 @@ App.handleRoute = async () => {
             } catch (e) {
                 console.error("AI Load Error:", e);
                 container.innerHTML = `
-                    <div class="text-center p-10 text-red-500 animate-fade-in bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-200 dark:border-red-800 m-4">
+                    <div class="text-center p-10 text-red-500 animate-fade-in">
                         <i class="fas fa-bug text-4xl mb-4"></i>
-                        <h3 class="font-bold text-lg mb-2">Error de Inicialización Detallado</h3>
-                        <div class="text-left bg-white dark:bg-black/50 p-4 rounded-lg font-mono text-xs overflow-auto max-h-60 mb-4 border border-red-100 dark:border-red-900/50">
-                            <p class="font-bold mb-2">${e.message}</p>
-                            <pre class="whitespace-pre-wrap text-[10px] opacity-75">${e.stack || 'No stack trace'}</pre>
-                        </div>
-                        <button onclick="location.reload()" class="bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-lg font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-sm">Recargar Página</button>
+                        <h3 class="font-bold text-lg mb-2">Error de Inicialización</h3>
+                        <p class="text-sm mb-4">No se pudieron cargar los archivos del Asistente.</p>
+                        <button onclick="location.reload()" class="bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded font-bold text-sm hover:bg-slate-200 transition-colors">Recargar Página</button>
                     </div>`;
             }
             return;

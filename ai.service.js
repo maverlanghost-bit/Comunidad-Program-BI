@@ -16,36 +16,48 @@ window.App.aiService = window.App.aiService || {};
 
 const AI_CONFIG = {
     // 🚀 URL DEL PROXY DE PRODUCCIÓN
-    baseUrl: "https://us-central1-comunidad-program-bi.cloudfunctions.net/aiProxy", 
-    
+    baseUrl: "https://us-central1-comunidad-program-bi.cloudfunctions.net/aiProxy",
+
     // Modelo Rápido y Capaz
-    defaultModel: "x-ai/grok-4.1-fast", 
+    defaultModel: "x-ai/grok-4.1-fast",
     maxContextMessages: 15,
     timeout: 45000 // 45s Timeout
 };
 
 // 🎓 SYSTEM PROMPT: MENTOR DE DATA ANALYTICS
-const SYSTEM_PROMPT = {
-    role: "system",
-    content: `Eres Grok-BI, un Mentor Senior en Data Analytics y Desarrollo de Software.
+// 🎓 SYSTEM PROMPTS
+const PROMPTS = {
+    default: `Eres Grok-BI, un Mentor Senior en Data Analytics y Desarrollo de Software.
     Tu audiencia son estudiantes y profesionales aprendiendo: Excel, Power BI (DAX/M), Python (Pandas/NumPy) y SQL.
 
     TUS OBJETIVOS PEDAGÓGICOS:
     1. Claridad Absoluta: Explica conceptos complejos con analogías sencillas y lenguaje claro.
     2. Código Educativo: Todo código (Python, SQL, DAX) debe estar bien comentado, explicando el "por qué" de cada paso importante.
-    3. Buenas Prácticas: No solo des la solución; enseña la forma más eficiente y profesional de hacerlo (ej: "Mejor usar XLOOKUP que VLOOKUP", "Usa Medidas en lugar de Columnas Calculadas").
-    4. Seguridad: Advierte siempre sobre riesgos (ej: borrar datos en SQL sin WHERE).
+    3. Buenas Prácticas: No solo des la solución; enseña la forma más eficiente y profesional de hacerlo.
+    4. Seguridad: Advierte siempre sobre riesgos.
 
     REGLAS DE FORMATO:
-    - Usa Markdown para estructurar tu respuesta (Negritas para énfasis, Listas para pasos).
-    - Siempre encierra el código en bloques con su lenguaje: \`\`\`python, \`\`\`dax, \`\`\`sql.
-    - Sé conciso pero completo. Evita saludos largos, ve directo al valor.
-    - Si detectas un error en el código del usuario, explícalo con empatía y muestra la corrección.
+    - Usa Markdown para estructurar tu respuesta.
+    - Siempre encierra el código en bloques con su lenguaje.
+    - Sé conciso pero completo.`,
 
-    ESTILO DE PERSONALIDAD:
-    - Profesional, paciente y alentador.
-    - Actúa como un compañero senior que quiere que el usuario triunfe.`
+    tutor: `Modo Tutor Activado. Eres un Profesor Experto que enseña paso a paso.
+    TU OBJETIVO PRINCIPAL: Que el alumno aprenda razonando, no solo copiando código.
+    
+    METODOLOGÍA DE ENSEÑANZA:
+    1. ENFOQUE PASO A PASO: Desglosa problemas complejos en pasos pequeños y manejables.
+    2. MÉTODO SOCRÁTICO: Haz preguntas guía en lugar de dar respuestas directas inmediatamente.
+    3. EXPLICACIÓN PROFUNDA: Detalla el "por qué" y el "cómo" de cada línea de código.
+    4. ANALOGÍAS: Usa ejemplos del mundo real para simplificar conceptos abstractos.
+    
+    Al dar código, explica primero la lógica. Si es un concepto nuevo, defínelo.
+    Fomenta buenas prácticas y pensamiento crítico.`
 };
+
+const _getSystemPrompt = (mode) => ({
+    role: "system",
+    content: mode === 'tutor' ? PROMPTS.tutor : PROMPTS.default
+});
 
 let _activeController = null;
 
@@ -54,10 +66,10 @@ const _updateCacheAndNotify = (conversations) => {
     window.App.state = window.App.state || {};
     window.App.state.cache = window.App.state.cache || {};
     window.App.state.cache.aiConversations = conversations;
-    
+
     // Despachar evento para que el Sidebar se entere
-    window.dispatchEvent(new CustomEvent('app:ai-history-updated', { 
-        detail: conversations 
+    window.dispatchEvent(new CustomEvent('app:ai-history-updated', {
+        detail: conversations
     }));
 };
 
@@ -65,7 +77,17 @@ const _updateCacheAndNotify = (conversations) => {
 // 2. MOTOR DE COMUNICACIÓN (PROXY STREAMING)
 // ============================================================================
 
-App.aiService.streamMessage = async (history, onChunk, onComplete) => {
+App.aiService.streamMessage = async (history, onChunk, onComplete, optionsOrModelId = null) => {
+    // Manejo flexible de argumentos para compatibilidad
+    let options = {};
+    if (typeof optionsOrModelId === 'string') {
+        options = { modelId: optionsOrModelId };
+    } else if (typeof optionsOrModelId === 'object') {
+        options = optionsOrModelId || {};
+    }
+
+    const { modelId, mode } = options;
+
     if (_activeController) {
         _activeController.abort();
         _activeController = null;
@@ -75,7 +97,7 @@ App.aiService.streamMessage = async (history, onChunk, onComplete) => {
     const signal = _activeController.signal;
 
     // Acumulador local para asegurar que tenemos el texto completo al finalizar
-    let accumulatedResponse = ""; 
+    let accumulatedResponse = "";
 
     const timeoutId = setTimeout(() => {
         if (_activeController) _activeController.abort();
@@ -85,26 +107,29 @@ App.aiService.streamMessage = async (history, onChunk, onComplete) => {
         if (!window.F || !window.F.auth || !window.F.auth.currentUser) {
             throw new Error("Debes iniciar sesión para usar la IA.");
         }
-        
+
         const idToken = await window.F.auth.currentUser.getIdToken(false);
 
         const recentHistory = history.slice(-AI_CONFIG.maxContextMessages);
+        const sysPrompt = _getSystemPrompt(mode);
         const messagesPayload = [
-            SYSTEM_PROMPT, 
+            sysPrompt,
             ...recentHistory.map(m => ({
                 role: m.role,
-                content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) 
+                content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
             }))
         ];
+
+        const modelToUse = modelId || AI_CONFIG.defaultModel;
 
         const response = await fetch(AI_CONFIG.baseUrl, {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${idToken}`, 
+                "Authorization": `Bearer ${idToken}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                model: AI_CONFIG.defaultModel,
+                model: modelToUse,
                 messages: messagesPayload,
                 stream: true
             }),
@@ -117,11 +142,11 @@ App.aiService.streamMessage = async (history, onChunk, onComplete) => {
             let errorMsg = `Error Backend (${response.status})`;
             try {
                 errorMsg = await response.text();
-            } catch (e) {}
-            
+            } catch (e) { }
+
             if (response.status === 403) errorMsg = "Sesión inválida. Recarga la página.";
             if (response.status === 500) errorMsg = "El servidor de IA está despertando. Intenta de nuevo en 5 segundos.";
-            
+
             throw new Error(errorMsg);
         }
 
@@ -135,12 +160,12 @@ App.aiService.streamMessage = async (history, onChunk, onComplete) => {
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split("\n");
-            buffer = lines.pop(); 
+            buffer = lines.pop();
 
             for (const line of lines) {
                 const trimmed = line.trim();
                 if (!trimmed || trimmed === "data: [DONE]") continue;
-                
+
                 if (trimmed.startsWith("data: ")) {
                     try {
                         const json = JSON.parse(trimmed.substring(6));
@@ -156,14 +181,14 @@ App.aiService.streamMessage = async (history, onChunk, onComplete) => {
         }
 
         _activeController = null;
-        
+
         // 2. Pasamos el texto COMPLETO al finalizar
-        if (onComplete) onComplete(accumulatedResponse); 
+        if (onComplete) onComplete(accumulatedResponse);
 
     } catch (error) {
         clearTimeout(timeoutId);
         if (error.name === 'AbortError') {
-            if (onComplete) onComplete(null, "abort"); 
+            if (onComplete) onComplete(null, "abort");
         } else {
             console.error("AI Service Error:", error);
             if (onComplete) onComplete(null, error.message || "Error de conexión.");
@@ -188,17 +213,17 @@ App.aiService.stopGeneration = () => {
 App.aiService.getConversations = async (userId) => {
     try {
         if (!window.F || !window.F.db) throw new Error("Firebase no inicializado");
-        
+
         // Sin orderBy para evitar errores de índice
         const q = window.F.query(
             window.F.collection(window.F.db, `users/${userId}/ai_conversations`),
-            window.F.limit(50) 
+            window.F.limit(50)
         );
-        
+
         const snap = await window.F.getDocs(q);
-        
-        const conversations = snap.docs.map(doc => ({ 
-            id: doc.id, 
+
+        const conversations = snap.docs.map(doc => ({
+            id: doc.id,
             ...doc.data(),
             title: doc.data().title || "Conversación sin título",
             preview: doc.data().preview || "..."
@@ -213,13 +238,13 @@ App.aiService.getConversations = async (userId) => {
 
         // Actualizar caché reactiva
         _updateCacheAndNotify(sorted);
-        
+
         return sorted;
 
-    } catch (e) { 
+    } catch (e) {
         console.error("Error fetching conversations:", e);
         _updateCacheAndNotify([]);
-        return []; 
+        return [];
     }
 };
 
@@ -233,10 +258,10 @@ App.aiService.createConversation = async (userId, title = "Nueva Consulta") => {
             model: AI_CONFIG.defaultModel,
             preview: "Iniciando..."
         });
-        
+
         // Refrescar caché
         App.aiService.getConversations(userId);
-        
+
         return docRef.id;
     } catch (e) { throw e; }
 };
@@ -246,22 +271,22 @@ App.aiService.saveMessage = async (userId, conversationId, role, content, files 
     // 1. Validación de seguridad
     if (!conversationId) {
         console.error("❌ ERROR FATAL: Intentando guardar mensaje sin conversationId. Abortando.");
-        return; 
+        return;
     }
 
     try {
         console.log(`💾 [AI SERVICE] Guardando mensaje (${role}) en: ${conversationId}`);
-        
+
         const msgData = {
-            role, 
-            content, 
+            role,
+            content,
             createdAt: new Date().toISOString()
         };
         if (files && files.length > 0) msgData.files = files;
 
         // 2. Guardar en Subcolección
         await window.F.addDoc(
-            window.F.collection(window.F.db, `users/${userId}/ai_conversations/${conversationId}/messages`), 
+            window.F.collection(window.F.db, `users/${userId}/ai_conversations/${conversationId}/messages`),
             msgData
         );
 
@@ -274,11 +299,11 @@ App.aiService.saveMessage = async (userId, conversationId, role, content, files 
             updatedAt: new Date().toISOString(),
             preview: previewText
         });
-        
+
         console.log("✅ [AI SERVICE] Mensaje guardado correctamente.");
 
-    } catch (e) { 
-        console.error("❌ [AI SERVICE] Error guardando mensaje:", e); 
+    } catch (e) {
+        console.error("❌ [AI SERVICE] Error guardando mensaje:", e);
     }
 };
 
@@ -291,11 +316,11 @@ App.aiService.getMessages = async (userId, conversationId) => {
         // Pedimos los datos "crudos" y los ordenamos en memoria.
         // Esto evita que Firebase lance error si falta el índice compuesto.
         const msgsRef = window.F.collection(window.F.db, `users/${userId}/ai_conversations/${conversationId}/messages`);
-        
+
         const snap = await window.F.getDocs(msgsRef);
-        
+
         const msgs = snap.docs.map(doc => doc.data());
-        
+
         // Ordenamiento seguro en Cliente (Más antiguo arriba, más nuevo abajo)
         return msgs.sort((a, b) => {
             const dateA = new Date(a.createdAt || 0);
@@ -303,7 +328,7 @@ App.aiService.getMessages = async (userId, conversationId) => {
             return dateA - dateB;
         });
 
-    } catch (e) { 
+    } catch (e) {
         console.error("Error crítico obteniendo mensajes:", e);
         return [];
     }
@@ -315,17 +340,17 @@ App.aiService.deleteConversation = async (userId, conversationId) => {
     try {
         const docRef = window.F.doc(window.F.db, "users", userId, "ai_conversations", conversationId);
         await window.F.deleteDoc(docRef);
-        
+
         // Actualización Optimista
         if (window.App.state.cache.aiConversations) {
             const filtered = window.App.state.cache.aiConversations.filter(c => c.id !== conversationId);
             _updateCacheAndNotify(filtered);
         }
-        
+
         return true;
-    } catch (e) { 
+    } catch (e) {
         console.error("[AI SERVICE] Error al borrar:", e);
-        return false; 
+        return false;
     }
 };
 
@@ -335,7 +360,7 @@ App.aiService.deleteConversation = async (userId, conversationId) => {
 
 App.aiService.generateTitle = async (text) => {
     if (!text) return "Nueva Consulta";
-    const cleanText = text.replace(/[#*`]/g, '').trim(); 
+    const cleanText = text.replace(/[#*`]/g, '').trim();
     if (cleanText.length < 30) return cleanText;
     return cleanText.split(' ').slice(0, 6).join(' ') + "...";
 };

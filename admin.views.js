@@ -57,7 +57,7 @@ window.App.renderAdmin = async (activeTab = 'overview') => {
     try {
         const userDocRef = window.F.doc(window.F.db, "users", user.uid);
         const userDocSnap = await window.F.getDoc(userDocRef);
-        
+
         if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
             if (userData.role === 'admin') {
@@ -192,7 +192,7 @@ async function _loadAdminCommunities() {
     const container = document.getElementById('admin-content');
     try {
         const communities = await App.api.getCommunities();
-        
+
         if (communities.length === 0) {
             container.innerHTML = `<div class="text-center py-20 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-3xl"><p class="text-slate-500">No hay comunidades creadas.</p><button onclick="App.admin.openCommunityModal()" class="text-[#1890ff] font-bold hover:underline mt-2">Crear la primera</button></div>`;
             return;
@@ -201,17 +201,17 @@ async function _loadAdminCommunities() {
         container.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             ${communities.map(c => {
-                const planCount = c.plans ? c.plans.length : 0;
-                const galleryCount = c.gallery ? c.gallery.length : (c.image ? 1 : 0);
-                
-                return `
+            const planCount = c.plans ? c.plans.length : 0;
+            const galleryCount = c.gallery ? c.gallery.length : (c.image ? 1 : 0);
+
+            return `
                 <div class="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-5 hover:shadow-xl hover:-translate-y-1 transition-all group relative">
                     <div class="flex items-start justify-between mb-4">
                         <div class="w-16 h-16 rounded-xl bg-gray-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-slate-700 relative">
-                            ${c.logoUrl ? `<img src="${c.logoUrl}" class="w-full h-full object-contain p-2">` : 
-                                (c.image ? `<img src="${c.image}" class="w-full h-full object-cover">` : `<i class="fas ${c.icon || 'fa-users'} text-2xl text-slate-400"></i>`)
-                            }
-                            ${galleryCount > 1 ? `<div class="absolute bottom-1 right-1 bg-black/50 text-white text-[9px] px-1.5 rounded-md font-bold backdrop-blur-sm">+${galleryCount-1}</div>` : ''}
+                            ${c.logoUrl ? `<img src="${c.logoUrl}" class="w-full h-full object-contain p-2">` :
+                    (c.image ? `<img src="${c.image}" class="w-full h-full object-cover">` : `<i class="fas ${c.icon || 'fa-users'} text-2xl text-slate-400"></i>`)
+                }
+                            ${galleryCount > 1 ? `<div class="absolute bottom-1 right-1 bg-black/50 text-white text-[9px] px-1.5 rounded-md font-bold backdrop-blur-sm">+${galleryCount - 1}</div>` : ''}
                         </div>
                         <div class="flex gap-2">
                             <button onclick="App.admin.editCommunity('${c.id}')" class="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 transition-colors"><i class="fas fa-pen text-xs"></i></button>
@@ -226,10 +226,10 @@ async function _loadAdminCommunities() {
                         <span class="px-2 py-1 bg-gray-100 dark:bg-slate-800 rounded text-slate-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700"><i class="fas fa-photo-video mr-1"></i> ${galleryCount} Assets</span>
                     </div>
                 </div>`;
-            }).join('')}
+        }).join('')}
         </div>`;
-    } catch (e) { 
-        console.error(e); 
+    } catch (e) {
+        console.error(e);
         container.innerHTML = `<div class="p-8 text-center text-red-500">Error cargando comunidades.</div>`;
     }
 }
@@ -262,7 +262,7 @@ async function _loadAdminUsers() {
     try {
         const snap = await window.F.getDocs(window.F.query(window.F.collection(window.F.db, "users"), window.F.limit(50)));
         const tbody = document.getElementById('users-table-body');
-        
+
         if (snap.empty) {
             tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-500">No hay usuarios registrados.</td></tr>`;
             return;
@@ -274,7 +274,7 @@ async function _loadAdminUsers() {
             <tr class="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
                 <td class="px-6 py-4">
                     <div class="flex items-center gap-3">
-                        ${u.avatar ? `<img src="${u.avatar}" class="w-8 h-8 rounded-full bg-gray-200 object-cover">` : `<div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">${(u.name||'U').charAt(0)}</div>`}
+                        ${u.avatar ? `<img src="${u.avatar}" class="w-8 h-8 rounded-full bg-gray-200 object-cover">` : `<div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">${(u.name || 'U').charAt(0)}</div>`}
                         <div>
                             <p class="font-bold text-slate-900 dark:text-white">${u.name || 'Sin Nombre'}</p>
                             <p class="text-xs text-slate-500 dark:text-slate-400">${u.email}</p>
@@ -292,7 +292,7 @@ async function _loadAdminUsers() {
                 </td>
             </tr>`;
         }).join('');
-    } catch(e) { console.error(e); }
+    } catch (e) { console.error(e); }
 }
 
 async function _loadAdminContent() {
@@ -312,7 +312,7 @@ async function _loadAdminContent() {
         const q = window.F.query(window.F.collection(window.F.db, "posts"), window.F.orderBy("createdAt", "desc"), window.F.limit(50));
         const snap = await window.F.getDocs(q);
         const list = document.getElementById('moderation-list');
-        
+
         if (snap.empty) {
             list.innerHTML = `<div class="p-12 text-center text-slate-500 italic">No hay publicaciones recientes.</div>`;
             return;
@@ -326,7 +326,7 @@ async function _loadAdminContent() {
                     <div class="flex items-center gap-2 mb-2">
                         <span class="font-bold text-sm text-slate-900 dark:text-white">${p.authorName || 'Anónimo'}</span>
                         <span class="text-xs text-slate-400">• ${new Date(p.createdAt).toLocaleDateString()}</span>
-                        <span class="text-[10px] text-slate-400 bg-gray-100 dark:bg-slate-800 px-2 rounded-full font-mono">ID: ${p.id.substring(0,6)}</span>
+                        <span class="text-[10px] text-slate-400 bg-gray-100 dark:bg-slate-800 px-2 rounded-full font-mono">ID: ${p.id.substring(0, 6)}</span>
                     </div>
                     <p class="text-sm text-slate-600 dark:text-slate-300 truncate font-medium">${p.content}</p>
                 </div>
@@ -336,7 +336,7 @@ async function _loadAdminContent() {
                 </div>
             </div>`;
         }).join('');
-    } catch(e) { console.error(e); }
+    } catch (e) { console.error(e); }
 }
 
 // ==========================================
@@ -359,12 +359,12 @@ App.admin.addVariant = () => {
 
     // Agregar al store temporal (Ahora INCLUYE el paymentUrl)
     App.admin.tempVariants.push({ name, price, paymentUrl: link });
-    
+
     // Limpiar inputs
     document.getElementById('var-name').value = '';
     document.getElementById('var-price').value = '';
     document.getElementById('var-link').value = '';
-    
+
     // Renderizar la lista visual
     App.admin.renderVariantsList();
 };
@@ -402,7 +402,7 @@ App.admin.renderVariantsList = () => {
 App.admin.toggleDynamicPricingUI = (enabled) => {
     const dynamicSection = document.getElementById('plan-dynamic-settings');
     const staticSection = document.getElementById('plan-static-pricing');
-    
+
     if (enabled) {
         dynamicSection.classList.remove('hidden');
         staticSection.classList.add('opacity-50', 'pointer-events-none', 'grayscale');
@@ -418,6 +418,13 @@ App.admin.addPlanUnified = () => {
 
     if (!name) return App.ui.toast("Nombre del plan requerido", "warning");
 
+    // Recopilar modelos IA seleccionados
+    const selectedModels = [];
+    document.querySelectorAll('#plan-ai-models input[type="checkbox"]:checked').forEach(cb => {
+        selectedModels.push(cb.value);
+    });
+    if (selectedModels.length === 0) selectedModels.push('grok-fast'); // Default mínimo
+
     let planData = {
         id: 'plan_' + Date.now(),
         name,
@@ -425,14 +432,23 @@ App.admin.addPlanUnified = () => {
         isDynamic: isDynamic,
         // Configuración de Trial (Global para el plan)
         trialDays: parseInt(document.getElementById('plan-trial-days').value) || 0,
-        noCardRequired: document.getElementById('plan-no-card').checked
+        noCardRequired: document.getElementById('plan-no-card').checked,
+        // NUEVO: Restricciones del Plan
+        restrictions: {
+            maxClassesPerCourse: parseInt(document.getElementById('plan-max-classes').value) || -1,
+            maxProfessorMessages: parseInt(document.getElementById('plan-max-messages').value) || -1,
+            allowedAIModels: selectedModels,
+            accessAIAfterTrial: document.getElementById('plan-ai-after-trial').checked,
+            canAccessSuperClass: document.getElementById('plan-super-class').checked,
+            canDownloadContent: document.getElementById('plan-download').checked
+        }
     };
 
     if (isDynamic) {
         if (App.admin.tempVariants.length === 0) {
             return App.ui.toast("Debes agregar al menos una variante en la lista", "error");
         }
-        
+
         planData.dynamicPricing = {
             selectorLabel: document.getElementById('dyn-unit-name').value || 'Selecciona una opción',
             variants: [...App.admin.tempVariants]
@@ -456,7 +472,7 @@ App.admin.addPlanUnified = () => {
         planData.paymentUrlMonthly = urlMonthly;
         planData.priceAnnual = isNaN(priceAnnual) ? null : priceAnnual;
         planData.paymentUrlAnnual = urlAnnual;
-        
+
         // Compatibilidad Legacy
         planData.price = planData.priceMonthly || planData.priceAnnual;
         planData.interval = planData.priceMonthly ? 'month' : 'year';
@@ -464,14 +480,14 @@ App.admin.addPlanUnified = () => {
     }
 
     App.admin.tempPlans.push(planData);
-    
+
     // Limpiar Formulario
     document.getElementById('plan-name').value = '';
     document.getElementById('plan-features').value = '';
     document.getElementById('plan-is-dynamic').checked = false;
     document.getElementById('plan-trial-days').value = '';
     document.getElementById('plan-no-card').checked = false;
-    
+
     // Limpiar Sección Estática
     document.getElementById('plan-price-monthly').value = '';
     document.getElementById('plan-link-monthly').value = '';
@@ -484,6 +500,16 @@ App.admin.addPlanUnified = () => {
     App.admin.renderVariantsList();
     App.admin.toggleDynamicPricingUI(false);
 
+    // Limpiar Restricciones (Resetear a defaults)
+    document.getElementById('plan-max-classes').value = '';
+    document.getElementById('plan-max-messages').value = '';
+    document.querySelectorAll('#plan-ai-models input[type="checkbox"]').forEach((cb, i) => {
+        cb.checked = i === 0; // Solo Grok Fast por defecto
+    });
+    document.getElementById('plan-ai-after-trial').checked = false;
+    document.getElementById('plan-super-class').checked = true;
+    document.getElementById('plan-download').checked = false;
+
     App.admin.renderPlansList();
 };
 
@@ -495,7 +521,7 @@ App.admin.removePlan = (idx) => {
 App.admin.renderPlansList = () => {
     const list = document.getElementById('plans-list');
     if (!list) return;
-    
+
     if (App.admin.tempPlans.length === 0) {
         list.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs italic bg-gray-50 dark:bg-slate-800 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">Sin planes configurados. Agrega uno a la derecha.</div>`;
         return;
@@ -514,10 +540,32 @@ App.admin.renderPlansList = () => {
             const sep = (monthly && annual) ? ' + ' : '';
             details = `<div class="text-xs text-slate-500 font-mono mt-1">${monthly}${sep}${annual}</div>`;
         }
-        
+
         let trialLabel = '';
         if (p.trialDays > 0) {
             trialLabel = `<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold border border-green-200 ml-2">Trial ${p.trialDays}d</span>`;
+        }
+
+        // Badges de restricciones
+        let restrictionBadges = '';
+        if (p.restrictions) {
+            const r = p.restrictions;
+            const badges = [];
+
+            if (r.maxClassesPerCourse > 0) {
+                badges.push(`<span class="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[9px] font-bold">${r.maxClassesPerCourse} clases</span>`);
+            }
+            if (r.maxProfessorMessages > 0) {
+                badges.push(`<span class="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[9px] font-bold">${r.maxProfessorMessages} msgs</span>`);
+            }
+            if (r.allowedAIModels && r.allowedAIModels.length > 0) {
+                const modelsCount = r.allowedAIModels.length;
+                badges.push(`<span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[9px] font-bold">${modelsCount} modelo${modelsCount > 1 ? 's' : ''} IA</span>`);
+            }
+
+            if (badges.length > 0) {
+                restrictionBadges = `<div class="flex flex-wrap gap-1 mt-2">${badges.join('')}</div>`;
+            }
         }
 
         return `
@@ -527,6 +575,7 @@ App.admin.renderPlansList = () => {
                 <button onclick="App.admin.removePlan(${idx})" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fas fa-trash text-xs"></i></button>
             </div>
             ${details}
+            ${restrictionBadges}
         </div>`;
     }).join('');
 };
@@ -534,26 +583,26 @@ App.admin.renderPlansList = () => {
 // --- C. GESTIÓN COMUNIDADES (MODAL) ---
 App.admin.openCommunityModal = () => {
     const m = document.getElementById('community-modal');
-    if(!m) return;
-    
+    if (!m) return;
+
     document.getElementById('modal-title').innerText = "Nueva Comunidad";
     document.getElementById('btn-save-community').innerText = "Crear Comunidad";
-    
+
     // Reset Inputs (Incluyendo Logo y Toggle Título)
-    ['comm-id','comm-name','comm-logo','comm-icon','comm-desc','comm-category'].forEach(id => {
+    ['comm-id', 'comm-name', 'comm-logo', 'comm-icon', 'comm-desc', 'comm-category'].forEach(id => {
         const el = document.getElementById(id);
-        if(el) el.value = '';
+        if (el) el.value = '';
     });
-    
+
     // Default: Mostrar título activado
     const checkTitle = document.getElementById('comm-show-title');
-    if(checkTitle) checkTitle.checked = true;
-    
+    if (checkTitle) checkTitle.checked = true;
+
     // Reset Stores
     App.admin.tempPlans = [];
     App.admin.tempGallery = [];
     App.admin.tempVariants = [];
-    
+
     App.admin.renderGalleryList();
     App.admin.renderPlansList();
     App.admin.renderVariantsList();
@@ -580,10 +629,10 @@ App.admin.editCommunity = async (id) => {
         document.getElementById('comm-icon').value = comm.icon || '';
         document.getElementById('comm-desc').value = comm.description || '';
         document.getElementById('comm-category').value = comm.category || 'General';
-        
+
         // Cargar Toggle Título (Si no existe la propiedad, asumimos true para no romper diseño)
         document.getElementById('comm-show-title').checked = comm.showTitle !== false;
-        
+
         // Cargar Galería
         App.admin.tempGallery = comm.gallery || [];
         if (App.admin.tempGallery.length === 0) {
@@ -597,8 +646,8 @@ App.admin.editCommunity = async (id) => {
         // Compatibilidad Legacy si es necesario
         if (App.admin.tempPlans.length === 0 && comm.priceMonthly) {
             App.admin.tempPlans.push({
-                id: 'legacy_'+Date.now(), name: 'Plan Estándar', 
-                priceMonthly: comm.priceMonthly, 
+                id: 'legacy_' + Date.now(), name: 'Plan Estándar',
+                priceMonthly: comm.priceMonthly,
                 paymentUrlMonthly: comm.paymentUrl || '',
                 price: comm.priceMonthly, interval: 'month'
             });
@@ -618,7 +667,7 @@ App.admin.saveCommunity = async () => {
     const btn = document.getElementById('btn-save-community');
     let id = document.getElementById('comm-id').value;
     const name = document.getElementById('comm-name').value.trim();
-    
+
     if (!name) return App.ui.toast("El nombre es obligatorio", "warning");
 
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Guardando...';
@@ -638,7 +687,7 @@ App.admin.saveCommunity = async () => {
                 btn.disabled = false; btn.innerHTML = "Crear Comunidad";
                 return App.ui.toast(`El nombre "${name}" ya existe.`, "error");
             }
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     }
 
     // 2. PREPARAR DATOS
@@ -666,7 +715,7 @@ App.admin.saveCommunity = async () => {
         videoUrl: App.admin.tempGallery.find(i => i.type === 'video')?.url || '',
         plans: App.admin.tempPlans,
         priceMonthly: minPrice, // Precio de referencia para filtrado
-        isPublic: true, 
+        isPublic: true,
         updatedAt: new Date().toISOString()
     };
 
@@ -685,7 +734,7 @@ App.admin.saveCommunity = async () => {
 };
 
 App.admin.deleteCommunity = async (id) => {
-    if(confirm("⚠️ ¿Estás seguro de eliminar esta comunidad? Esta acción no se puede deshacer.")) {
+    if (confirm("⚠️ ¿Estás seguro de eliminar esta comunidad? Esta acción no se puede deshacer.")) {
         try {
             await window.F.deleteDoc(window.F.doc(window.F.db, "communities", id));
             App.ui.toast("Comunidad eliminada", "success");
@@ -699,13 +748,13 @@ App.admin.deleteCommunity = async (id) => {
 // --- D. GESTOR MULTIMEDIA ---
 App.admin.addMediaItem = () => {
     const url = document.getElementById('media-url').value.trim();
-    const type = document.getElementById('media-type').value; 
-    
+    const type = document.getElementById('media-type').value;
+
     if (!url) return App.ui.toast("Ingresa una URL válida", "warning");
 
     let finalUrl = url;
     if (type === 'video' && url.includes('youtube.com/watch?v=')) {
-        finalUrl = url.split('v=')[1].split('&')[0]; 
+        finalUrl = url.split('v=')[1].split('&')[0];
     }
 
     App.admin.tempGallery.push({ type, url: finalUrl });
@@ -739,10 +788,10 @@ App.admin.renderGalleryList = () => {
 
     list.innerHTML = App.admin.tempGallery.map((item, idx) => `
         <div class="relative group aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700 bg-black">
-            ${item.type === 'image' 
-                ? `<img src="${item.url}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity">` 
-                : `<div class="w-full h-full flex items-center justify-center bg-slate-900 text-red-500"><i class="fab fa-youtube text-3xl"></i></div>`
-            }
+            ${item.type === 'image'
+            ? `<img src="${item.url}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity">`
+            : `<div class="w-full h-full flex items-center justify-center bg-slate-900 text-red-500"><i class="fab fa-youtube text-3xl"></i></div>`
+        }
             <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button onclick="App.admin.moveMediaItem(${idx}, -1)" class="w-8 h-8 rounded-full bg-white text-slate-900 hover:bg-[#1890ff] hover:text-white transition-colors flex items-center justify-center"><i class="fas fa-arrow-left"></i></button>
                 <button onclick="App.admin.removeMediaItem(${idx})" class="w-8 h-8 rounded-full bg-white text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center"><i class="fas fa-trash"></i></button>
@@ -765,7 +814,7 @@ App.admin.savePostEdit = async () => {
     const id = document.getElementById('admin-edit-post-id').value;
     const content = document.getElementById('admin-edit-post-content').value;
     const btn = document.querySelector('#admin-post-edit-modal button:last-child');
-    
+
     btn.innerHTML = 'Guardando...';
     btn.disabled = true;
 
@@ -773,10 +822,10 @@ App.admin.savePostEdit = async () => {
         await App.api.updatePost(id, { content });
         App.ui.toast("Publicación editada correctamente", "success");
         App.admin.closePostEdit();
-        App.renderAdmin('content'); 
-    } catch(e) { 
+        App.renderAdmin('content');
+    } catch (e) {
         console.error(e);
-        App.ui.toast("Error al editar", "error"); 
+        App.ui.toast("Error al editar", "error");
     } finally {
         btn.innerHTML = 'Guardar';
         btn.disabled = false;
@@ -784,14 +833,14 @@ App.admin.savePostEdit = async () => {
 };
 
 App.admin.deletePost = async (postId) => {
-    if(!confirm("⚠️ ¿Eliminar permanentemente?")) return;
-    
+    if (!confirm("⚠️ ¿Eliminar permanentemente?")) return;
+
     try {
         await App.api.deletePost(postId);
         App.ui.toast("Eliminado", "success");
         const el = document.getElementById(`mod-post-${postId}`);
-        if(el) el.remove();
-    } catch(e) { App.ui.toast("Error al eliminar", "error"); }
+        if (el) el.remove();
+    } catch (e) { App.ui.toast("Error al eliminar", "error"); }
 };
 
 // ==========================================
@@ -1008,6 +1057,78 @@ function _renderCommunityModalUnified() {
                                 <div class="flex items-center gap-2 h-full pt-6">
                                     <input type="checkbox" id="plan-no-card" class="accent-green-500 w-4 h-4 cursor-pointer">
                                     <label for="plan-no-card" class="text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer select-none">Sin Tarjeta Requerida</label>
+                                </div>
+                            </div>
+
+                            <!-- SECCIÓN RESTRICCIONES DEL PLAN (NUEVO V2.0) -->
+                            <div class="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-xl border border-amber-200 dark:border-amber-800/30 mb-4">
+                                <h5 class="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase mb-4 flex items-center gap-2">
+                                    <i class="fas fa-lock"></i> Restricciones del Plan
+                                    <span class="text-[9px] font-normal text-amber-500 dark:text-amber-500/70 ml-auto">(-1 = ilimitado)</span>
+                                </h5>
+                                
+                                <!-- Límites numéricos -->
+                                <div class="grid grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Máx. Clases por Curso</label>
+                                        <input type="number" id="plan-max-classes" class="w-full p-2.5 rounded-lg border border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="-1 = ilimitado" value="">
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-0.5 block">Máx. Mensajes Profesor/Mes</label>
+                                        <input type="number" id="plan-max-messages" class="w-full p-2.5 rounded-lg border border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900 text-sm outline-none dark:text-white" placeholder="-1 = ilimitado" value="">
+                                    </div>
+                                </div>
+                                
+                                <!-- Modelos IA Permitidos -->
+                                <div class="mb-4">
+                                    <label class="text-[9px] text-slate-500 uppercase font-bold pl-1 mb-2 block">Modelos IA Permitidos</label>
+                                    <div id="plan-ai-models" class="flex flex-wrap gap-2">
+                                        <label class="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-amber-400 transition-colors">
+                                            <input type="checkbox" value="grok-fast" class="accent-amber-500 w-3.5 h-3.5" checked>
+                                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Grok 4.1 Fast</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-amber-400 transition-colors">
+                                            <input type="checkbox" value="grok-full" class="accent-amber-500 w-3.5 h-3.5">
+                                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Grok 4.1</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-amber-400 transition-colors">
+                                            <input type="checkbox" value="claude" class="accent-amber-500 w-3.5 h-3.5">
+                                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Claude 3.5</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-amber-400 transition-colors">
+                                            <input type="checkbox" value="gpt" class="accent-amber-500 w-3.5 h-3.5">
+                                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Chat GPT 5.2</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-amber-400 transition-colors">
+                                            <input type="checkbox" value="gemini-flash" class="accent-amber-500 w-3.5 h-3.5">
+                                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Gemini 3 Flash</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- Toggles de Acceso -->
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <label class="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-amber-400 transition-colors">
+                                        <input type="checkbox" id="plan-ai-after-trial" class="accent-amber-500 w-4 h-4">
+                                        <div class="flex flex-col">
+                                            <span class="text-xs font-bold text-slate-700 dark:text-slate-300">IA Post-Trial</span>
+                                            <span class="text-[9px] text-slate-400">Acceso IA después del trial</span>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-amber-400 transition-colors">
+                                        <input type="checkbox" id="plan-super-class" class="accent-amber-500 w-4 h-4" checked>
+                                        <div class="flex flex-col">
+                                            <span class="text-xs font-bold text-slate-700 dark:text-slate-300">Super Clase</span>
+                                            <span class="text-[9px] text-slate-400">Modo IDE integrado</span>
+                                        </div>
+                                    </label>
+                                    <label class="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-slate-700 cursor-pointer hover:border-amber-400 transition-colors">
+                                        <input type="checkbox" id="plan-download" class="accent-amber-500 w-4 h-4">
+                                        <div class="flex flex-col">
+                                            <span class="text-xs font-bold text-slate-700 dark:text-slate-300">Descargas</span>
+                                            <span class="text-[9px] text-slate-400">Descargar contenido</span>
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
                             

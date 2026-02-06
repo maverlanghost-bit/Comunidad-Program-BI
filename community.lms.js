@@ -7,6 +7,8 @@
  * - FEATURE: Edición de Clases (Modal para cambiar Título/URL).
  */
 
+console.log("🔄 [LMS] Cargando community.lms.js...");
+
 window.App = window.App || {};
 window.App.lms = window.App.lms || {};
 
@@ -218,15 +220,29 @@ window.App.lms.renderPlayer = (container, community, courseId, user, isAdmin) =>
         const isFirst = idx === 0;
         const isLast = idx === classes.length - 1;
 
+        // VERIFICACIÓN DE ACCESO POR PLAN
+        const accessCheck = window.App.permissions ?
+            window.App.permissions.canAccessClass(user, community, idx) :
+            { allowed: true };
+        const isLocked = !accessCheck.allowed && !isAdmin;
+
         return `
-                                    <div class="relative group">
-                                        <button onclick="App.lms.playClass('${commId}', '${course.id}', '${cls.id}')" id="btn-class-${cls.id}" class="w-full p-3 rounded-xl flex items-start gap-3 text-left hover:bg-gray-50 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-gray-200 dark:hover:border-slate-700">
-                                            <div class="w-6 h-6 rounded flex items-center justify-center shrink-0 text-[10px] font-bold mt-0.5 transition-all ${isCompleted ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}">
-                                                ${isCompleted ? '<i class="fas fa-check"></i>' : (idx + 1)}
+                                    <div class="relative group ${isLocked ? 'opacity-70' : ''}">
+                                        <button onclick="${isLocked
+                ? `App.permissions.showUpgradeModal('class', '${accessCheck.reason || 'Contenido premium'}', '${commId}')`
+                : `App.lms.playClass('${commId}', '${course.id}', '${cls.id}')`}" 
+                                            id="btn-class-${cls.id}" 
+                                            class="w-full p-3 rounded-xl flex items-start gap-3 text-left ${isLocked ? 'cursor-not-allowed' : ''} hover:bg-gray-50 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-gray-200 dark:hover:border-slate-700">
+                                            <div class="w-6 h-6 rounded flex items-center justify-center shrink-0 text-[10px] font-bold mt-0.5 transition-all ${isLocked ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : (isCompleted ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400')}">
+                                                ${isLocked ? '<i class="fas fa-lock"></i>' : (isCompleted ? '<i class="fas fa-check"></i>' : (idx + 1))}
                                             </div>
                                             <div class="min-w-0 flex-1">
-                                                <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-[#1890ff] dark:group-hover:text-white transition-colors line-clamp-1">${cls.title}</h4>
-                                                <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 flex items-center gap-1"><i class="far fa-play-circle"></i> Video</p>
+                                                <h4 class="text-xs font-bold ${isLocked ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-300 group-hover:text-[#1890ff] dark:group-hover:text-white'} transition-colors line-clamp-1">${cls.title}</h4>
+                                                <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 flex items-center gap-1">
+                                                    ${isLocked
+                ? '<i class="fas fa-crown text-amber-500"></i> Premium'
+                : '<i class="far fa-play-circle"></i> Video'}
+                                                </p>
                                             </div>
                                         </button>
                                         
@@ -743,6 +759,18 @@ window.App.lms.playClass = (cid, courseId, classId) => {
     const idx = course.classes.indexOf(cls) + 1;
 
     if (!cls) return;
+
+    // VERIFICACIÓN DE ACCESO POR PLAN
+    const user = App.state.currentUser;
+    if (user.role !== 'admin' && window.App.permissions) {
+        const classIndex = course.classes.indexOf(cls);
+        const accessCheck = window.App.permissions.canAccessClass(user, comm, classIndex);
+        if (!accessCheck.allowed) {
+            window.App.permissions.showUpgradeModal('class', accessCheck.reason, cid);
+            return;
+        }
+    }
+
     _currentClassId = classId;
 
     // Actualizar Textos
@@ -766,7 +794,6 @@ window.App.lms.playClass = (cid, courseId, classId) => {
     }
 
     // Estado del Botón Completar
-    const user = App.state.currentUser;
     const isCompleted = (user.completedModules || []).includes(`${cid}_${classId}`);
 
     if (btn) {
@@ -1175,3 +1202,5 @@ function _renderEditClassModalLocal() {
         </div>
     </div>`;
 }
+
+console.log("✅ [LMS] community.lms.js cargado correctamente. App.lms disponible:", !!window.App.lms);
